@@ -1,9 +1,9 @@
-use crate::shell::{status::Status, Shell};
-use small;
+use super::Status;
+use crate::{shell::Shell, types};
 use std::fs::File;
 
 /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
-pub fn source(shell: &mut Shell<'_>, arguments: &[small::String]) -> Status {
+pub fn source(shell: &mut Shell<'_>, arguments: &[types::Str]) -> Status {
     match arguments.get(1) {
         Some(argument) => {
             if let Ok(file) = File::open(argument.as_str()) {

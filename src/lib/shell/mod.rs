@@ -2,6 +2,7 @@ mod assignments;
 mod colors;
 mod directory_stack;
 mod flow;
+/// The various blocks
 pub mod flow_control;
 mod fork;
 mod fork_function;
@@ -9,17 +10,18 @@ mod job;
 mod pipe_exec;
 mod shell_expand;
 mod signals;
-pub mod status;
+pub(crate) mod sys;
+/// Variables for the shell
 pub mod variables;
 
 pub(crate) use self::job::Job;
 use self::{
     directory_stack::DirectoryStack,
-    flow_control::{Block, BlockError, FunctionError, Statement},
+    flow::BlockError,
+    flow_control::{Block, Function, FunctionError, Statement},
     foreground::ForegroundSignals,
     fork::{Fork, IonResult},
     pipe_exec::foreground,
-    status::*,
     variables::Variables,
 };
 pub use self::{
@@ -28,12 +30,13 @@ pub use self::{
     variables::Value,
 };
 use crate::{
-    builtins::BuiltinMap,
-    lexers::{Key, Primitive},
+    assignments::value_check,
+    builtins::{BuiltinMap, Status},
+    expansion::{pipelines::Pipeline, ExpansionError},
     parser::{
-        assignments::value_check, pipelines::Pipeline, ParseError, StatementError, Terminator,
+        lexers::{Key, Primitive},
+        ParseError, StatementError, Terminator,
     },
-    sys, types,
 };
 use err_derive::Error;
 use itertools::Itertools;
@@ -42,33 +45,57 @@ use std::{
     io::{self, Write},
     ops::{Deref, DerefMut},
     path::Path,
-    process,
     sync::{atomic::Ordering, Arc, Mutex},
     time::SystemTime,
 };
 
+/// Errors from execution
 #[derive(Debug, Error)]
 pub enum IonError {
+    /// The fork failed
     #[error(display = "failed to fork: {}", _0)]
     Fork(#[error(cause)] io::Error),
+    /// Failed to setup capturing for function
+    #[error(display = "error reading stdout of child: {}", _0)]
+    CaptureFailed(#[error(cause)] io::Error),
+    /// The variable/function does not exist
     #[error(display = "element does not exist")]
     DoesNotExist,
+    /// The input is not properly terminated
     #[error(display = "input was not terminated")]
     Unterminated,
+    /// Function execution error
     #[error(display = "function error: {}", _0)]
     Function(#[error(cause)] FunctionError),
+
+    /// Unclosed block
     #[error(display = "unexpected end of script: expected end block for `{}`", _0)]
     UnclosedBlock(String),
+
+    /// Parsing failed
     #[error(display = "syntax error: {}", _0)]
     InvalidSyntax(#[error(cause)] ParseError),
+
+    /// Incorrect order of blocks
     #[error(display = "block error: {}", _0)]
     StatementFlowError(#[error(cause)] BlockError),
+
+    /// Unterminated statement
     #[error(display = "statement error: {}", _0)]
     UnterminatedStatementError(#[error(cause)] StatementError),
-    #[error(display = "Could not exit the current block since it does not exist!")]
+
+    /// Found end without associated block
+    #[error(display = "could not exit the current block since it does not exist!")]
     EmptyBlock,
-    #[error(display = "Could not execute file '{}': {}", _0, _1)]
+    /// Could not execute file
+    #[error(display = "could not execute file '{}': {}", _0, _1)]
     FileExecutionError(String, #[error(cause)] io::Error),
+    /// Failed to run a pipeline
+    #[error(display = "pipeline execution error: {}", _0)]
+    PipelineExecutionError(#[error(cause)] PipelineError),
+    /// Could not properly expand to a pipeline
+    #[error(display = "expansion error: {}", _0)]
+    ExpansionError(#[error(cause)] ExpansionError<IonError>),
 }
 
 impl From<ParseError> for IonError {
@@ -87,10 +114,19 @@ impl From<BlockError> for IonError {
     fn from(cause: BlockError) -> Self { IonError::StatementFlowError(cause) }
 }
 
+impl From<PipelineError> for IonError {
+    fn from(cause: PipelineError) -> Self { IonError::PipelineExecutionError(cause) }
+}
+
 impl From<io::Error> for IonError {
     fn from(cause: io::Error) -> Self { IonError::Fork(cause) }
 }
 
+impl From<ExpansionError<IonError>> for IonError {
+    fn from(cause: ExpansionError<IonError>) -> Self { IonError::ExpansionError(cause) }
+}
+
+/// Options for the shell
 #[derive(Debug, Clone, Hash)]
 pub struct ShellOptions {
     /// Exit from the shell on the first error.
@@ -131,16 +167,15 @@ pub struct Shell<'a> {
     background: Arc<Mutex<Vec<BackgroundProcess>>>,
     /// Used by an interactive session to know when the input is not terminated.
     pub unterminated: bool,
-    /// Set when a signal is received, this will tell the flow control logic to
-    /// abort.
-    break_flow: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<ForegroundSignals>,
-    /// Custom callback to cleanup before exit
-    prep_for_exit: Option<Box<dyn FnMut(&mut Shell<'_>) + 'a>>,
     /// Custom callback for each command call
     on_command: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
+}
+
+impl<'a> Default for Shell<'a> {
+    fn default() -> Self { Self::new() }
 }
 
 impl<'a> Shell<'a> {
@@ -148,18 +183,18 @@ impl<'a> Shell<'a> {
     fn install_signal_handler() {
         extern "C" fn handler(signal: i32) {
             let signal = match signal {
-                sys::SIGINT => signals::SIGINT,
-                sys::SIGHUP => signals::SIGHUP,
-                sys::SIGTERM => signals::SIGTERM,
+                libc::SIGINT => signals::SIGINT,
+                libc::SIGHUP => signals::SIGHUP,
+                libc::SIGTERM => signals::SIGTERM,
                 _ => unreachable!(),
             };
 
             signals::PENDING.store(signal as usize, Ordering::SeqCst);
         }
 
-        let _ = sys::signal(sys::SIGHUP, handler);
-        let _ = sys::signal(sys::SIGINT, handler);
-        let _ = sys::signal(sys::SIGTERM, handler);
+        let _ = sys::signal(libc::SIGHUP, handler);
+        let _ = sys::signal(libc::SIGINT, handler);
+        let _ = sys::signal(libc::SIGTERM, handler);
 
         extern "C" fn sigpipe_handler(signal: i32) {
             let _ = io::stdout().flush();
@@ -167,19 +202,14 @@ impl<'a> Shell<'a> {
             sys::fork_exit(127 + signal);
         }
 
-        let _ = sys::signal(sys::SIGPIPE, sigpipe_handler);
+        let _ = sys::signal(libc::SIGPIPE, sigpipe_handler);
     }
 
-    pub fn binary() -> Self { Self::new(false) }
-
-    pub fn library() -> Self { Self::new(true) }
-
-    pub fn new(is_background_shell: bool) -> Self {
-        Self::with_builtins(BuiltinMap::default().with_shell_dangerous(), is_background_shell)
-    }
+    /// Create a new shell with default settings
+    pub fn new() -> Self { Self::with_builtins(BuiltinMap::default()) }
 
     /// Create a shell with custom builtins
-    pub fn with_builtins(builtins: BuiltinMap<'a>, is_background_shell: bool) -> Self {
+    pub fn with_builtins(builtins: BuiltinMap<'a>) -> Self {
         Self::install_signal_handler();
 
         // This will block SIGTSTP, SIGTTOU, SIGTTIN, and SIGCHLD, which is required
@@ -194,23 +224,23 @@ impl<'a> Shell<'a> {
             previous_job: !0,
             previous_status: Status::SUCCESS,
             opts: ShellOptions {
-                err_exit: false,
-                print_comms: false,
-                no_exec: false,
-                huponexit: false,
-                is_background_shell,
+                err_exit:            false,
+                print_comms:         false,
+                no_exec:             false,
+                huponexit:           false,
+                is_background_shell: true,
             },
             background: Arc::new(Mutex::new(Vec::new())),
-            break_flow: false,
             foreground_signals: Arc::new(ForegroundSignals::new()),
             on_command: None,
-            prep_for_exit: None,
             unterminated: false,
         }
     }
 
+    /// Access the directory stack
     pub fn dir_stack(&self) -> &DirectoryStack { &self.directory_stack }
 
+    /// Mutable access to the directory stack
     pub fn dir_stack_mut(&mut self) -> &mut DirectoryStack { &mut self.directory_stack }
 
     /// Resets the flow control fields to their default values.
@@ -246,7 +276,7 @@ impl<'a> Shell<'a> {
         name: &str,
         args: &[S],
     ) -> Result<Status, IonError> {
-        if let Some(Value::Function(function)) = self.variables.get_ref(name).cloned() {
+        if let Some(Value::Function(function)) = self.variables.get(name).cloned() {
             function.execute(self, args)?;
             Ok(self.previous_status)
         } else {
@@ -282,7 +312,7 @@ impl<'a> Shell<'a> {
             self.on_command(&cmd)?;
         }
 
-        if let Some(block) = self.flow_control.last().map(Statement::short) {
+        if let Some(block) = self.flow_control.last().map(Statement::to_string) {
             self.previous_status = Status::from_exit_code(1);
             Err(IonError::UnclosedBlock(block.into()))
         } else {
@@ -291,10 +321,10 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Result<Status, PipelineError> {
+    pub fn run_pipeline(&mut self, pipeline: Pipeline<'a>) -> Result<Status, IonError> {
         let command_start_time = SystemTime::now();
 
-        pipeline.expand(self);
+        let pipeline = pipeline.expand(self)?;
         // A string representing the command is stored here.
         if self.opts.print_comms {
             eprintln!("> {}", pipeline);
@@ -309,22 +339,28 @@ impl<'a> Shell<'a> {
             if !pipeline.requires_piping() {
                 Ok(main(&pipeline.items[0].job.args, self))
             } else {
-                self.execute_pipeline(pipeline)
+                self.execute_pipeline(pipeline).map_err(Into::into)
             }
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(Value::Function(function)) =
-            self.variables.get_ref(&pipeline.items[0].job.args[0]).cloned()
+            self.variables.get(&pipeline.items[0].job.args[0]).cloned()
         {
             if !pipeline.requires_piping() {
-                function
-                    .execute(self, &pipeline.items[0].job.args)
-                    .map(|_| self.previous_status)
-                    .map_err(Into::into)
+                function.execute(self, &pipeline.items[0].job.args).map(|_| self.previous_status)
             } else {
-                self.execute_pipeline(pipeline)
+                self.execute_pipeline(pipeline).map_err(Into::into)
             }
         } else {
-            self.execute_pipeline(pipeline)
+            self.execute_pipeline(pipeline).map_err(Into::into)
+        };
+
+        let exit_status = match exit_status {
+            Ok(exit_status) => exit_status,
+            Err(IonError::PipelineExecutionError(PipelineError::CommandNotFound(command))) => {
+                self.command_not_found(&command);
+                Status::COULD_NOT_EXEC
+            }
+            Err(err) => return Err(err.into()),
         };
 
         if let Some(ref callback) = self.on_command {
@@ -333,9 +369,14 @@ impl<'a> Shell<'a> {
             }
         }
 
-        exit_status
+        if self.opts.err_exit && !exit_status.is_success() {
+            Err(PipelineError::EarlyExit)?
+        }
+
+        Ok(exit_status)
     }
 
+    /// Get the pid of the last executed job
     pub fn previous_job(&self) -> Option<usize> {
         if self.previous_job == !0 {
             None
@@ -344,24 +385,19 @@ impl<'a> Shell<'a> {
         }
     }
 
-    /// Call the cleanup callback
-    pub fn prep_for_exit(&mut self) {
-        if let Some(mut callback) = self.prep_for_exit.take() {
-            callback(self);
-        }
-    }
-
-    /// Set the callback to call before exiting the shell
-    pub fn set_prep_for_exit(&mut self, callback: Option<Box<dyn FnMut(&mut Shell<'_>) + 'a>>) {
-        self.prep_for_exit = callback;
-    }
-
     /// Set the callback to call on each command
     pub fn set_on_command(
         &mut self,
         callback: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
     ) {
         self.on_command = callback;
+    }
+
+    /// Set the callback to call on each command
+    pub fn on_command_mut(
+        &mut self,
+    ) -> &mut Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>> {
+        &mut self.on_command
     }
 
     /// Get access to the builtins
@@ -400,21 +436,10 @@ impl<'a> Shell<'a> {
         self.background.lock().expect("Could not lock the mutex")
     }
 
-    pub fn suspend(&self) { signals::suspend(0); }
-
     /// Get the last command's return code and/or the code for the error
     pub fn previous_status(&self) -> Status { self.previous_status }
 
-    /// Cleanly exit ion
-    pub fn exit(&mut self) -> ! { self.exit_with_code(self.previous_status) }
-
-    /// Cleanly exit ion with custom code
-    pub fn exit_with_code(&mut self, status: Status) -> ! {
-        self.prep_for_exit();
-        process::exit(status.as_os_code());
-    }
-
-    pub fn assign(&mut self, key: &Key<'_>, value: Value<'a>) -> Result<(), String> {
+    fn assign(&mut self, key: &Key<'_>, value: Value<Function<'a>>) -> Result<(), String> {
         match (&key.kind, &value) {
             (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
                 let index = value_check(self, index_name, index_kind)

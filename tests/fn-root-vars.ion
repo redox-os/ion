@@ -1,0 +1,9 @@
+fn env
+  echo $HOME
+  echo $PROMPT
+  echo $UID
+  echo @CDPATH
+end
+
+env
+

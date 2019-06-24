@@ -1,0 +1,18 @@
+hello
+world
+goodbye
+1
+2
+3
+4
+5
+6
+7
+8
+9
+1
+4
+9
+16
+25
+ion: function error: argument has invalid type: expected int, found value '$num'

@@ -1,6 +1,6 @@
-use small;
+use crate::types;
 
-pub fn check_help(args: &[small::String], man_page: &'static str) -> bool {
+pub fn check_help(args: &[types::Str], man_page: &'static str) -> bool {
     for arg in args {
         if arg == "-h" || arg == "--help" {
             println!("{}", man_page);
@@ -195,20 +195,6 @@ DESCRIPTION
     eval evaluates the given arguments as a command. If more than one argument is given,
     all arguments are joined using a space as a separator."#;
 
-pub const MAN_EXEC: &str = r#"NAME
-    exec - Replace the shell with the given command.
-
-SYNOPSIS
-    exec [-ch] [--help] [command [arguments ...]]
-
-DESCRIPTION
-    Execute <command>, replacing the shell with the specified program.
-    The <arguments> following the command become the arguments to
-    <command>.
-
-OPTIONS
-    -c  Execute command with an empty environment."#;
-
 pub const MAN_SOURCE: &str = r#"NAME
     source - evaluates given file
 
@@ -329,15 +315,6 @@ OPTIONS
     -r  Remove all running jobs from the background process list.
     -h  Specifies that each job supplied will not receive the SIGHUP signal when the shell receives a SIGHUP.
     -a  If no job IDs were supplied, remove all jobs from the background process list."#;
-
-pub const MAN_EXIT: &str = r#"NAME
-    exit - exit the shell
-
-SYNOPSIS
-    exit
-
-DESCRIPTION
-    Makes ion exit. The exit status will be that of the last command executed."#;
 
 pub const MAN_MATCHES: &str = r#"NAME
     matches - checks if the second argument contains any portion of the first.

@@ -1,0 +1,13 @@
+fn demo
+  echo ${super::foo}
+  drop foo
+
+  fn bar
+    super::demo
+  end
+  bar
+end
+
+let foo = bar
+echo $foo
+demo

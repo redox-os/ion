@@ -1,45 +1,46 @@
 //! Contains the binary logic of Ion.
+pub mod builtins;
 mod completer;
 mod designators;
 mod history;
+mod lexer;
 mod prompt;
 mod readln;
 
-use self::{prompt::prompt, readln::readln};
 use ion_shell::{
-    builtins::man_pages,
-    parser::{Expander, Terminator},
-    status::Status,
-    Shell,
+    builtins::{man_pages, Status},
+    expansion::Expander,
+    parser::Terminator,
+    types, Shell,
 };
-use ion_sys::SIGHUP;
 use itertools::Itertools;
+use libc::SIGHUP;
 use liner::{Buffer, Context, KeyBindings};
 use std::{cell::RefCell, fs::OpenOptions, io, io::Write, path::Path, rc::Rc};
 use xdg::BaseDirectories;
 
-pub const MAN_ION: &str = "NAME
-    Ion - The Ion shell
+#[cfg(not(feature = "advanced_arg_parsing"))]
+pub const MAN_ION: &str = r#"Ion - The Ion Shell 1.0.0-alpha
+Ion is a commandline shell created to be a faster and easier to use alternative to the currently available shells. It is
+not POSIX compliant.
 
-SYNOPSIS
-    ion [options] [args...]
+USAGE:
+    ion [FLAGS] [OPTIONS] [args]...
 
-DESCRIPTION
-    Ion is a commandline shell created to be a faster and easier to use alternative to the
-    currently available shells. It is not POSIX compliant.
+FLAGS:
+    -h, --help           Prints help information
+    -i, --interactive    Force interactive mode
+    -n, --no-execute     Do not execute any commands, perform only syntax checking
+    -x                   Print commands before execution
+    -v, --version        Print the version, platform and revision of Ion then exit
 
 OPTIONS:
-    -c <command>        evaluates given commands instead of reading from the commandline.
-
-    -n or --no-execute
-        do not execute any commands, just do syntax checking.
-
-    -v or --version
-        prints the version, platform and revision of ion then exits.
+    -c <command>             Evaluate given commands instead of reading from the commandline
+    -o <key_bindings>        Shortcut layout. Valid options: "vi", "emacs"
 
 ARGS:
-    <args>...    Script arguments (@args). If the -c option is not specified, the first
-                 parameter is taken as a filename to execute";
+    <args>...    Script arguments (@args). If the -c option is not specified, the first parameter is taken as a
+                 filename to execute"#;
 
 pub(crate) const MAN_HISTORY: &str = r#"NAME
     history - print command history
@@ -70,7 +71,7 @@ impl<'a> InteractiveBinary<'a> {
     pub fn new(shell: Shell<'a>) -> Self {
         let mut context = Context::new();
         context.word_divider_fn = Box::new(word_divide);
-        if shell.variables().get_str("HISTFILE_ENABLED") == Some("1".into()) {
+        if shell.variables().get_str("HISTFILE_ENABLED").ok() == Some("1".into()) {
             let path = shell.variables().get_str("HISTFILE").expect("shell didn't set HISTFILE");
             if !Path::new(path.as_str()).exists() {
                 eprintln!("ion: creating history file at \"{}\"", path);
@@ -83,7 +84,12 @@ impl<'a> InteractiveBinary<'a> {
     /// Handles commands given by the REPL, and saves them to history.
     pub fn save_command(&self, cmd: &str) {
         if !cmd.ends_with('/')
-            && self.shell.borrow().tilde(cmd).map_or(false, |path| Path::new(&path).is_dir())
+            && self
+                .shell
+                .borrow()
+                .tilde(cmd)
+                .ok()
+                .map_or(false, |path| Path::new(&path.as_str()).is_dir())
         {
             self.save_command_in_history(&[cmd, "/"].concat());
         } else {
@@ -92,24 +98,12 @@ impl<'a> InteractiveBinary<'a> {
     }
 
     pub fn add_callbacks(&self) {
-        let mut shell = self.shell.borrow_mut();
         let context = self.context.clone();
-        shell.set_prep_for_exit(Some(Box::new(move |shell| {
-            // context will be sent a signal to commit all changes to the history file,
-            // and waiting for the history thread in the background to finish.
-            if shell.opts().huponexit {
-                shell.resume_stopped();
-                shell.background_send(SIGHUP);
-            }
-            context.borrow_mut().history.commit_to_file();
-        })));
-
-        let context = self.context.clone();
-        shell.set_on_command(Some(Box::new(move |shell, elapsed| {
+        self.shell.borrow_mut().set_on_command(Some(Box::new(move |shell, elapsed| {
             // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the
             // pipline just executed to the the file and context histories. At the
             // moment, this means record how long it took.
-            if Some("1".into()) == shell.variables().get_str("RECORD_SUMMARY") {
+            if Some("1".into()) == shell.variables().get_str("RECORD_SUMMARY").ok() {
                 let summary = format!(
                     "#summary# elapsed real time: {}.{:09} seconds",
                     elapsed.as_secs(),
@@ -133,7 +127,30 @@ impl<'a> InteractiveBinary<'a> {
     /// Liner.
     pub fn execute_interactive(self) -> ! {
         let context_bis = self.context.clone();
-        let history = &move |args: &[small::String], _shell: &mut Shell<'_>| -> Status {
+        let prep_for_exit = &move |shell: &mut Shell<'_>| {
+            // context will be sent a signal to commit all changes to the history file,
+            // and waiting for the history thread in the background to finish.
+            if shell.opts().huponexit {
+                shell.resume_stopped();
+                shell.background_send(SIGHUP);
+            }
+            context_bis.borrow_mut().history.commit_to_file();
+        };
+
+        let exit = self.shell.borrow().builtins().get("exit").unwrap();
+        let exit = &|args: &[types::Str], shell: &mut Shell<'_>| -> Status {
+            prep_for_exit(shell);
+            exit(args, shell)
+        };
+
+        let exec = self.shell.borrow().builtins().get("exec").unwrap();
+        let exec = &|args: &[types::Str], shell: &mut Shell<'_>| -> Status {
+            prep_for_exit(shell);
+            exec(args, shell)
+        };
+
+        let context_bis = self.context.clone();
+        let history = &move |args: &[types::Str], _shell: &mut Shell<'_>| -> Status {
             if man_pages::check_help(args, MAN_HISTORY) {
                 return Status::SUCCESS;
             }
@@ -173,7 +190,7 @@ impl<'a> InteractiveBinary<'a> {
         };
 
         let context_bis = self.context.clone();
-        let keybindings = &move |args: &[small::String], _shell: &mut Shell<'_>| -> Status {
+        let keybindings = &move |args: &[types::Str], _shell: &mut Shell<'_>| -> Status {
             match args.get(1).map(|s| s.as_str()) {
                 Some("vi") => {
                     context_bis.borrow_mut().key_bindings = KeyBindings::Vi;
@@ -190,23 +207,23 @@ impl<'a> InteractiveBinary<'a> {
 
         // change the lifetime to allow adding local builtins
         let InteractiveBinary { context, shell } = self;
-        let this = InteractiveBinary { context, shell: RefCell::new(shell.into_inner()) };
+        let mut shell = shell.into_inner();
+        let builtins = shell.builtins_mut();
+        builtins.add("history", history, "Display a log of all commands previously executed");
+        builtins.add("keybindings", keybindings, "Change the keybindings");
+        builtins.add("exit", exit, "Exits the current session");
+        builtins.add("exec", exec, "Replace the shell with the given command.");
 
-        this.shell.borrow_mut().builtins_mut().add(
-            "history",
-            history,
-            "Display a log of all commands previously executed",
-        );
-        this.shell.borrow_mut().builtins_mut().add(
-            "keybindings",
-            keybindings,
-            "Change the keybindings",
-        );
+        Self::exec_init_file(&mut shell);
 
+        InteractiveBinary { context, shell: RefCell::new(shell) }.exec(prep_for_exit)
+    }
+
+    fn exec_init_file(shell: &mut Shell) {
         match BaseDirectories::with_prefix("ion") {
             Ok(base_dirs) => match base_dirs.find_config_file(Self::CONFIG_FILE_NAME) {
                 Some(initrc) => {
-                    if let Err(err) = this.shell.borrow_mut().execute_file(&initrc) {
+                    if let Err(err) = shell.execute_file(&initrc) {
                         eprintln!("ion: {}", err)
                     }
                 }
@@ -220,44 +237,40 @@ impl<'a> InteractiveBinary<'a> {
                 eprintln!("ion: unable to get base directory: {}", err);
             }
         }
+    }
 
+    fn exec<T: Fn(&mut Shell<'_>)>(self, prep_for_exit: &T) -> ! {
         loop {
-            let mut lines = std::iter::repeat_with(|| this.readln())
+            let mut lines = std::iter::repeat_with(|| self.readln(prep_for_exit))
                 .filter_map(|cmd| cmd)
                 .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
             match Terminator::new(&mut lines).terminate() {
                 Some(command) => {
-                    this.shell.borrow_mut().unterminated = false;
                     let cmd: &str = &designators::expand_designators(
-                        &this.context.borrow(),
+                        &self.context.borrow(),
                         command.trim_end(),
                     );
-                    if let Err(why) = this.shell.borrow_mut().on_command(&cmd) {
-                        eprintln!("{}", why);
+                    {
+                        let mut shell = self.shell.borrow_mut();
+                        shell.unterminated = false;
+                        if let Err(why) = shell.on_command(&cmd) {
+                            eprintln!("{}", why);
+                            shell.reset_flow();
+                        }
                     }
-                    this.save_command(&cmd);
+                    self.save_command(&cmd);
                 }
                 None => {
-                    this.shell.borrow_mut().unterminated = true;
+                    self.shell.borrow_mut().unterminated = true;
                 }
             }
         }
     }
 
     /// Set the keybindings of the underlying liner context
-    #[inline]
     pub fn set_keybindings(&mut self, key_bindings: KeyBindings) {
         self.context.borrow_mut().key_bindings = key_bindings;
     }
-
-    /// Ion's interface to Liner's `read_line` method, which handles everything related to
-    /// rendering, controlling, and getting input from the prompt.
-    #[inline]
-    pub fn readln(&self) -> Option<String> { readln(self) }
-
-    /// Generates the prompt that will be used by Liner.
-    #[inline]
-    pub fn prompt(&self) -> String { prompt(&self.shell.borrow_mut()) }
 }
 
 #[derive(Debug)]

@@ -2,10 +2,8 @@
 
 use std::io::{self, Write};
 
-use crate::{
-    shell::{status::Status, variables::Variables},
-    types,
-};
+use super::Status;
+use crate::{shell::variables::Variables, types};
 
 fn print_list(vars: &Variables<'_>) {
     let stdout = io::stdout();
@@ -87,7 +85,7 @@ pub fn drop_alias<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Status
         return Status::error("ion: you must specify an alias name".to_string());
     }
     for alias in args.iter().skip(1) {
-        if vars.remove_variable(alias.as_ref()).is_none() {
+        if vars.remove(alias.as_ref()).is_none() {
             return Status::error(format!("ion: undefined alias: {}", alias.as_ref()));
         }
     }
@@ -105,7 +103,7 @@ pub fn drop_array<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Status
     }
 
     for array in args.iter().skip(2) {
-        if vars.remove_variable(array.as_ref()).is_none() {
+        if vars.remove(array.as_ref()).is_none() {
             return Status::error(format!("ion: undefined array: {}", array.as_ref()));
         }
     }
@@ -119,7 +117,7 @@ pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Sta
     }
 
     for variable in args.iter().skip(1) {
-        if vars.remove_variable(variable.as_ref()).is_none() {
+        if vars.remove(variable.as_ref()).is_none() {
             return Status::error(format!("ion: undefined variable: {}", variable.as_ref()));
         }
     }
@@ -130,13 +128,7 @@ pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Sta
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::parser::Expander;
-
-    struct VariableExpander<'a>(pub Variables<'a>);
-
-    impl<'a> Expander for VariableExpander<'a> {
-        fn string(&self, var: &str) -> Option<types::Str> { self.0.get_str(var) }
-    }
+    use crate::{expansion::Expander, shell::variables::tests::VariableExpander};
 
     // TODO: Rewrite tests now that let is part of the grammar.
     // #[test]
@@ -168,8 +160,7 @@ mod test {
         variables.set("FOO", "BAR");
         let return_status = drop_variable(&mut variables, &["drop", "FOO"]);
         assert!(return_status.is_success());
-        let expanded = VariableExpander(variables).expand_string("$FOO").join("");
-        assert_eq!("", expanded);
+        assert!(VariableExpander(variables).expand_string("$FOO").is_err());
     }
 
     #[test]
@@ -189,11 +180,10 @@ mod test {
     #[test]
     fn drop_deletes_array() {
         let mut variables = Variables::default();
-        variables.set("FOO", array!["BAR"]);
+        variables.set("FOO", types_rs::array!["BAR"]);
         let return_status = drop_array(&mut variables, &["drop", "-a", "FOO"]);
         assert_eq!(Status::SUCCESS, return_status);
-        let expanded = VariableExpander(variables).expand_string("@FOO").join("");
-        assert_eq!("", expanded);
+        assert!(VariableExpander(variables).expand_string("@FOO").is_err());
     }
 
     #[test]

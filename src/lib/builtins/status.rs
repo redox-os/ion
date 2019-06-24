@@ -1,11 +1,8 @@
-use crate::{
-    builtins::man_pages::MAN_STATUS,
-    shell::{status::Status, Shell},
-};
-use small;
+use super::{man_pages::MAN_STATUS, Status};
+use crate::{shell::Shell, types};
 use std::env;
 
-pub fn status(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn status(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let mut help = false;
     let mut login_shell = false;
     let mut interactive = false;

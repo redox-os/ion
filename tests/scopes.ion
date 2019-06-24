@@ -1,0 +1,13 @@
+if test 1 == 1
+  let x = 5
+
+  if test 1 == 1
+    let x = 2
+    let y = 3
+  end
+
+  echo $x
+  echo $y
+  echo Should not be printed
+end
+

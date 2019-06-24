@@ -1,4 +1,5 @@
-use ion_lexers::{ArgumentSplitter, DesignatorLexer, DesignatorToken};
+use super::lexer::{DesignatorLexer, DesignatorToken};
+use ion_shell::parser::lexers::ArgumentSplitter;
 use liner::Context;
 use std::{borrow::Cow, str};
 

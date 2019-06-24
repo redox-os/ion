@@ -5,15 +5,15 @@ use super::{
 };
 use crate::{
     builtins::BuiltinMap,
-    lexers::{assignment_lexer, ArgumentSplitter},
     parser::{
+        lexers::{assignment_lexer, ArgumentSplitter},
         pipelines::PipelineParsingError,
         statement::{case::CaseError, functions::FunctionParseError},
     },
     shell::flow_control::{Case, ElseIf, ExportAction, IfMode, LocalAction, Statement},
+    types,
 };
 use err_derive::Error;
-use small;
 use std::char;
 
 pub fn is_valid_name(name: &str) -> bool {
@@ -154,7 +154,7 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
             match variables {
                 Some(variables) => Ok(Statement::For {
                     variables,
-                    values: ArgumentSplitter::new(cmd).map(small::String::from).collect(),
+                    values: ArgumentSplitter::new(cmd).map(types::Str::from).collect(),
                     statements: Vec::new(),
                 }),
                 None => Err(ParseError::NoInKeyword),
@@ -190,7 +190,7 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
 
             let (args, description) = parse_function(&cmd[pos..]);
             Ok(Statement::Function {
-                description: description.map(small::String::from),
+                description: description.map(types::Str::from),
                 name:        name.into(),
                 args:        collect_arguments(args)?,
                 statements:  Vec::new(),
@@ -227,12 +227,11 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
 
 #[cfg(test)]
 mod tests {
-    use self::pipelines::{PipeItem, PipeType, Pipeline};
     use super::*;
     use crate::{
         builtins::BuiltinMap,
-        lexers::assignments::{KeyBuf, Primitive},
-        parser::pipelines::RedirectFrom,
+        expansion::pipelines::{PipeItem, PipeType, Pipeline, RedirectFrom},
+        parser::lexers::assignments::{KeyBuf, Primitive},
         shell::{flow_control::Statement, Job},
     };
 

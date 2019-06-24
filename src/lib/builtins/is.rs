@@ -1,7 +1,7 @@
-use crate::{shell::Shell, status::Status, types};
-use small;
+use super::Status;
+use crate::{shell::Shell, types};
 
-pub fn is(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn is(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match args.len() {
         4 => {
             if args[1] != "not" {
@@ -36,15 +36,18 @@ fn get_var_string(name: &str, shell: &mut Shell<'_>) -> types::Str {
     }
 
     match shell.variables().get_str(&name[1..]) {
-        Some(s) => s,
-        None => "".into(),
+        Ok(s) => s,
+        Err(why) => {
+            eprintln!("{}", why);
+            "".into()
+        }
     }
 }
 
 #[test]
 fn test_is() {
-    fn vec_string(args: &[&str]) -> Vec<small::String> { args.iter().map(|&s| s.into()).collect() }
-    let mut shell = Shell::library();
+    fn vec_string(args: &[&str]) -> Vec<types::Str> { args.iter().map(|&s| s.into()).collect() }
+    let mut shell = Shell::default();
     shell.variables_mut().set("x", "value");
     shell.variables_mut().set("y", "0");
 

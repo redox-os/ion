@@ -1,14 +1,17 @@
 //! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job
 //! control in the shell.
 
-use crate::shell::{status::*, BackgroundProcess, Shell};
-use small;
+use super::Status;
+use crate::{
+    shell::{BackgroundProcess, Shell},
+    types,
+};
 use smallvec::SmallVec;
 
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark
 /// SIGHUP ignoral.
-pub fn disown(shell: &mut Shell<'_>, args: &[small::String]) -> Result<(), String> {
+pub fn disown(shell: &mut Shell<'_>, args: &[types::Str]) -> Result<(), String> {
     // Specifies that a process should be set to not receive SIGHUP signals.
     let mut no_sighup = false;
     // Specifies that all jobs in the process table should be manipulated.
@@ -73,16 +76,19 @@ pub fn jobs(shell: &mut Shell<'_>) {
 /// Hands control of the foreground process to the specified jobs, recording their exit status.
 /// If the job is stopped, the job will be resumed.
 /// If multiple jobs are given, then only the last job's exit status will be returned.
-pub fn fg(shell: &mut Shell<'_>, args: &[small::String]) -> Status {
+pub fn fg(shell: &mut Shell<'_>, args: &[types::Str]) -> Status {
     fn fg_job(shell: &mut Shell<'_>, njob: usize) -> Status {
-        if let Some(job) = shell.background_jobs().iter().nth(njob).filter(|p| p.exists()) {
-            // Give the bg task the foreground, and wait for it to finish. Also resume it if it
-            // isn't running
-            shell.set_bg_task_in_foreground(job.pid(), !job.is_running())
-        } else {
-            // Informs the user that the specified job ID no longer exists.
-            return Status::error(format!("ion: fg: job {} does not exist", njob));
-        }
+        let (pid, cont) = {
+            if let Some(job) = shell.background_jobs().iter().nth(njob).filter(|p| p.exists()) {
+                (job.pid(), !job.is_running())
+            } else {
+                // Informs the user that the specified job ID no longer exists.
+                return Status::error(format!("ion: fg: job {} does not exist", njob));
+            }
+        };
+        // Give the bg task the foreground, and wait for it to finish. Also resume it if it
+        // isn't running
+        shell.set_bg_task_in_foreground(pid, cont)
     }
 
     if args.is_empty() {
@@ -107,7 +113,7 @@ pub fn fg(shell: &mut Shell<'_>, args: &[small::String]) -> Status {
 }
 
 /// Resumes a stopped background process, if it was stopped.
-pub fn bg(shell: &mut Shell<'_>, args: &[small::String]) -> Status {
+pub fn bg(shell: &mut Shell<'_>, args: &[types::Str]) -> Status {
     fn bg_job(shell: &mut Shell<'_>, njob: usize) -> Status {
         if let Some(job) = shell.background_jobs().iter().nth(njob).filter(|p| p.exists()) {
             if job.is_running() {

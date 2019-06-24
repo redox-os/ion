@@ -1,12 +1,10 @@
 use auto_enums::auto_enum;
 use glob::{glob_with, MatchOptions};
 use ion_shell::{
-    parser::{unescape, Expander},
+    expansion::{unescape, Expander},
     Shell,
 };
-use ion_sys::PATH_SEPARATOR;
 use liner::{BasicCompleter, Completer, CursorPosition, Event, EventKind};
-use smallvec::SmallVec;
 use std::{env, iter, path::PathBuf, str};
 
 pub struct IonCompleter<'a, 'b> {
@@ -23,7 +21,7 @@ fn escape(input: &str) -> String {
     for character in input.bytes() {
         match character {
             b'(' | b')' | b'[' | b']' | b'&' | b'$' | b'@' | b'{' | b'}' | b'<' | b'>' | b';'
-            | b'"' | b'\'' | b'#' | b'^' | b'*' => output.push(b'\\'),
+            | b'"' | b'\'' | b'#' | b'^' | b'*' | b' ' => output.push(b'\\'),
             _ => (),
         }
         output.push(character);
@@ -68,11 +66,13 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
             // Creates completers containing definitions from all directories
             // listed
             // in the environment's **$PATH** variable.
-            let file_completers: Vec<_> = env::var("PATH")
-                .unwrap_or_else(|_| "/bin/".to_string())
-                .split(PATH_SEPARATOR)
-                .map(|s| IonFileCompleter::new(Some(s), &self.shell))
-                .collect();
+            let file_completers: Vec<_> = if let Some(paths) = env::var_os("PATH") {
+                env::split_paths(&paths)
+                    .map(|s| IonFileCompleter::new(Some(s), &self.shell))
+                    .collect()
+            } else {
+                vec![IonFileCompleter::new(Some("/bin/".into()), &self.shell)]
+            };
             // Merge the collected definitions with the file path definitions.
             completions.extend(MultiCompleter::new(file_completers).completions(start));
         }
@@ -125,15 +125,12 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
 pub struct IonFileCompleter<'a, 'b> {
     shell: &'b Shell<'a>,
     /// The directory the expansion takes place in
-    path: String,
+    path: PathBuf,
 }
 
 impl<'a, 'b> IonFileCompleter<'a, 'b> {
-    pub fn new(path: Option<&str>, shell: &'b Shell<'a>) -> Self {
-        let mut path = path.unwrap_or("").to_string();
-        if !path.is_empty() && !path.ends_with('/') {
-            path.push('/');
-        }
+    pub fn new(path: Option<PathBuf>, shell: &'b Shell<'a>) -> Self {
+        let path = path.unwrap_or_default();
         IonFileCompleter { shell, path }
     }
 }
@@ -153,76 +150,83 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
         // because no changes will occur to either of the underlying references in the
         // duration between creation of the completers and execution of their
         // completions.
-        if let Some(expanded) = self.shell.tilde(start) {
-            // Now we obtain completions for the `expanded` form of the `start` value.
-            let iterator = filename_completion(&expanded, &self.path);
-
-            // We can do that by obtaining the index position where the tilde character
-            // ends. We don't search with `~` because we also want to
-            // handle other tilde variants.
-            let t_index = start.find('/').unwrap_or(1);
-            // `tilde` is the tilde pattern, and `search` is the pattern that follows.
-            let (tilde, search) = start.split_at(t_index);
-
-            if search.len() < 2 {
-                // If the length of the search pattern is less than 2, the search pattern is
-                // empty, and thus the completions actually contain files and directories in
-                // the home directory.
-
-                // The tilde pattern will actually be our `start` command in itself,
-                // and the completed form will be all of the characters beyond the length of
-                // the expanded form of the tilde pattern.
-                iterator.map(|completion| [start, &completion[expanded.len()..]].concat()).collect()
-            // To save processing time, we should get obtain the index position where our
-            // search pattern begins, and re-use that index to slice the completions so
-            // that we may re-add the tilde character with the completion that follows.
-            } else if let Some(e_index) = expanded.rfind(search) {
-                // And then we will need to take those completions and remove the expanded form
-                // of the tilde pattern and replace it with that pattern yet again.
-                iterator
-                    .map(|completion| escape(&[tilde, &completion[e_index..]].concat()))
-                    .collect()
-            } else {
-                Vec::new()
+        let expanded = match self.shell.tilde(start) {
+            Ok(expanded) => expanded,
+            Err(why) => {
+                eprintln!("ion: {}", why);
+                return vec![start.into()];
             }
+        };
+        // Now we obtain completions for the `expanded` form of the `start` value.
+        let completions = filename_completion(&expanded, &self.path);
+        if expanded == start {
+            return completions.collect();
+        }
+        // We can do that by obtaining the index position where the tilde character
+        // ends. We don't search with `~` because we also want to
+        // handle other tilde variants.
+        let t_index = start.find('/').unwrap_or(1);
+        // `tilde` is the tilde pattern, and `search` is the pattern that follows.
+        let (tilde, search) = start.split_at(t_index);
+
+        if search.len() < 2 {
+            // If the length of the search pattern is less than 2, the search pattern is
+            // empty, and thus the completions actually contain files and directories in
+            // the home directory.
+
+            // The tilde pattern will actually be our `start` command in itself,
+            // and the completed form will be all of the characters beyond the length of
+            // the expanded form of the tilde pattern.
+            completions.map(|completion| [start, &completion[expanded.len()..]].concat()).collect()
+        // To save processing time, we should get obtain the index position where our
+        // search pattern begins, and re-use that index to slice the completions so
+        // that we may re-add the tilde character with the completion that follows.
+        } else if let Some(e_index) = expanded.rfind(search) {
+            // And then we will need to take those completions and remove the expanded form
+            // of the tilde pattern and replace it with that pattern yet again.
+            completions
+                .map(|completion| {
+                    println!("'{}' : {}", completion, e_index);
+                    escape(&[tilde, &completion[e_index..]].concat())
+                })
+                .collect()
         } else {
-            filename_completion(&start, &self.path).collect()
+            Vec::new()
         }
     }
 }
 
 #[auto_enum]
-fn filename_completion<'a>(start: &'a str, path: &'a str) -> impl Iterator<Item = String> + 'a {
+fn filename_completion<'a>(start: &'a str, path: &'a PathBuf) -> impl Iterator<Item = String> + 'a {
     let unescaped_start = unescape(start);
 
     let mut split_start = unescaped_start.split('/');
-    let mut string: SmallVec<[u8; 128]> = SmallVec::with_capacity(128);
+    let mut string = String::with_capacity(128);
 
     // When 'start' is an absolute path, "/..." gets split to ["", "..."]
     // So we skip the first element and add "/" to the start of the string
     if unescaped_start.starts_with('/') {
         split_start.next();
-        string.push(b'/');
+        string.push('/');
     } else {
-        string.extend_from_slice(path.as_bytes());
+        string.push_str(&path.to_string_lossy());
     }
 
     for element in split_start {
-        string.extend_from_slice(element.as_bytes());
+        string.push_str(element);
         if element != "." && element != ".." {
-            string.push(b'*');
+            string.push('*');
         }
-        string.push(b'/');
+        string.push('/');
     }
 
     string.pop(); // pop out the last '/' character
-    if string.last() == Some(&b'.') {
-        string.push(b'*')
+    if string.ends_with('.') {
+        string.push('*')
     }
-    let string = unsafe { &str::from_utf8_unchecked(&string) };
 
     let globs = glob_with(
-        string,
+        &string,
         MatchOptions {
             case_sensitive:              true,
             require_literal_separator:   true,
@@ -232,7 +236,7 @@ fn filename_completion<'a>(start: &'a str, path: &'a str) -> impl Iterator<Item 
     .ok()
     .map(|completions| {
         completions.filter_map(Result::ok).filter_map(move |file| {
-            let out = file.to_str()?.trim_start_matches(&path);
+            let out = file.to_str()?;
             let mut joined = String::with_capacity(out.len() + 3); // worst case senario
             if unescaped_start.starts_with("./") {
                 joined.push_str("./");
@@ -241,7 +245,7 @@ fn filename_completion<'a>(start: &'a str, path: &'a str) -> impl Iterator<Item 
             if file.is_dir() {
                 joined.push('/');
             }
-            Some(joined)
+            Some(escape(&joined))
         })
     });
 
@@ -275,7 +279,7 @@ mod tests {
 
     #[test]
     fn filename_completion() {
-        let shell = Shell::library();
+        let shell = Shell::default();
         let mut completer = IonFileCompleter::new(None, &shell);
         assert_eq!(completer.completions("testing"), vec!["testing/"]);
         assert_eq!(completer.completions("testing/file"), vec!["testing/file_with_text"]);

@@ -1,18 +1,22 @@
 use super::{
     flow_control::{ExportAction, LocalAction},
-    status::*,
     Shell,
 };
 use crate::{
-    lexers::assignments::{Key, Operator, Primitive},
-    parser::{assignments::*, is_valid_name},
-    shell::variables::{EuclDiv, Modifications, OpError, Pow, Value},
+    assignments::*,
+    builtins::Status,
+    parser::{
+        is_valid_name,
+        lexers::assignments::{Key, Operator, Primitive},
+    },
+    shell::{flow_control::Function, Value},
 };
 use std::{
     env,
     io::{self, BufWriter, Write},
     result::Result,
 };
+use types_rs::{EuclDiv, Modifications, OpError, Pow};
 
 fn list_vars(shell: &Shell<'_>) -> Result<(), io::Error> {
     let stdout = io::stdout();
@@ -80,11 +84,11 @@ impl<'b> Shell<'b> {
                 Status::SUCCESS
             }
             ExportAction::LocalExport(ref key) => match self.variables.get_str(key) {
-                Some(var) => {
+                Ok(var) => {
                     env::set_var(key, &*var);
                     Status::SUCCESS
                 }
-                None => {
+                Err(_) => {
                     Status::error(format!("ion: cannot export {} because it does not exist.", key))
                 }
             },
@@ -103,7 +107,7 @@ impl<'b> Shell<'b> {
     pub(crate) fn calculate<'a>(
         &mut self,
         actions: AssignmentActions<'a>,
-    ) -> Result<Vec<(Key<'a>, Value<'b>)>, String> {
+    ) -> Result<Vec<(Key<'a>, Value<Function<'b>>)>, String> {
         let mut backup: Vec<_> = Vec::with_capacity(4);
         for action in actions {
             let Action(key, operator, expression) = action.map_err(|e| e.to_string())?;
@@ -119,7 +123,7 @@ impl<'b> Shell<'b> {
                     .to_string());
             }
 
-            if operator == Operator::OptionalEqual && self.variables.get_ref(key.name).is_some() {
+            if operator == Operator::OptionalEqual && self.variables.get(key.name).is_some() {
                 continue;
             }
 
@@ -140,7 +144,7 @@ impl<'b> Shell<'b> {
                     backup.push((key, rhs))
                 }
                 _ => {
-                    let lhs = self.variables.get_ref(key.name).ok_or_else(|| {
+                    let lhs = self.variables.get(key.name).ok_or_else(|| {
                         format!("cannot update non existing variable `{}`", key.name)
                     })?;
                     let val = apply(operator, &lhs, rhs).map_err(|_| {
@@ -183,7 +187,11 @@ impl<'b> Shell<'b> {
 // This should logically be a method over operator, but Value is only accessible in the main repo
 // TODO: too much allocations occur over here. We need to expand variables before they get
 // parsed
-fn apply<'b>(op: Operator, lhs: &Value<'b>, rhs: Value<'b>) -> Result<Value<'b>, OpError> {
+fn apply<'a>(
+    op: Operator,
+    lhs: &Value<Function<'a>>,
+    rhs: Value<Function<'a>>,
+) -> Result<Value<Function<'a>>, OpError> {
     match op {
         Operator::Add => lhs + rhs,
         Operator::Divide => lhs / rhs,

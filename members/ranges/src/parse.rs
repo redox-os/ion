@@ -1,14 +1,13 @@
 use super::{Index, Range};
-use small;
 use std::{cmp::Ordering, u8};
 
-fn numeric_range<'a>(
+fn numeric_range<'a, K: From<String>>(
     start: isize,
     end: isize,
     step: isize,
     inclusive: bool,
     nb_digits: usize,
-) -> Option<Box<Iterator<Item = small::String> + 'a>> {
+) -> Option<Box<dyn Iterator<Item = K> + 'a>> {
     let end = if start < end && inclusive {
         end + 1
     } else if start > end && inclusive {
@@ -40,12 +39,12 @@ fn numeric_range<'a>(
     }
 }
 
-fn char_range<'a>(
+fn char_range<'a, K: From<String>>(
     start: u8,
     mut end: u8,
     step: isize,
     inclusive: bool,
-) -> Option<Box<Iterator<Item = small::String> + 'a>> {
+) -> Option<Box<dyn Iterator<Item = K> + 'a>> {
     if !start.is_ascii_alphabetic() || !end.is_ascii_alphabetic() || step == 0 {
         return None;
     }
@@ -67,18 +66,18 @@ fn char_range<'a>(
 fn count_minimum_digits(a: &str) -> usize {
     match a.bytes().find(|&c| c != b'-') {
         Some(b'0') => a.len(),
-        Some(b'1'...b'9') => 0,
+        Some(b'1'..=b'9') => 0,
         Some(_) => panic!("count_minimum_digits should only be called for a valid number."),
         None => 0,
     }
 }
 
-fn finish(
+fn finish<K: From<String>>(
     inclusive: bool,
     start_str: &str,
     end_str: &str,
     step: isize,
-) -> Option<Box<Iterator<Item = small::String>>> {
+) -> Option<Box<dyn Iterator<Item = K>>> {
     if let (Ok(start), Ok(end)) = (start_str.parse::<isize>(), end_str.parse::<isize>()) {
         let step = if step == 1 && start >= end { -step } else { step };
         let nb_digits = usize::max(count_minimum_digits(start_str), count_minimum_digits(end_str));
@@ -96,7 +95,7 @@ fn finish(
 //      Inclusive nonstepped: {start...end}
 //      Exclusive stepped: {start..step..end}
 //      Inclusive stepped: {start..step...end}
-pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
+pub fn parse_range<K: From<String>>(input: &str) -> Option<Box<dyn Iterator<Item = K>>> {
     let mut parts = input.split("..").collect::<Vec<_>>();
     let len = parts.len();
 

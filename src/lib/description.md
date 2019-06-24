@@ -12,7 +12,7 @@ ion_shell = "1.0"
 ## Demo
 
 ```rust
-use ion_shell::{BuiltinMap, BuiltinFunction, Shell, status::Status};
+use ion_shell::{BuiltinMap, BuiltinFunction, Shell, status::Status, types};
 use std::{thread, time, cell::RefCell, rc::Rc};
 
 enum Layout {
@@ -25,7 +25,7 @@ fn main() {
   let layout = RefCell::new(Layout::Simple); // A state for your application
 
   // Create a custom callback to update your state when called by a script
-  let set_layout: BuiltinFunction = &move |args: &[small::String], shell: &mut Shell| {
+  let set_layout: BuiltinFunction = &move |args: &[types::Str], shell: &mut Shell| {
     *layout.borrow_mut() = if let Some(text) = args.get(0) {
       Layout::Complex(text.to_string())
     } else {

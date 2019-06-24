@@ -1,10 +1,8 @@
-use crate::sys;
-
 use super::{
-    super::{status::*, Shell},
+    super::{sys, Shell},
     job_control::{BackgroundProcess, ProcessState},
 };
-use crate::parser::pipelines::Pipeline;
+use crate::{builtins::Status, expansion::pipelines::Pipeline};
 
 impl<'a> Shell<'a> {
     /// Ensures that the forked child is given a unique process ID.
@@ -16,10 +14,10 @@ impl<'a> Shell<'a> {
         match unsafe { sys::fork() } {
             Ok(0) => {
                 self.opts_mut().is_background_shell = true;
-                let _ = sys::reset_signal(sys::SIGINT);
-                let _ = sys::reset_signal(sys::SIGHUP);
-                let _ = sys::reset_signal(sys::SIGTERM);
-                let _ = sys::close(sys::STDIN_FILENO);
+                let _ = sys::reset_signal(libc::SIGINT);
+                let _ = sys::reset_signal(libc::SIGHUP);
+                let _ = sys::reset_signal(libc::SIGTERM);
+                let _ = sys::close(libc::STDIN_FILENO);
 
                 // This ensures that the child fork has a unique PGID.
                 Self::create_process_group(0);

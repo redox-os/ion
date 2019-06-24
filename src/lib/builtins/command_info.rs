@@ -1,13 +1,12 @@
+use super::{check_help, man_pages::MAN_WHICH, Status};
 use crate::{
-    builtins::man_pages::*,
-    shell::{status::Status, Shell, Value},
-    sys,
+    shell::{Shell, Value},
+    types,
 };
-use small;
 
-use std::{borrow::Cow, env, path::Path};
+use std::{borrow::Cow, env};
 
-pub fn which(args: &[small::String], shell: &mut Shell<'_>) -> Result<Status, ()> {
+pub fn which(args: &[types::Str], shell: &mut Shell<'_>) -> Result<Status, ()> {
     if check_help(args, MAN_WHICH) {
         return Ok(Status::SUCCESS);
     }
@@ -22,7 +21,7 @@ pub fn which(args: &[small::String], shell: &mut Shell<'_>) -> Result<Status, ()
         match get_command_info(command, shell) {
             Ok(c_type) => match c_type.as_ref() {
                 "alias" => {
-                    if let Some(Value::Alias(ref alias)) = shell.variables().get_ref(&**command) {
+                    if let Some(Value::Alias(ref alias)) = shell.variables().get(&**command) {
                         println!("{}: alias to {}", command, &**alias);
                     }
                 }
@@ -36,7 +35,7 @@ pub fn which(args: &[small::String], shell: &mut Shell<'_>) -> Result<Status, ()
     Ok(result)
 }
 
-pub fn find_type(args: &[small::String], shell: &mut Shell<'_>) -> Result<Status, ()> {
+pub fn find_type(args: &[types::Str], shell: &mut Shell<'_>) -> Result<Status, ()> {
     // Type does not accept help flags, aka "--help".
     if args.len() == 1 {
         eprintln!("type: Expected at least 1 args, got only 0");
@@ -49,7 +48,7 @@ pub fn find_type(args: &[small::String], shell: &mut Shell<'_>) -> Result<Status
             Ok(c_type) => {
                 match c_type.as_ref() {
                     "alias" => {
-                        if let Some(Value::Alias(alias)) = shell.variables().get_ref(&**command) {
+                        if let Some(Value::Alias(alias)) = shell.variables().get(&**command) {
                             println!("{} is aliased to `{}`", command, &**alias);
                         }
                     }
@@ -66,15 +65,14 @@ pub fn find_type(args: &[small::String], shell: &mut Shell<'_>) -> Result<Status
 }
 
 fn get_command_info<'a>(command: &str, shell: &mut Shell<'_>) -> Result<Cow<'a, str>, ()> {
-    match shell.variables().get_ref(command) {
+    match shell.variables().get(command) {
         Some(Value::Alias(_)) => Ok("alias".into()),
         Some(Value::Function(_)) => Ok("function".into()),
         _ if shell.builtins().contains(command) => Ok("builtin".into()),
         _ => {
-            for path in
-                env::var("PATH").unwrap_or_else(|_| String::from("/bin")).split(sys::PATH_SEPARATOR)
-            {
-                let executable = Path::new(path).join(command);
+            let paths = env::var_os("PATH").unwrap_or_else(|| "/bin".into());
+            for path in env::split_paths(&paths) {
+                let executable = path.join(command);
                 if executable.is_file() {
                     return Ok(executable.display().to_string().into());
                 }

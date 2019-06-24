@@ -1,11 +1,14 @@
 use super::{
-    super::{signals, status::*, Shell},
+    super::{signals, Shell},
     foreground::{BackgroundResult, ForegroundSignals},
+    sys::{
+        self, kill, strerror, waitpid, wcoredump, wexitstatus, wifcontinued, wifexited,
+        wifsignaled, wifstopped, wstopsig, wtermsig,
+    },
+    PipelineError,
 };
-use crate::sys::{
-    self, kill, strerror, waitpid, wcoredump, wexitstatus, wifcontinued, wifexited, wifsignaled,
-    wifstopped, wstopsig, wtermsig, ECHILD, SIGINT, SIGPIPE, WCONTINUED, WNOHANG, WUNTRACED,
-};
+use crate::builtins::Status;
+use libc::{ECHILD, SIGINT, SIGPIPE, WCONTINUED, WNOHANG, WUNTRACED};
 use std::{
     fmt, process,
     sync::Mutex,
@@ -37,7 +40,8 @@ impl fmt::Display for ProcessState {
 /// A background process is a process that is attached to, but not directly managed
 /// by the shell. The shell will only retain information about the process, such
 /// as the process ID, state that the process is in, and the command that the
-/// process is executing.
+/// process is executing. Note that it is necessary to check if the process exists with the exists
+/// method.
 pub struct BackgroundProcess {
     pid:           u32,
     ignore_sighup: bool,
@@ -50,16 +54,22 @@ impl BackgroundProcess {
         BackgroundProcess { pid, ignore_sighup: false, state, name }
     }
 
+    /// Get the pid associated with the job
     pub fn pid(&self) -> u32 { self.pid }
 
+    /// Check if the process is still running
     pub fn is_running(&self) -> bool { self.state == ProcessState::Running }
 
-    pub fn exists(&self) -> bool { self.state == ProcessState::Empty }
+    /// Check if this is in fact a process
+    pub fn exists(&self) -> bool { self.state != ProcessState::Empty }
 
+    /// Stop capturing information about the process. *This action is irreversible*
     pub fn forget(&mut self) { self.state = ProcessState::Empty }
 
+    /// Should the process ignore sighups
     pub fn set_ignore_sighup(&mut self, ignore: bool) { self.ignore_sighup = ignore }
 
+    /// resume a stopped job
     pub fn resume(&self) { signals::resume(self.pid); }
 }
 
@@ -73,7 +83,7 @@ impl<'a> Shell<'a> {
     /// If a SIGTERM is received, a SIGTERM will be sent to all background processes
     /// before the shell terminates itself.
     pub fn handle_signal(&self, signal: i32) -> bool {
-        if signal == sys::SIGTERM || signal == sys::SIGHUP {
+        if signal == libc::SIGTERM || signal == libc::SIGHUP {
             self.background_send(signal);
             true
         } else {
@@ -169,6 +179,7 @@ impl<'a> Shell<'a> {
         }
     }
 
+    /// Send the current job to the background and spawn a thread to update its state
     pub fn send_to_background(&mut self, process: BackgroundProcess) {
         // Add the process to the background list, and mark the job's ID as
         // the previous job in the shell (in case fg/bg is executed w/ no args).
@@ -190,7 +201,7 @@ impl<'a> Shell<'a> {
     /// Send a kill signal to all running background tasks.
     pub fn background_send(&self, signal: i32) {
         let filter: fn(&&BackgroundProcess) -> bool =
-            if signal == sys::SIGHUP { |p| !p.ignore_sighup } else { |p| p.is_running() };
+            if signal == libc::SIGHUP { |p| !p.ignore_sighup } else { |p| p.is_running() };
         self.background_jobs().iter().filter(filter).for_each(|p| {
             let _ = sys::killpg(p.pid(), signal);
         })
@@ -203,19 +214,23 @@ impl<'a> Shell<'a> {
         }
     }
 
-    pub fn watch_foreground(&mut self, pgid: u32) -> Status {
-        let mut signaled = Status::SUCCESS;
+    /// Wait for the job in foreground
+    pub fn watch_foreground(&mut self, pgid: u32) -> Result<Status, PipelineError> {
+        let mut signaled = None;
         let mut exit_status = Status::SUCCESS;
 
         loop {
             let mut status = 0;
             match waitpid(-(pgid as i32), &mut status, WUNTRACED) {
                 Err(errno) => match errno {
-                    ECHILD if signaled.is_success() => break exit_status,
-                    ECHILD => break signaled,
-                    errno => {
-                        break Status::error(format!("ion: waitpid error: {}", strerror(errno)))
+                    ECHILD => {
+                        if let Some(signal) = signaled {
+                            break Err(signal);
+                        } else {
+                            break Ok(exit_status);
+                        }
                     }
+                    errno => break Err(PipelineError::WaitPid(strerror(errno))),
                 },
                 Ok(0) => (),
                 Ok(_) if wifexited(status) => {
@@ -225,19 +240,17 @@ impl<'a> Shell<'a> {
                     let signal = wtermsig(status);
                     if signal == SIGPIPE {
                     } else if wcoredump(status) {
-                        eprintln!("ion: process ({}) had a core dump", pid);
+                        signaled = Some(PipelineError::CoreDump(pid as u32));
                     } else {
-                        eprintln!("ion: process ({}) ended by signal {}", pid, signal);
                         match signal {
                             SIGINT => {
                                 let _ = kill(pid as u32, signal as i32);
-                                self.break_flow = true;
                             }
                             _ => {
                                 self.handle_signal(signal);
                             }
                         }
-                        signaled = Status::from_signal(signal as i32);
+                        signaled = Some(PipelineError::Interrupted(pid as u32, signal));
                     }
                 }
                 Ok(pid) if wifstopped(status) => {
@@ -246,8 +259,7 @@ impl<'a> Shell<'a> {
                         ProcessState::Stopped,
                         "".to_string(),
                     ));
-                    self.break_flow = true;
-                    break Status::from_signal(wstopsig(status));
+                    break Err(PipelineError::Interrupted(pid as u32, wstopsig(status)));
                 }
                 Ok(_) => (),
             }
@@ -256,14 +268,15 @@ impl<'a> Shell<'a> {
 
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.
-    pub fn wait_for_background(&mut self) {
-        while self.background.lock().unwrap().iter().any(|p| p.state == ProcessState::Running) {
-            if let Some(signal) = signals::SignalHandler.find(|&s| s != sys::SIGTSTP) {
+    pub fn wait_for_background(&mut self) -> Result<(), PipelineError> {
+        while let Some(p) = { self.background_jobs().iter().find(|p| p.is_running()) } {
+            if let Some(signal) = signals::SignalHandler.find(|&s| s != libc::SIGTSTP) {
                 self.background_send(signal);
-                self.exit_with_code(Status::from_signal(signal));
+                return Err(PipelineError::Interrupted(p.pid(), signal));
             }
             sleep(Duration::from_millis(100));
         }
+        Ok(())
     }
 
     /// When given a process ID, that process's group will be assigned as the
