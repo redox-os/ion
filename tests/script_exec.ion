@@ -1,0 +1,3 @@
+for script in tests/script_exec/a* tests/script_exec/b*
+    target/debug/ion $script
+end

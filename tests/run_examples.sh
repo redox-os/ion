@@ -22,10 +22,10 @@ EXIT_VAL=0
 cd $PROJECT_DIR
 
 # Create expected output for fn-root-vars
-echo $HOME > examples/fn-root-vars.out # Overwrite previous file
-echo '${x::1B}]0;${USER}: ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# ${c::reset}' >> examples/fn-root-vars.out
-echo $UID >> examples/fn-root-vars.out
-echo >> examples/fn-root-vars.out
+echo $HOME > $EXAMPLES_DIR/fn-root-vars.out # Overwrite previous file
+echo '${x::1B}]0;${USER}: ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# ${c::reset}' >> $EXAMPLES_DIR/fn-root-vars.out
+echo $UID >> $EXAMPLES_DIR/fn-root-vars.out
+echo >> $EXAMPLES_DIR/fn-root-vars.out
 
 function test {
     # Replace .ion with .out in file name
@@ -99,9 +99,9 @@ function perform_testing {
 cargo +$TOOLCHAIN build
 perform_testing
 
-set -e
 # Build debug binary for testing structopt argument parsing
 cargo +$TOOLCHAIN build --features=advanced_arg_parsing
 perform_testing
 
+set -e
 exit $EXIT_VAL

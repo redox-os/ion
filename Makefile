@@ -30,7 +30,7 @@ ifeq ($(RUSTUP),1)
 	TOOLCHAIN_ARG = +$(TOOLCHAIN)
 endif
 
-.PHONY: all clean distclean install uninstall
+.PHONY: tests all clean distclean install uninstall
 
 all: $(SRC) $(GIT_REVISION)
 ifeq ($(REDOX),1)
@@ -53,7 +53,7 @@ format:
 
 tests:
 	cargo $(TOOLCHAIN_ARG) test $(ARGSV)
-	TOOLCHAIN=$(TOOLCHAIN) bash examples/run_examples.sh
+	TOOLCHAIN=$(TOOLCHAIN) bash tests/run_examples.sh
 	for crate in members/*; do \
 		cargo $(TOOLCHAIN_ARG) test $(ARGSV) --manifest-path $$crate/Cargo.toml || exit 1; \
 	done

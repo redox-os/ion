@@ -1,11 +1,11 @@
 echo *argo.toml
-echo examples/br*.*
+echo tests/br*.*
 echo [A-Z]argo.toml
 echo ?argo.toml
 echo Cargo.*
 echo Cargo?toml
 echo Cargo.[tqr]oml
-echo examples/[ef]*.ion
+echo tests/[ef]*.ion
 echo "[]"
 echo "[] []"
 mkdir glob_test
