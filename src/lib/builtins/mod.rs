@@ -18,21 +18,24 @@ mod variables;
 
 use self::{
     command_info::{find_type, which},
+    conditionals::{contains, ends_with, starts_with},
     echo::echo,
     exists::exists,
     functions::print_functions,
     is::is,
     man_pages::*,
     source::source,
-    status::status,
+    status::builtin_status,
     test::test,
     variables::{alias, drop_alias, drop_array, drop_variable},
 };
 pub use self::{helpers::Status, man_pages::check_help};
+use crate as ion_shell;
 use crate::{
     shell::{sys, Capture, Shell, Value},
     types,
 };
+use builtins_proc::builtin;
 use hashbrown::HashMap;
 use itertools::Itertools;
 use liner::{Completer, Context};
@@ -56,12 +59,13 @@ pub type BuiltinFunction<'a> = &'a dyn Fn(&[types::Str], &mut Shell<'_>) -> Stat
 // parses -N or +N patterns
 // required for popd, pushd, dirs
 fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
-    match arg.chars().nth(0) {
+    let b = match arg.chars().nth(0) {
         Some('+') => Some(true),
         Some('-') => Some(false),
         _ => None,
-    }
-    .and_then(|b| arg[1..].parse::<usize>().ok().map(|num| (b, num)))
+    }?;
+    let num = arg[1..].parse::<usize>().ok()?;
+    Some((b, num))
 }
 
 /// A container for builtins and their respective help text
@@ -196,7 +200,7 @@ impl<'a> BuiltinMap<'a> {
         self.add("bool", &builtin_bool, "If the value is '1' or 'true', return 0 exit status")
             .add("calc", &builtin_calc, "Calculate a mathematical expression")
             .add("eq", &builtin_eq, "Simple alternative to == and !=")
-            .add("is", &builtin_is, "Simple alternative to == and !=")
+            .add("is", &builtin_eq, "Simple alternative to == and !=")
             .add("true", &builtin_true, "Do nothing, successfully")
             .add("false", &builtin_false, "Do nothing, unsuccessfully")
             .add(
@@ -243,19 +247,6 @@ impl<'a> BuiltinMap<'a> {
     }
 }
 
-fn starts_with(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    Status::from_exit_code(conditionals::starts_with(args))
-}
-fn ends_with(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    Status::from_exit_code(conditionals::ends_with(args))
-}
-fn contains(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    Status::from_exit_code(conditionals::contains(args))
-}
-
-// Definitions of simple builtins go here
-pub fn builtin_status(args: &[types::Str], shell: &mut Shell<'_>) -> Status { status(args, shell) }
-
 pub fn builtin_dir_depth(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let depth = match args.get(1) {
         None => None,
@@ -268,11 +259,17 @@ pub fn builtin_dir_depth(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-pub fn builtin_cd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_CD) {
-        return Status::SUCCESS;
-    }
+#[builtin(man = "
+Change directory.
 
+SYNOPSIS
+    cd DIRECTORY
+
+DESCRIPTION
+    Without arguments cd changes the working directory to your home directory.
+    With arguments cd changes the working directory to the directory you provided.
+")]
+pub fn cd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let err = match args.get(1) {
         Some(dir) => {
             let dir = dir.as_ref();
@@ -307,7 +304,16 @@ pub fn builtin_cd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_bool(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
+#[builtin(man = "
+Returns true if the value given to it is equal to '1' or 'true'.
+
+SYNOPSIS
+    bool VALUE
+
+DESCRIPTION
+    Returns true if the value given to it is equal to '1' or 'true'.
+")]
+pub fn bool(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if args.len() != 2 {
         return Status::error("bool requires one argument");
     }
@@ -320,32 +326,27 @@ pub fn builtin_bool(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
         _ => match &*args[1] {
             "1" => (),
             "true" => (),
-            "--help" => println!("{}", MAN_BOOL),
-            "-h" => println!("{}", MAN_BOOL),
             _ => return Status::from_exit_code(1),
         },
     }
     Status::SUCCESS
 }
 
-pub fn builtin_is(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_IS) {
-        return Status::SUCCESS;
-    }
+#[builtin(man = "
+prints the directory stack
 
-    is(args, shell)
-}
+SYNOPSIS
+    dirs
 
-pub fn builtin_dirs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
+DESCRIPTION
+    dirs prints the current directory stack.
+")]
+pub fn dirs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     // converts pbuf to an absolute path if possible
     fn try_abs_path(pbuf: &PathBuf) -> Cow<'_, str> {
         Cow::Owned(
             pbuf.canonicalize().unwrap_or_else(|_| pbuf.clone()).to_string_lossy().to_string(),
         )
-    }
-
-    if check_help(args, MAN_DIRS) {
-        return Status::SUCCESS;
     }
 
     let mut clear = false; // -c
@@ -403,11 +404,16 @@ pub fn builtin_dirs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_pushd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_PUSHD) {
-        return Status::SUCCESS;
-    }
+#[builtin(man = "
+push a directory to the directory stack
 
+SYNOPSIS
+    pushd DIRECTORY
+
+DESCRIPTION
+    pushd pushes a directory to the directory stack.
+")]
+pub fn pushd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     enum Action {
         Switch,          // <no arguments>
         RotLeft(usize),  // +[num]
@@ -474,11 +480,18 @@ pub fn builtin_pushd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-pub fn builtin_popd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_POPD) {
-        return Status::SUCCESS;
-    }
+#[builtin(man = "
+shift through the directory stack
 
+SYNOPSIS
+    popd
+
+DESCRIPTION
+    popd removes the top directory from the directory stack and changes the working directory to \
+                 the new top directory.
+    pushd adds directories to the stack.
+")]
+pub fn popd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let len = shell.dir_stack().dirs().len();
     if len <= 1 {
         return Status::error("ion: popd: directory stack empty");

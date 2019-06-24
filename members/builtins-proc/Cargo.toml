@@ -1,0 +1,15 @@
+[package]
+name = "builtins-proc"
+version = "0.1.0"
+authors = ["Xavier L'Heureux <xavier.lheureux@icloud.com>"]
+edition = "2018"
+
+[dependencies]
+quote = "0.6"
+syn = { version = "0.15", features = ["full"] }
+
+[dev-dependencies]
+ion-shell = { path = "../.." }
+
+[lib]
+proc-macro = true

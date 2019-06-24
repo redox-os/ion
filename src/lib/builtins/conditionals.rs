@@ -1,15 +1,19 @@
+use super::Status;
 use small;
 
 macro_rules! string_function {
     ($method:tt) => {
-        pub fn $method(args: &[small::String]) -> i32 {
-            match args.len() {
-                0...2 => {
-                    eprintln!("ion: {}: two arguments must be supplied", args[0]);
-                    return 2;
-                }
-                3 => !args[1].$method(args[2].as_str()) as i32,
-                _ => !args[2..].iter().any(|arg| args[1].$method(arg.as_str())) as i32,
+        pub fn $method(args: &[small::String], _shell: &mut crate::Shell<'_>) -> Status {
+            if args.len() <= 2 {
+                return Status::bad_argument(format!(
+                    "ion: {}: two arguments must be supplied",
+                    args[0]
+                ));
+            }
+            if args[2..].iter().any(|arg| args[1].$method(arg.as_str())) {
+                Status::SUCCESS
+            } else {
+                Status::error("")
             }
         }
     };
