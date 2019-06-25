@@ -1,13 +1,13 @@
+use super::Status;
+use crate as ion_shell;
+use crate::{types, Shell};
+use builtins_proc::builtin;
 use std::{
     fs,
     os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt},
     path::Path,
     time::SystemTime,
 };
-use crate as ion_shell;
-use builtins_proc::builtin;
-use super::Status;
-use crate::{types, Shell};
 
 const QUICK_GUIDE: &str = r#"Usage: test [EXPRESSION]
 Try 'test --help' for more information."#;
@@ -219,10 +219,7 @@ fn get_modified_file_time(filename: &str) -> Option<SystemTime> {
 }
 
 /// Attempt to parse a &str as a usize.
-fn parse_integers(
-    left: &str,
-    right: &str,
-) -> Result<(Option<isize>, Option<isize>), types::Str> {
+fn parse_integers(left: &str, right: &str) -> Result<(Option<isize>, Option<isize>), types::Str> {
     let parse_integer = |input: &str| -> Result<Option<isize>, types::Str> {
         match input
             .parse::<isize>()
@@ -381,9 +378,7 @@ fn test_empty_str() {
 
 #[test]
 fn test_integers_arguments() {
-    fn vec_string(args: &[&str]) -> Vec<types::Str> {
-        args.iter().map(|s| (*s).into()).collect()
-    }
+    fn vec_string(args: &[&str]) -> Vec<types::Str> { args.iter().map(|s| (*s).into()).collect() }
     // Equal To
     assert_eq!(evaluate_arguments(&vec_string(&["10", "-eq", "10"])), Ok(true));
     assert_eq!(evaluate_arguments(&vec_string(&["10", "-eq", "5"])), Ok(false));

@@ -9,6 +9,7 @@ use builtins_proc::builtin;
 use std::{borrow::Cow, env};
 
 #[builtin(
+    names = "which, type",
     desc = "locate a program file in the current user's path",
     man = "
 SYNOPSIS
@@ -37,34 +38,6 @@ pub fn which(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                 _path => println!("{}", _path),
             },
             Err(_) => result = Status::from_exit_code(1),
-        }
-    }
-    result
-}
-
-pub fn builtin_type(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    // Type does not accept help flags, aka "--help".
-    if args.len() == 1 {
-        return Status::bad_argument("type: Expected at least 1 args, got only 0");
-    }
-
-    let mut result = Status::SUCCESS;
-    for command in &args[1..] {
-        match get_command_info(command, shell) {
-            Ok(c_type) => {
-                match c_type.as_ref() {
-                    "alias" => {
-                        if let Some(Value::Alias(alias)) = shell.variables().get(&**command) {
-                            println!("{} is aliased to `{}`", command, &**alias);
-                        }
-                    }
-                    // TODO Make it print the function.
-                    "function" => println!("{} is a function", command),
-                    "builtin" => println!("{} is a shell builtin", command),
-                    _path => println!("{} is {}", command, _path),
-                }
-            }
-            Err(_) => result = Status::error(format!("type: {}: not found", command)),
         }
     }
     result

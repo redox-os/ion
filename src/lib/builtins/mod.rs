@@ -17,7 +17,7 @@ mod test;
 mod variables;
 
 pub use self::{
-    command_info::{builtin_type, builtin_which},
+    command_info::builtin_which,
     conditionals::{contains, ends_with, starts_with},
     echo::builtin_echo,
     exists::exists,
@@ -181,10 +181,9 @@ impl<'a> BuiltinMap<'a> {
 
     /// Utilities concerning the filesystem
     ///
-    /// Contains `which`, `test`, `exists`, `popd`, `pushd`, `dirs`, `cd`
+    /// Contains `test`, `exists`, `popd`, `pushd`, `dirs`, `cd`
     pub fn with_files_and_directory(&mut self) -> &mut Self {
-        self.add("which", &builtin_which, "Shows the full path of commands")
-            .add("test", &builtin_test, "Performs tests on files and text")
+        self.add("test", &builtin_test, "Performs tests on files and text")
             .add("exists", &builtin_exists, "Performs tests on files and text")
             .add("popd", &builtin_popd, "Pop a directory from the stack")
             .add("pushd", &builtin_pushd, "Push a directory to the stack")
@@ -225,13 +224,14 @@ impl<'a> BuiltinMap<'a> {
 
     /// Basic utilities for any ion embedded library
     ///
-    /// Contains `help`, `source`, `status`, `echo`, `type`
+    /// Contains `help`, `source`, `status`, `echo`, `type`, `which`
     pub fn with_basic(&mut self) -> &mut Self {
         self.add("help", &builtin_help, HELP_DESC)
             .add("source", &builtin_source, SOURCE_DESC)
             .add("status", &builtin_status, "Evaluates the current runtime status")
             .add("echo", &builtin_echo, "Display a line of text")
-            .add("type", &builtin_type, "indicates how a command would be interpreted")
+            .add("which", &builtin_which, "indicates what would be called for a given command")
+            .add("type", &builtin_which, "indicates what would be called for a given command")
     }
 
     /// Utilities that may be a security risk. Not included by default

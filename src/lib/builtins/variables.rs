@@ -123,11 +123,9 @@ pub fn drop(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{expansion::Expander};
+    use crate::expansion::Expander;
 
-    fn vec_string(args: &[&str]) -> Vec<types::Str> {
-        args.iter().map(|s| (*s).into()).collect()
-    }
+    fn vec_string(args: &[&str]) -> Vec<types::Str> { args.iter().map(|s| (*s).into()).collect() }
 
     // TODO: Rewrite tests now that let is part of the grammar.
     // #[test]
