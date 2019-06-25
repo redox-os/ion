@@ -72,9 +72,7 @@ fn find_operator(bytes: &[u8], read: usize) -> Option<(Operator, usize)> {
     }
 }
 
-fn is_open_delimiter(byte: u8) -> bool {
-    byte == b'['
-}
+fn is_open_delimiter(byte: u8) -> bool { byte == b'[' }
 
 fn delimiters_match(open: u8, close: u8) -> bool {
     match (open, close) {

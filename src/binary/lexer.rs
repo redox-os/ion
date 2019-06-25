@@ -15,7 +15,7 @@ pub enum DesignatorToken<'a> {
 
 #[derive(Debug)]
 pub struct DesignatorLexer<'a> {
-    data: &'a [u8],
+    data:   &'a [u8],
     quotes: Quotes,
     design: bool,
 }

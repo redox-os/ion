@@ -48,7 +48,7 @@ pub enum Capture {
 ///
 /// Using this structure directly is equivalent to using `Shell`'s fork method.
 pub struct Fork<'a, 'b: 'a> {
-    shell: &'a Shell<'b>,
+    shell:   &'a Shell<'b>,
     capture: Capture,
 }
 
@@ -58,7 +58,7 @@ pub struct Fork<'a, 'b: 'a> {
 /// in the future, once there's a better means of obtaining the exit status without having to
 /// wait on the PID.
 pub struct IonResult {
-    pub pid: u32,
+    pub pid:    u32,
     pub stdout: Option<File>,
     pub stderr: Option<File>,
     pub status: u8,
@@ -151,7 +151,5 @@ impl<'a, 'b> Fork<'a, 'b> {
     }
 
     /// Creates a new `Fork` state from an existing shell.
-    pub fn new(shell: &'a Shell<'b>, capture: Capture) -> Fork<'a, 'b> {
-        Fork { shell, capture }
-    }
+    pub fn new(shell: &'a Shell<'b>, capture: Capture) -> Fork<'a, 'b> { Fork { shell, capture } }
 }

@@ -24,17 +24,13 @@ impl<T: Eq> Eq for Value<T> {}
 
 // this one’s only special because of the lifetime parameter
 impl<'a, T> From<&'a str> for Value<T> {
-    fn from(string: &'a str) -> Self {
-        Value::Str(string.into())
-    }
+    fn from(string: &'a str) -> Self { Value::Str(string.into()) }
 }
 
 macro_rules! value_from_type {
     ($arg:ident: $from:ty => $variant:ident($inner:expr)) => {
         impl<T> From<$from> for Value<T> {
-            fn from($arg: $from) -> Self {
-                Value::$variant($inner)
-            }
+            fn from($arg: $from) -> Self { Value::$variant($inner) }
         }
     };
 }

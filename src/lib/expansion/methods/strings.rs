@@ -357,9 +357,9 @@ mod test {
     fn test_ends_with_succeeding() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "ends_with",
-            variable: "$FOO",
-            pattern: "\"BAR\"",
+            method:    "ends_with",
+            variable:  "$FOO",
+            pattern:   "\"BAR\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -370,9 +370,9 @@ mod test {
     fn test_ends_with_failing() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "ends_with",
-            variable: "$FOO",
-            pattern: "\"BA\"",
+            method:    "ends_with",
+            variable:  "$FOO",
+            pattern:   "\"BA\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -383,9 +383,9 @@ mod test {
     fn test_contains_succeeding() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "contains",
-            variable: "$FOO",
-            pattern: "\"OBA\"",
+            method:    "contains",
+            variable:  "$FOO",
+            pattern:   "\"OBA\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -396,9 +396,9 @@ mod test {
     fn test_contains_failing() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "contains",
-            variable: "$FOO",
-            pattern: "\"OBI\"",
+            method:    "contains",
+            variable:  "$FOO",
+            pattern:   "\"OBI\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -409,9 +409,9 @@ mod test {
     fn test_starts_with_succeeding() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "starts_with",
-            variable: "$FOO",
-            pattern: "\"FOO\"",
+            method:    "starts_with",
+            variable:  "$FOO",
+            pattern:   "\"FOO\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -422,9 +422,9 @@ mod test {
     fn test_starts_with_failing() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "starts_with",
-            variable: "$FOO",
-            pattern: "\"OO\"",
+            method:    "starts_with",
+            variable:  "$FOO",
+            pattern:   "\"OO\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -435,9 +435,9 @@ mod test {
     fn test_basename() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "basename",
-            variable: "\"/home/redox/file.txt\"",
-            pattern: "",
+            method:    "basename",
+            variable:  "\"/home/redox/file.txt\"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -448,9 +448,9 @@ mod test {
     fn test_extension() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "extension",
-            variable: "\"/home/redox/file.txt\"",
-            pattern: "",
+            method:    "extension",
+            variable:  "\"/home/redox/file.txt\"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -461,9 +461,9 @@ mod test {
     fn test_filename() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "filename",
-            variable: "\"/home/redox/file.txt\"",
-            pattern: "",
+            method:    "filename",
+            variable:  "\"/home/redox/file.txt\"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -474,9 +474,9 @@ mod test {
     fn test_parent() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "parent",
-            variable: "\"/home/redox/file.txt\"",
-            pattern: "",
+            method:    "parent",
+            variable:  "\"/home/redox/file.txt\"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -487,9 +487,9 @@ mod test {
     fn test_to_lowercase() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "to_lowercase",
-            variable: "\"Ford Prefect\"",
-            pattern: "",
+            method:    "to_lowercase",
+            variable:  "\"Ford Prefect\"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -500,9 +500,9 @@ mod test {
     fn test_to_uppercase() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "to_uppercase",
-            variable: "\"Ford Prefect\"",
-            pattern: "",
+            method:    "to_uppercase",
+            variable:  "\"Ford Prefect\"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -513,9 +513,9 @@ mod test {
     fn test_trim_with_string() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "trim",
-            variable: "\"  Foo Bar \"",
-            pattern: "",
+            method:    "trim",
+            variable:  "\"  Foo Bar \"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -525,8 +525,12 @@ mod test {
     #[test]
     fn test_trim_with_variable() {
         let mut output = types::Str::new();
-        let method =
-            StringMethod { method: "trim", variable: "$BAZ", pattern: "", selection: Select::All };
+        let method = StringMethod {
+            method:    "trim",
+            variable:  "$BAZ",
+            pattern:   "",
+            selection: Select::All,
+        };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "BARBAZ");
     }
@@ -535,9 +539,9 @@ mod test {
     fn test_trim_right_with_string() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "trim_right",
-            variable: "\"  Foo Bar \"",
-            pattern: "",
+            method:    "trim_right",
+            variable:  "\"  Foo Bar \"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -548,9 +552,9 @@ mod test {
     fn test_trim_right_with_variable() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "trim_right",
-            variable: "$BAZ",
-            pattern: "",
+            method:    "trim_right",
+            variable:  "$BAZ",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -561,9 +565,9 @@ mod test {
     fn test_trim_left_with_string() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "trim_left",
-            variable: "\"  Foo Bar \"",
-            pattern: "",
+            method:    "trim_left",
+            variable:  "\"  Foo Bar \"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -574,9 +578,9 @@ mod test {
     fn test_trim_left_with_variable() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "trim_left",
-            variable: "$BAZ",
-            pattern: "",
+            method:    "trim_left",
+            variable:  "$BAZ",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -587,9 +591,9 @@ mod test {
     fn test_repeat_succeeding() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "repeat",
-            variable: "$FOO",
-            pattern: "2",
+            method:    "repeat",
+            variable:  "$FOO",
+            pattern:   "2",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -601,9 +605,9 @@ mod test {
     fn test_repeat_failing() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "repeat",
-            variable: "$FOO",
-            pattern: "-2",
+            method:    "repeat",
+            variable:  "$FOO",
+            pattern:   "-2",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -613,9 +617,9 @@ mod test {
     fn test_replace_succeeding() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "replace",
-            variable: "$FOO",
-            pattern: "[\"FOO\" \"BAR\"]",
+            method:    "replace",
+            variable:  "$FOO",
+            pattern:   "[\"FOO\" \"BAR\"]",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -627,9 +631,9 @@ mod test {
     fn test_replace_failing() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "replace",
-            variable: "$FOO",
-            pattern: "[]",
+            method:    "replace",
+            variable:  "$FOO",
+            pattern:   "[]",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -639,9 +643,9 @@ mod test {
     fn test_replacen_succeeding() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "replacen",
-            variable: "\"FOO$FOO\"",
-            pattern: "[\"FOO\" \"BAR\" 1]",
+            method:    "replacen",
+            variable:  "\"FOO$FOO\"",
+            pattern:   "[\"FOO\" \"BAR\" 1]",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -653,9 +657,9 @@ mod test {
     fn test_replacen_failing() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "replacen",
-            variable: "$FOO",
-            pattern: "[]",
+            method:    "replacen",
+            variable:  "$FOO",
+            pattern:   "[]",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -665,9 +669,9 @@ mod test {
     fn test_regex_replace_succeeding() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "regex_replace",
-            variable: "$FOO",
-            pattern: "[\"^F\" \"f\"]",
+            method:    "regex_replace",
+            variable:  "$FOO",
+            pattern:   "[\"^F\" \"f\"]",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -678,9 +682,9 @@ mod test {
     fn test_regex_replace_failing() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "regex_replace",
-            variable: "$FOO",
-            pattern: "[\"^f\" \"F\"]",
+            method:    "regex_replace",
+            variable:  "$FOO",
+            pattern:   "[\"^f\" \"F\"]",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -691,9 +695,9 @@ mod test {
     fn test_join_with_string() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "join",
-            variable: "[\"FOO\" \"BAR\"]",
-            pattern: "\" \"",
+            method:    "join",
+            variable:  "[\"FOO\" \"BAR\"]",
+            pattern:   "\" \"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -704,9 +708,9 @@ mod test {
     fn test_join_with_array() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "join",
-            variable: "[\"FOO\" \"BAR\"]",
-            pattern: "[\"-\" \"-\"]",
+            method:    "join",
+            variable:  "[\"FOO\" \"BAR\"]",
+            pattern:   "[\"-\" \"-\"]",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -717,9 +721,9 @@ mod test {
     fn test_len_with_array() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "len",
-            variable: "[\"1\"]",
-            pattern: "",
+            method:    "len",
+            variable:  "[\"1\"]",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -730,9 +734,9 @@ mod test {
     fn test_len_with_string() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "len",
-            variable: "\"FOO\"",
-            pattern: "",
+            method:    "len",
+            variable:  "\"FOO\"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -742,8 +746,12 @@ mod test {
     #[test]
     fn test_len_with_variable() {
         let mut output = types::Str::new();
-        let method =
-            StringMethod { method: "len", variable: "$FOO", pattern: "", selection: Select::All };
+        let method = StringMethod {
+            method:    "len",
+            variable:  "$FOO",
+            pattern:   "",
+            selection: Select::All,
+        };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "6");
     }
@@ -752,9 +760,9 @@ mod test {
     fn test_len_bytes_with_variable() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "len_bytes",
-            variable: "$FOO",
-            pattern: "",
+            method:    "len_bytes",
+            variable:  "$FOO",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -765,9 +773,9 @@ mod test {
     fn test_len_bytes_with_string() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "len_bytes",
-            variable: "\"oh là là\"",
-            pattern: "",
+            method:    "len_bytes",
+            variable:  "\"oh là là\"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -778,9 +786,9 @@ mod test {
     fn test_reverse_with_variable() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "reverse",
-            variable: "$FOO",
-            pattern: "",
+            method:    "reverse",
+            variable:  "$FOO",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -791,9 +799,9 @@ mod test {
     fn test_reverse_with_string() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "reverse",
-            variable: "\"FOOBAR\"",
-            pattern: "",
+            method:    "reverse",
+            variable:  "\"FOOBAR\"",
+            pattern:   "",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -804,9 +812,9 @@ mod test {
     fn test_find_succeeding() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "find",
-            variable: "$FOO",
-            pattern: "\"O\"",
+            method:    "find",
+            variable:  "$FOO",
+            pattern:   "\"O\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -817,9 +825,9 @@ mod test {
     fn test_find_failing() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "find",
-            variable: "$FOO",
-            pattern: "\"L\"",
+            method:    "find",
+            variable:  "$FOO",
+            pattern:   "\"L\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -830,9 +838,9 @@ mod test {
     fn test_or_undefined() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "or",
-            variable: "$NDIUKFBINCF",
-            pattern: "\"baz\"",
+            method:    "or",
+            variable:  "$NDIUKFBINCF",
+            pattern:   "\"baz\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -843,9 +851,9 @@ mod test {
     fn test_or_empty() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "or",
-            variable: "$EMPTY",
-            pattern: "\"baz\"",
+            method:    "or",
+            variable:  "$EMPTY",
+            pattern:   "\"baz\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -856,9 +864,9 @@ mod test {
     fn test_or_defined() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "or",
-            variable: "$FOO",
-            pattern: "\"baz\"",
+            method:    "or",
+            variable:  "$FOO",
+            pattern:   "\"baz\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -869,9 +877,9 @@ mod test {
     fn test_or_three_args_second_arg_defined() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "or",
-            variable: "$EMPTY",
-            pattern: "\"bar\", \"baz\"",
+            method:    "or",
+            variable:  "$EMPTY",
+            pattern:   "\"bar\", \"baz\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -882,9 +890,9 @@ mod test {
     fn test_or_three_args_third_arg_defined() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "or",
-            variable: "$EMPTY",
-            pattern: "\"\", \"baz\"",
+            method:    "or",
+            variable:  "$EMPTY",
+            pattern:   "\"\", \"baz\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
@@ -895,9 +903,9 @@ mod test {
     fn test_or_no_pattern() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method: "or",
-            variable: "$FOO",
-            pattern: "\"\"",
+            method:    "or",
+            variable:  "$FOO",
+            pattern:   "\"\"",
             selection: Select::All,
         };
         method.handle(&mut output, &DummyExpander).unwrap();

@@ -15,9 +15,7 @@ pub const SIGHUP: u8 = 2;
 pub const SIGTERM: u8 = 4;
 
 /// Resumes a given process by it's process ID.
-pub fn resume(pid: u32) {
-    let _ = sys::killpg(pid, libc::SIGCONT);
-}
+pub fn resume(pid: u32) { let _ = sys::killpg(pid, libc::SIGCONT); }
 
 /// The purpose of the signal handler is to ignore signals when it is active, and then continue
 /// listening to signals once the handler is dropped.
@@ -31,9 +29,7 @@ impl SignalHandler {
 }
 
 impl Drop for SignalHandler {
-    fn drop(&mut self) {
-        unblock();
-    }
+    fn drop(&mut self) { unblock(); }
 }
 
 impl Iterator for SignalHandler {

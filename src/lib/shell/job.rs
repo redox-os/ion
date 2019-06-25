@@ -8,16 +8,14 @@ use std::{fmt, fs::File, str};
 
 #[derive(Clone)]
 pub struct Job<'a> {
-    pub args: types::Args,
+    pub args:        types::Args,
     pub redirection: RedirectFrom,
-    pub builtin: Option<BuiltinFunction<'a>>,
+    pub builtin:     Option<BuiltinFunction<'a>>,
 }
 
 impl<'a> Job<'a> {
     /// Get the job command (its first arg)
-    pub fn command(&self) -> &types::Str {
-        &self.args[0]
-    }
+    pub fn command(&self) -> &types::Str { &self.args[0] }
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
@@ -71,11 +69,11 @@ fn expand_arg(arg: &str, shell: &Shell<'_>) -> expansion::Result<types::Args, Io
 /// This represents a job that has been processed and expanded to be run
 /// as part of some pipeline
 pub struct RefinedJob<'a> {
-    pub stdin: Option<File>,
+    pub stdin:  Option<File>,
     pub stdout: Option<File>,
     pub stderr: Option<File>,
-    pub args: types::Args,
-    pub var: JobVariant<'a>,
+    pub args:   types::Args,
+    pub var:    JobVariant<'a>,
 }
 
 pub enum JobVariant<'a> {
@@ -102,13 +100,9 @@ pub struct TeeItem {
 }
 
 impl TeeItem {
-    pub fn new() -> Self {
-        TeeItem { sinks: Vec::new(), source: None }
-    }
+    pub fn new() -> Self { TeeItem { sinks: Vec::new(), source: None } }
 
-    pub fn add(&mut self, sink: File) {
-        self.sinks.push(sink);
-    }
+    pub fn add(&mut self, sink: File) { self.sinks.push(sink); }
 
     /// Writes out to all destinations of a Tee. Takes an extra `RedirectFrom` argument in
     /// order to
@@ -162,13 +156,9 @@ impl TeeItem {
 }
 
 impl<'a> RefinedJob<'a> {
-    pub fn command(&self) -> &types::Str {
-        &self.args[0]
-    }
+    pub fn command(&self) -> &types::Str { &self.args[0] }
 
-    pub fn args(&self) -> &types::Args {
-        &self.args
-    }
+    pub fn args(&self) -> &types::Args { &self.args }
 
     pub fn stderr(&mut self, file: File) {
         if let JobVariant::Cat { .. } = self.var {
@@ -185,31 +175,27 @@ impl<'a> RefinedJob<'a> {
         }
     }
 
-    pub fn stdout(&mut self, file: File) {
-        self.stdout = Some(file);
-    }
+    pub fn stdout(&mut self, file: File) { self.stdout = Some(file); }
 
-    pub fn stdin(&mut self, file: File) {
-        self.stdin = Some(file);
-    }
+    pub fn stdin(&mut self, file: File) { self.stdin = Some(file); }
 
     pub fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
         RefinedJob {
-            stdin: None,
+            stdin:  None,
             stdout: None,
             stderr: None,
-            args: types::Args::new(),
-            var: JobVariant::Tee { items: (tee_out, tee_err) },
+            args:   types::Args::new(),
+            var:    JobVariant::Tee { items: (tee_out, tee_err) },
         }
     }
 
     pub fn cat(sources: Vec<File>) -> Self {
         RefinedJob {
-            stdin: None,
+            stdin:  None,
             stdout: None,
             stderr: None,
-            args: types::Args::new(),
-            var: JobVariant::Cat { sources },
+            args:   types::Args::new(),
+            var:    JobVariant::Cat { sources },
         }
     }
 

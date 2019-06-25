@@ -14,9 +14,9 @@ use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ArrayMethod<'a> {
-    method: &'a str,
-    variable: &'a str,
-    pattern: Pattern<'a>,
+    method:    &'a str,
+    variable:  &'a str,
+    pattern:   Pattern<'a>,
     selection: Select<types::Str>,
 }
 

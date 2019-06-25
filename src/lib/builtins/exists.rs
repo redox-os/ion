@@ -166,9 +166,7 @@ fn file_has_execute_permission(filepath: &str) -> bool {
 }
 
 /// Returns true if the string is not empty
-fn string_is_nonzero(string: &str) -> bool {
-    !string.is_empty()
-}
+fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
 
 /// Returns true if the variable is an array and the array is not empty
 fn array_var_is_not_empty(arrayvar: &str, shell: &Shell<'_>) -> bool {

@@ -52,9 +52,7 @@ macro_rules! math {
         impl<'a, T> $trait<Value<T>> for &'a Value<T> {
             type Output = Result<Value<T>, OpError>;
 
-            fn $fn(self, rhs: Value<T>) -> Self::Output {
-                self.$fn(&rhs)
-            }
+            fn $fn(self, rhs: Value<T>) -> Self::Output { self.$fn(&rhs) }
         }
 
         impl<'a, T> $trait<i128> for &'a Value<T> {

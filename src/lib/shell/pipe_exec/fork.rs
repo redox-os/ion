@@ -6,9 +6,7 @@ use crate::{builtins::Status, expansion::pipelines::Pipeline};
 
 impl<'a> Shell<'a> {
     /// Ensures that the forked child is given a unique process ID.
-    fn create_process_group(pgid: u32) {
-        let _ = sys::setpgid(0, pgid);
-    }
+    fn create_process_group(pgid: u32) { let _ = sys::setpgid(0, pgid); }
 
     /// Forks the shell, adding the child to the parent's background list, and executing
     /// the given commands in the child fork.

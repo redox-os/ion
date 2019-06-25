@@ -53,7 +53,7 @@ DESCRIPTION
 
 pub struct InteractiveBinary<'a> {
     context: Rc<RefCell<Context>>,
-    shell: RefCell<Shell<'a>>,
+    shell:   RefCell<Shell<'a>>,
 }
 
 impl<'a> InteractiveBinary<'a> {
@@ -240,8 +240,8 @@ struct WordDivide<I>
 where
     I: Iterator<Item = (usize, char)>,
 {
-    iter: I,
-    count: usize,
+    iter:       I,
+    count:      usize,
     word_start: Option<usize>,
 }
 impl<I> WordDivide<I>

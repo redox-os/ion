@@ -14,8 +14,8 @@ pub enum Namespace {
 
 #[derive(Clone, Debug)]
 pub struct Scopes<K: Hash + Eq, V> {
-    flags: u8,
-    scopes: Vec<Scope<K, V>>,
+    flags:   u8,
+    scopes:  Vec<Scope<K, V>>,
     current: usize,
 }
 
@@ -30,22 +30,18 @@ pub struct Scope<K: Hash + Eq, V> {
 impl<K: Hash + Eq, V> Deref for Scope<K, V> {
     type Target = HashMap<K, V>;
 
-    fn deref(&self) -> &Self::Target {
-        &self.vars
-    }
+    fn deref(&self) -> &Self::Target { &self.vars }
 }
 
 impl<K: Hash + Eq, V> DerefMut for Scope<K, V> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.vars
-    }
+    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.vars }
 }
 
 impl<K: Hash + Eq, V: Clone> Scopes<K, V> {
     pub fn with_capacity(cap: usize) -> Self {
         Self {
-            flags: 0,
-            scopes: vec![Scope { vars: HashMap::with_capacity(cap), namespace: false }],
+            flags:   0,
+            scopes:  vec![Scope { vars: HashMap::with_capacity(cap), namespace: false }],
             current: 0,
         }
     }

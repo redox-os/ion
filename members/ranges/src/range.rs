@@ -36,19 +36,11 @@ impl Range {
         }
     }
 
-    pub fn exclusive(start: Index, end: Index) -> Range {
-        Range { start, end, inclusive: false }
-    }
+    pub fn exclusive(start: Index, end: Index) -> Range { Range { start, end, inclusive: false } }
 
-    pub fn inclusive(start: Index, end: Index) -> Range {
-        Range { start, end, inclusive: true }
-    }
+    pub fn inclusive(start: Index, end: Index) -> Range { Range { start, end, inclusive: true } }
 
-    pub fn from(start: Index) -> Range {
-        Range { start, end: Index::new(-1), inclusive: true }
-    }
+    pub fn from(start: Index) -> Range { Range { start, end: Index::new(-1), inclusive: true } }
 
-    pub fn to(end: Index) -> Range {
-        Range { start: Index::new(0), end, inclusive: false }
-    }
+    pub fn to(end: Index) -> Range { Range { start: Index::new(0), end, inclusive: false } }
 }

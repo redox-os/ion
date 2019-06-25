@@ -40,16 +40,16 @@ pub enum StatementVariant<'a> {
 
 #[derive(Debug)]
 pub struct StatementSplitter<'a> {
-    data: &'a str,
-    read: usize,
-    paren_level: u8,
-    brace_level: u8,
+    data:             &'a str,
+    read:             usize,
+    paren_level:      u8,
+    brace_level:      u8,
     math_paren_level: i8,
-    logical: LogicalOp,
-    skip: bool,
-    vbrace: bool,
-    variable: bool,
-    quotes: bool,
+    logical:          LogicalOp,
+    skip:             bool,
+    vbrace:           bool,
+    variable:         bool,
+    quotes:           bool,
 }
 
 impl<'a> StatementSplitter<'a> {

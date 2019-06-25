@@ -92,15 +92,11 @@ pub enum ExpansionError<T: fmt::Debug + error::Error + fmt::Display + 'static> {
 }
 
 impl<T: fmt::Display + fmt::Debug + error::Error> From<TypeError> for ExpansionError<T> {
-    fn from(cause: TypeError) -> Self {
-        ExpansionError::TypeError(cause)
-    }
+    fn from(cause: TypeError) -> Self { ExpansionError::TypeError(cause) }
 }
 
 impl<T: fmt::Display + fmt::Debug + error::Error> From<MethodError> for ExpansionError<T> {
-    fn from(cause: MethodError) -> Self {
-        ExpansionError::MethodError(cause)
-    }
+    fn from(cause: MethodError) -> Self { ExpansionError::MethodError(cause) }
 }
 
 /// The result of expansion with a given expander
@@ -156,9 +152,7 @@ pub trait Expander: Sized {
         }
     }
     /// Get an array that exists in the shell.
-    fn get_array(&self, value: &str) -> Result<Args, Self::Error> {
-        self.expand_string(value)
-    }
+    fn get_array(&self, value: &str) -> Result<Args, Self::Error> { self.expand_string(value) }
     /// Performs shell expansions to an input string, efficiently returning the final
     /// expanded form. Shells must provide their own batteries for expanding tilde
     /// and variable words.
@@ -672,13 +666,9 @@ pub(crate) mod test {
             }
         }
 
-        fn command(&self, cmd: &str) -> Result<types::Str, Self::Error> {
-            Ok(cmd.into())
-        }
+        fn command(&self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
 
-        fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> {
-            Ok(input.into())
-        }
+        fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 
         fn map_keys<'a>(
             &'a self,
