@@ -54,7 +54,7 @@ EXAMPLES
 
 AUTHOR
     Written by Fabian Würfl.
-    Heavily based on implementation of the test builtin, which was written by Michael Murph.
+    Heavily based on implementation of the test builtin, which was written by Michael Murphy.
 0
 NAME
     exists - check whether items exist
@@ -110,7 +110,7 @@ EXAMPLES
 
 AUTHOR
     Written by Fabian Würfl.
-    Heavily based on implementation of the test builtin, which was written by Michael Murph.
+    Heavily based on implementation of the test builtin, which was written by Michael Murphy.
 0
 1
 0

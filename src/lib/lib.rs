@@ -82,3 +82,4 @@ pub use crate::{
     builtins::{BuiltinFunction, BuiltinMap},
     shell::*,
 };
+pub use builtins_proc::builtin;

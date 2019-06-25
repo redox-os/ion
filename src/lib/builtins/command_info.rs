@@ -1,19 +1,27 @@
-use super::{check_help, man_pages::MAN_WHICH, Status};
+use super::Status;
+use crate as ion_shell;
 use crate::{
     shell::{Shell, Value},
     types,
 };
+use builtins_proc::builtin;
 
 use std::{borrow::Cow, env};
 
-pub fn which(args: &[types::Str], shell: &mut Shell<'_>) -> Result<Status, ()> {
-    if check_help(args, MAN_WHICH) {
-        return Ok(Status::SUCCESS);
-    }
+#[builtin(
+    names = "which, type",
+    desc = "locate a program file in the current user's path",
+    man = "
+SYNOPSIS
+    which PROGRAM
 
+DESCRIPTION
+    The which utility takes a list of command names and searches for the
+    alias/builtin/function/executable that would be executed if you ran that command."
+)]
+pub fn which(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if args.len() == 1 {
-        eprintln!("which: Expected at least 1 args, got only 0");
-        return Err(());
+        return Status::bad_argument("which: Expected at least 1 args, got only 0");
     }
 
     let mut result = Status::SUCCESS;
@@ -32,36 +40,7 @@ pub fn which(args: &[types::Str], shell: &mut Shell<'_>) -> Result<Status, ()> {
             Err(_) => result = Status::from_exit_code(1),
         }
     }
-    Ok(result)
-}
-
-pub fn find_type(args: &[types::Str], shell: &mut Shell<'_>) -> Result<Status, ()> {
-    // Type does not accept help flags, aka "--help".
-    if args.len() == 1 {
-        eprintln!("type: Expected at least 1 args, got only 0");
-        return Err(());
-    }
-
-    let mut result = Status::SUCCESS;
-    for command in &args[1..] {
-        match get_command_info(command, shell) {
-            Ok(c_type) => {
-                match c_type.as_ref() {
-                    "alias" => {
-                        if let Some(Value::Alias(alias)) = shell.variables().get(&**command) {
-                            println!("{} is aliased to `{}`", command, &**alias);
-                        }
-                    }
-                    // TODO Make it print the function.
-                    "function" => println!("{} is a function", command),
-                    "builtin" => println!("{} is a shell builtin", command),
-                    _path => println!("{} is {}", command, _path),
-                }
-            }
-            Err(_) => result = Status::error(format!("type: {}: not found", command)),
-        }
-    }
-    Ok(result)
+    result
 }
 
 fn get_command_info<'a>(command: &str, shell: &mut Shell<'_>) -> Result<Cow<'a, str>, ()> {

@@ -1,40 +1,32 @@
-use ion_shell::{
-    builtins::{man_pages::check_help, Status},
-    types::Str,
-    Shell,
-};
+use ion_shell::{builtin, builtins::Status, types::Str, Shell};
 use libc::SIGTERM;
 use std::{error::Error, os::unix::process::CommandExt, process::Command};
 
-const MAN_EXEC: &str = r#"NAME
-    exec - Replace the shell with the given command.
-
+#[builtin(
+    desc = "suspend the current shell",
+    man = "
 SYNOPSIS
-    exec [-ch] [--help] [command [arguments ...]]
+    suspend
 
 DESCRIPTION
-    Execute <command>, replacing the shell with the specified program.
-    The <arguments> following the command become the arguments to
-    <command>.
+    Suspends the current shell by sending it the SIGTSTP signal,
+    returning to the parent process. It can be resumed by sending it SIGCONT."
+)]
+pub fn suspend(args: &[Str], _shell: &mut Shell<'_>) -> Status {
+    let _ = unsafe { libc::kill(0, libc::SIGSTOP) };
+    Status::SUCCESS
+}
 
-OPTIONS
-    -c  Execute command with an empty environment."#;
-
-pub const MAN_EXIT: &str = r#"NAME
-    exit - exit the shell
-
+#[builtin(
+    desc = "exit the shell",
+    man = "
 SYNOPSIS
     exit
 
 DESCRIPTION
-    Makes ion exit. The exit status will be that of the last command executed."#;
-
-/// Executes the givent commmand.
-
+    Makes ion exit. The exit status will be that of the last command executed."
+)]
 pub fn exit(args: &[Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_EXIT) {
-        return Status::SUCCESS;
-    }
     // Kill all active background tasks before exiting the shell.
     shell.background_send(SIGTERM);
     let exit_code = args
@@ -44,10 +36,21 @@ pub fn exit(args: &[Str], shell: &mut Shell<'_>) -> Status {
     std::process::exit(exit_code);
 }
 
+#[builtin(
+    desc = "replace the shell with the given command",
+    man = "
+SYNOPSIS
+    exec [-ch] [--help] [command [arguments ...]]
+
+DESCRIPTION
+    Execute <command>, replacing the shell with the specified program.
+    The <arguments> following the command become the arguments to
+    <command>.
+
+OPTIONS
+    -c  Execute command with an empty environment."
+)]
 pub fn exec(args: &[Str], _shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_EXEC) {
-        return Status::SUCCESS;
-    }
     let mut clear_env = false;
     let mut idx = 1;
     for arg in args.iter().skip(1) {

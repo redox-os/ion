@@ -305,9 +305,7 @@ impl<'a> Shell<'a> {
             // signal, the status of that process will be communicated back. To
             // avoid consuming CPU cycles, we wait 25 ms between polls.
             match self.foreground_signals.was_processed() {
-                Some(BackgroundResult::Status(stat)) => {
-                    break Status::from_exit_code(i32::from(stat))
-                }
+                Some(BackgroundResult::Status(stat)) => break Status::from_exit_code(stat),
                 Some(BackgroundResult::Errored) => break Status::TERMINATED,
                 None => sleep(Duration::from_millis(25)),
             }

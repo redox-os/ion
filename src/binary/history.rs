@@ -31,7 +31,7 @@ impl<'a> InteractiveBinary<'a> {
             let mut settings = IgnoreSetting::default();
             // for convenience and to avoid typos
             let regex_prefix = "regex:";
-            for pattern in patterns.into_iter() {
+            for pattern in patterns.iter() {
                 let pattern = format!("{}", pattern);
                 match pattern.as_ref() {
                     "all" => settings.all = true,

@@ -24,7 +24,7 @@ edition = "2018"
 advanced_arg_parsing = []
 
 [workspace]
-members = [ "members/ranges", "members/scopes-rs", "members/types-rs" ]
+members = [ "members/builtins-proc", "members/ranges", "members/scopes-rs", "members/types-rs" ]
 
 [dev-dependencies]
 criterion = "0.2"
@@ -66,6 +66,7 @@ xdg = "2.2.0"
 ion-ranges = { path = "members/ranges" }
 scopes = { path = "members/scopes-rs" }
 types-rs = { path = "members/types-rs" }
+builtins-proc = { path = "members/builtins-proc" }
 hashbrown = "0.5"
 itertools = "0.8"
 lexical = "2.0"
@@ -81,7 +82,6 @@ users = "0.9"
 
 [target."cfg(target_os = \"dragonfly\")".dependencies]
 errno-dragonfly = "0.1.1"
-
 
 [lib]
 path = "src/lib/lib.rs"
