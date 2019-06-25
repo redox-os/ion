@@ -8,7 +8,7 @@ use liner::{BasicCompleter, Completer, CursorPosition, Event, EventKind};
 use std::{env, iter, path::PathBuf, str};
 
 pub struct IonCompleter<'a, 'b> {
-    shell:             &'b Shell<'a>,
+    shell: &'b Shell<'a>,
     history_completer: Option<BasicCompleter>,
 }
 
@@ -30,7 +30,9 @@ fn escape(input: &str) -> String {
 }
 
 impl<'a, 'b> IonCompleter<'a, 'b> {
-    pub fn new(shell: &'b Shell<'a>) -> Self { IonCompleter { shell, history_completer: None } }
+    pub fn new(shell: &'b Shell<'a>) -> Self {
+        IonCompleter { shell, history_completer: None }
+    }
 }
 
 impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
@@ -228,8 +230,8 @@ fn filename_completion<'a>(start: &'a str, path: &'a PathBuf) -> impl Iterator<I
     let globs = glob_with(
         &string,
         MatchOptions {
-            case_sensitive:              true,
-            require_literal_separator:   true,
+            case_sensitive: true,
+            require_literal_separator: true,
             require_literal_leading_dot: false,
         },
     )
@@ -261,7 +263,9 @@ fn filename_completion<'a>(start: &'a str, path: &'a PathBuf) -> impl Iterator<I
 pub struct MultiCompleter<A>(Vec<A>);
 
 impl<A> MultiCompleter<A> {
-    pub fn new(completions: Vec<A>) -> Self { MultiCompleter(completions) }
+    pub fn new(completions: Vec<A>) -> Self {
+        MultiCompleter(completions)
+    }
 }
 
 impl<A> Completer for MultiCompleter<A>

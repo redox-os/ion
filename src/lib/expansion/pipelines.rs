@@ -6,18 +6,27 @@ use crate::{
 use itertools::Itertools;
 use std::fmt;
 
+/// What to redirect to the next command
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RedirectFrom {
+    /// Stdout (`|`)
     Stdout,
+    /// Stderr (`^|`)
     Stderr,
+    /// Both (`&|`)
     Both,
+    /// Nothing (this is the end of the pipeline)
     None,
 }
 
+/// An output redirection for a command
 #[derive(Debug, PartialEq, Clone)]
 pub struct Redirection {
-    pub from:   RedirectFrom,
-    pub file:   types::Str,
+    /// What to redirect
+    pub from: RedirectFrom,
+    /// Where to redirect
+    pub file: types::Str,
+    /// Should the file be overridden
     pub append: bool,
 }
 
@@ -59,9 +68,13 @@ impl<'a> fmt::Display for Redirection {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+/// Where should the pipeline be run
 pub enum PipeType {
+    /// In the foreground
     Normal,
+    /// In the background (`&`)
     Background,
+    /// In a separate process group (`&!`)
     Disown,
 }
 
@@ -70,19 +83,32 @@ impl Default for PipeType {
 }
 
 #[derive(Default, Debug, PartialEq, Clone)]
+/// A pipeline
+///
+/// Ex: `cat <<< input > output | cat &| cat &`
 pub struct Pipeline<'a> {
+    /// The individual commands
     pub items: Vec<PipeItem<'a>>,
-    pub pipe:  PipeType,
+    /// Should the pipeline be runned in background
+    pub pipe: PipeType,
 }
 
+/// A single job to run in a pipeline
+///
+/// For example `cat <<< input > output` is a pipeitem, with its own redirections, but representing
+/// a single executable to run
 #[derive(Debug, PartialEq, Clone)]
 pub struct PipeItem<'a> {
-    pub job:     Job<'a>,
+    /// The command to spawn
+    pub job: Job<'a>,
+    /// Where to send output
     pub outputs: Vec<Redirection>,
-    pub inputs:  Vec<Input>,
+    /// A list of inputs
+    pub inputs: Vec<Input>,
 }
 
 impl<'a> PipeItem<'a> {
+    /// Expand a single job to argument literals for execution
     pub fn expand(&self, shell: &Shell<'a>) -> super::Result<Self, <Shell as Expander>::Error> {
         let mut job = self.job.clone();
         job.expand(shell)?;
@@ -111,8 +137,10 @@ impl<'a> PipeItem<'a> {
         Ok(PipeItem { job, outputs, inputs })
     }
 
+    /// Get the command to lookup for execution
     pub fn command(&self) -> &types::Str { self.job.command() }
 
+    /// Create a new pipeitem with the given job and redirections
     pub fn new(job: Job<'a>, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
         PipeItem { job, outputs, inputs }
     }
@@ -141,6 +169,7 @@ impl<'a> fmt::Display for PipeItem<'a> {
 }
 
 impl<'a> Pipeline<'a> {
+    /// Check if the function can be executed without any forking
     pub fn requires_piping(&self) -> bool {
         self.items.len() > 1
             || self.items.iter().any(|it| !it.outputs.is_empty())
@@ -148,11 +177,13 @@ impl<'a> Pipeline<'a> {
             || self.pipe != PipeType::Normal
     }
 
+    /// Expand the pipeline to a set of arguments for execution
     pub fn expand(&self, shell: &Shell<'a>) -> super::Result<Self, <Shell as Expander>::Error> {
         let items = self.items.iter().map(|i| i.expand(shell)).collect::<Result<_, _>>()?;
         Ok(Pipeline { items, pipe: self.pipe })
     }
 
+    /// A useless, empty pipeline
     pub fn new() -> Self { Self::default() }
 }
 

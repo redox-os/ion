@@ -49,15 +49,21 @@ pub enum ParseError {
 }
 
 impl From<FunctionParseError> for ParseError {
-    fn from(cause: FunctionParseError) -> Self { ParseError::InvalidFunctionArgument(cause) }
+    fn from(cause: FunctionParseError) -> Self {
+        ParseError::InvalidFunctionArgument(cause)
+    }
 }
 
 impl From<CaseError> for ParseError {
-    fn from(cause: CaseError) -> Self { ParseError::CaseError(cause) }
+    fn from(cause: CaseError) -> Self {
+        ParseError::CaseError(cause)
+    }
 }
 
 impl From<PipelineParsingError> for ParseError {
-    fn from(cause: PipelineParsingError) -> Self { ParseError::PipelineParsingError(cause) }
+    fn from(cause: PipelineParsingError) -> Self {
+        ParseError::PipelineParsingError(cause)
+    }
 }
 
 pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
@@ -110,10 +116,10 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
         }
         _ if cmd.starts_with("if ") => Ok(Statement::If {
             expression: vec![parse(cmd[3..].trim_start(), builtins)?],
-            success:    Vec::new(),
-            else_if:    Vec::new(),
-            failure:    Vec::new(),
-            mode:       IfMode::Success,
+            success: Vec::new(),
+            else_if: Vec::new(),
+            failure: Vec::new(),
+            mode: IfMode::Success,
         }),
         "else" => Ok(Statement::Else),
         _ if cmd.starts_with("else") => {
@@ -121,7 +127,7 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
             if !cmd.is_empty() && cmd.starts_with("if ") {
                 Ok(Statement::ElseIf(ElseIf {
                     expression: vec![parse(cmd[3..].trim_start(), builtins)?],
-                    success:    Vec::new(),
+                    success: Vec::new(),
                 }))
             } else {
                 Ok(Statement::Else)
@@ -176,10 +182,9 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
 
             Ok(Statement::Case(Case { value, binding, conditional, statements: Vec::new() }))
         }
-        _ if cmd.starts_with("match ") => Ok(Statement::Match {
-            expression: cmd[6..].trim_start().into(),
-            cases:      Vec::new(),
-        }),
+        _ if cmd.starts_with("match ") => {
+            Ok(Statement::Match { expression: cmd[6..].trim_start().into(), cases: Vec::new() })
+        }
         _ if cmd.starts_with("fn ") => {
             let cmd = cmd[3..].trim_start();
             let pos = cmd.find(char::is_whitespace).unwrap_or_else(|| cmd.len());
@@ -191,9 +196,9 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
             let (args, description) = parse_function(&cmd[pos..]);
             Ok(Statement::Function {
                 description: description.map(types::Str::from),
-                name:        name.into(),
-                args:        collect_arguments(args)?,
-                statements:  Vec::new(),
+                name: name.into(),
+                args: collect_arguments(args)?,
+                statements: Vec::new(),
             })
         }
         _ if cmd.starts_with("time ") => {
@@ -240,8 +245,8 @@ mod tests {
         assert_eq!(
             parse("for x y z in 1..=10", &BuiltinMap::new()).unwrap(),
             Statement::For {
-                variables:  vec!["x", "y", "z"].into_iter().map(Into::into).collect(),
-                values:     vec!["1..=10"].into_iter().map(Into::into).collect(),
+                variables: vec!["x", "y", "z"].into_iter().map(Into::into).collect(),
+                values: vec!["1..=10"].into_iter().map(Into::into).collect(),
                 statements: Vec::new(),
             }
         );
@@ -249,8 +254,8 @@ mod tests {
         assert_eq!(
             parse("for  x  in  {1..=10} {1..=10}", &BuiltinMap::new()).unwrap(),
             Statement::For {
-                variables:  vec!["x"].into_iter().map(Into::into).collect(),
-                values:     vec!["{1..=10}", "{1..=10}"].into_iter().map(Into::into).collect(),
+                variables: vec!["x"].into_iter().map(Into::into).collect(),
+                values: vec!["{1..=10}", "{1..=10}"].into_iter().map(Into::into).collect(),
                 statements: Vec::new(),
             }
         );
@@ -263,7 +268,7 @@ mod tests {
         let correct_parse = Statement::If {
             expression: vec![Statement::Pipeline(Pipeline {
                 items: vec![PipeItem {
-                    job:     Job::new(
+                    job: Job::new(
                         vec!["test".into(), "1".into(), "-eq".into(), "2".into()]
                             .into_iter()
                             .collect(),
@@ -271,14 +276,14 @@ mod tests {
                         None,
                     ),
                     outputs: Vec::new(),
-                    inputs:  Vec::new(),
+                    inputs: Vec::new(),
                 }],
-                pipe:  PipeType::Normal,
+                pipe: PipeType::Normal,
             })],
-            success:    vec![],
-            else_if:    vec![],
-            failure:    vec![],
-            mode:       IfMode::Success,
+            success: vec![],
+            else_if: vec![],
+            failure: vec![],
+            mode: IfMode::Success,
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -327,9 +332,9 @@ mod tests {
         let parsed_if = parse("fn bob", &BuiltinMap::new()).unwrap();
         let correct_parse = Statement::Function {
             description: None,
-            name:        "bob".into(),
-            args:        Default::default(),
-            statements:  Default::default(),
+            name: "bob".into(),
+            args: Default::default(),
+            statements: Default::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -345,12 +350,12 @@ mod tests {
         let parsed_if = parse("fn bob a b", &BuiltinMap::new()).unwrap();
         let correct_parse = Statement::Function {
             description: None,
-            name:        "bob".into(),
-            args:        vec![
+            name: "bob".into(),
+            args: vec![
                 KeyBuf { name: "a".into(), kind: Primitive::Str },
                 KeyBuf { name: "b".into(), kind: Primitive::Str },
             ],
-            statements:  Default::default(),
+            statements: Default::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -361,12 +366,12 @@ mod tests {
         let parsed_if = parse("fn bob a b --bob is a nice function", &BuiltinMap::new()).unwrap();
         let correct_parse = Statement::Function {
             description: Some("bob is a nice function".into()),
-            name:        "bob".into(),
-            args:        vec![
+            name: "bob".into(),
+            args: vec![
                 KeyBuf { name: "a".into(), kind: Primitive::Str },
                 KeyBuf { name: "b".into(), kind: Primitive::Str },
             ],
-            statements:  vec![],
+            statements: vec![],
         };
         assert_eq!(correct_parse, parsed_if);
         let parsed_if =

@@ -338,7 +338,9 @@ fn file_is_character_device(filepath: &str) -> bool {
 }
 
 /// Exits SUCCESS if the file exists
-fn file_exists(filepath: &str) -> bool { Path::new(filepath).exists() }
+fn file_exists(filepath: &str) -> bool {
+    Path::new(filepath).exists()
+}
 
 /// Exits SUCCESS if the file is a regular file
 fn file_is_regular(filepath: &str) -> bool {
@@ -356,10 +358,14 @@ fn file_is_symlink(filepath: &str) -> bool {
 }
 
 /// Exits SUCCESS if the string is not empty
-fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
+fn string_is_nonzero(string: &str) -> bool {
+    !string.is_empty()
+}
 
 /// Exits SUCCESS if the string is empty
-fn string_is_zero(string: &str) -> bool { string.is_empty() }
+fn string_is_zero(string: &str) -> bool {
+    string.is_empty()
+}
 
 #[test]
 fn test_strings() {

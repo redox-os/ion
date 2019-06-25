@@ -12,5 +12,7 @@ pub use self::{
 pub mod fuzzing {
     use super::*;
 
-    pub fn statement_parse(data: &str) { statement::parse::parse(data); }
+    pub fn statement_parse(data: &str) {
+        statement::parse::parse(data);
+    }
 }

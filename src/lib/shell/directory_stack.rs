@@ -43,12 +43,14 @@ fn set_current_dir_ion(dir: &Path) -> Result<(), DirStackError> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirectoryStack {
-    dirs:      VecDeque<PathBuf>, // The top is always the current directory
+    dirs: VecDeque<PathBuf>, // The top is always the current directory
     max_depth: Option<usize>,
 }
 
 impl Default for DirectoryStack {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DirectoryStack {
@@ -76,9 +78,13 @@ impl DirectoryStack {
         new_dir
     }
 
-    pub fn set_max_depth(&mut self, max_depth: Option<usize>) { self.max_depth = max_depth; }
+    pub fn set_max_depth(&mut self, max_depth: Option<usize>) {
+        self.max_depth = max_depth;
+    }
 
-    pub fn max_depth(&mut self) -> Option<usize> { self.max_depth }
+    pub fn max_depth(&mut self) -> Option<usize> {
+        self.max_depth
+    }
 
     // pushd -<num>
     pub fn rotate_right(&mut self, num: usize) -> Result<(), DirStackError> {
@@ -107,7 +113,9 @@ impl DirectoryStack {
         self.dirs.get(self.dirs.len() - num)
     }
 
-    pub fn dir_from_top(&self, num: usize) -> Option<&PathBuf> { self.dirs.get(num) }
+    pub fn dir_from_top(&self, num: usize) -> Option<&PathBuf> {
+        self.dirs.get(num)
+    }
 
     pub fn dirs(&self) -> impl DoubleEndedIterator<Item = &PathBuf> + ExactSizeIterator {
         self.dirs.iter()
@@ -171,9 +179,13 @@ impl DirectoryStack {
 
     /// Attempts to set the current directory to the directory stack's previous directory,
     /// and then removes the front directory from the stack.
-    pub fn popd(&mut self, index: usize) -> Option<PathBuf> { self.dirs.remove(index) }
+    pub fn popd(&mut self, index: usize) -> Option<PathBuf> {
+        self.dirs.remove(index)
+    }
 
-    pub fn clear(&mut self) { self.dirs.truncate(1) }
+    pub fn clear(&mut self) {
+        self.dirs.truncate(1)
+    }
 
     /// Create a new `DirectoryStack` containing the current working directory,
     /// if available.

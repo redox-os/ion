@@ -16,21 +16,29 @@ pub type Str = small::String;
 pub struct Alias(pub Str);
 
 impl Alias {
-    pub fn empty() -> Self { Alias(Str::with_capacity(1)) }
+    pub fn empty() -> Self {
+        Alias(Str::with_capacity(1))
+    }
 }
 
 impl Deref for Alias {
     type Target = Str;
 
-    fn deref(&self) -> &Self::Target { &self.0 }
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl DerefMut for Alias {
-    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl Into<Str> for Alias {
-    fn into(self) -> Str { self.0 }
+    fn into(self) -> Str {
+        self.0
+    }
 }
 
 impl<T> FromIterator<Value<T>> for Value<T> {

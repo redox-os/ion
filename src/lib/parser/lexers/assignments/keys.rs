@@ -35,7 +35,9 @@ impl<'a> Key<'a> {
 }
 
 impl<'a> From<Key<'a>> for KeyBuf {
-    fn from(key: Key<'a>) -> KeyBuf { KeyBuf { kind: key.kind, name: key.name.to_owned() } }
+    fn from(key: Key<'a>) -> KeyBuf {
+        KeyBuf { kind: key.kind, name: key.name.to_owned() }
+    }
 }
 
 /// Quite simply, an iterator that returns keys.
@@ -114,7 +116,9 @@ impl<'a> KeyIterator<'a> {
         }
     }
 
-    pub fn new(data: &'a str) -> KeyIterator<'a> { KeyIterator { data, read: 0 } }
+    pub fn new(data: &'a str) -> KeyIterator<'a> {
+        KeyIterator { data, read: 0 }
+    }
 }
 
 impl<'a> Iterator for KeyIterator<'a> {

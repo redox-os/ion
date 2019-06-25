@@ -4,7 +4,7 @@ use std::fmt;
 
 #[derive(Debug)]
 struct StaticMap {
-    keys:   &'static [&'static str],
+    keys: &'static [&'static str],
     values: &'static [&'static str],
 }
 

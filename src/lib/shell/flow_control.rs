@@ -225,9 +225,9 @@ pub type Block<'a> = Vec<Statement<'a>>;
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Function<'a> {
     description: Option<types::Str>,
-    name:        types::Str,
-    args:        Vec<KeyBuf>,
-    statements:  Block<'a>,
+    name: types::Str,
+    args: Vec<KeyBuf>,
+    statements: Block<'a>,
 }
 
 /// Error during function execution
@@ -290,7 +290,9 @@ impl<'a> Function<'a> {
     }
 
     /// Get the function's description
-    pub fn description(&self) -> Option<&types::Str> { self.description.as_ref() }
+    pub fn description(&self) -> Option<&types::Str> {
+        self.description.as_ref()
+    }
 
     /// Create a new function
     pub fn new(

@@ -36,11 +36,11 @@ pub enum AssignmentError<'a> {
 /// string, and will contain the key/value pair to assign.
 #[derive(Debug)]
 pub struct AssignmentActions<'a> {
-    keys:     KeyIterator<'a>,
+    keys: KeyIterator<'a>,
     operator: Operator,
-    values:   ArgumentSplitter<'a>,
+    values: ArgumentSplitter<'a>,
     prevkeys: Vec<&'a str>,
-    prevval:  &'a str,
+    prevval: &'a str,
 }
 
 impl<'a> AssignmentActions<'a> {

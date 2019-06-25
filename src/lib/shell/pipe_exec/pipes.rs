@@ -9,9 +9,9 @@ use super::{
 use std::{fs::File, os::unix::io::FromRawFd};
 
 pub struct TeePipe<'a, 'b> {
-    parent:          &'a mut RefinedJob<'b>,
+    parent: &'a mut RefinedJob<'b>,
     ext_stdio_pipes: &'a mut Option<Vec<File>>,
-    is_external:     bool,
+    is_external: bool,
 }
 
 impl<'a, 'b> TeePipe<'a, 'b> {

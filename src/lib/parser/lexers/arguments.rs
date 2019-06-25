@@ -18,7 +18,7 @@ use self::Field::*;
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Levels {
     parens: i32,
-    array:  i32,
+    array: i32,
     braces: i32,
 }
 
@@ -58,7 +58,9 @@ impl Levels {
         *level -= 1;
     }
 
-    pub fn are_rooted(&self) -> bool { self.parens == 0 && self.array == 0 && self.braces == 0 }
+    pub fn are_rooted(&self) -> bool {
+        self.parens == 0 && self.array == 0 && self.braces == 0
+    }
 
     pub fn check(&self) -> Result<(), LevelsError> {
         if self.parens > 0 {

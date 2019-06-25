@@ -10,16 +10,24 @@ pub const NULL_PATH: &str = "/dev/null";
 
 // Why each platform wants to be unique in this regard is anyone's guess.
 #[cfg(target_os = "linux")]
-fn errno() -> i32 { unsafe { *libc::__errno_location() } }
+fn errno() -> i32 {
+    unsafe { *libc::__errno_location() }
+}
 
 #[cfg(any(target_os = "openbsd", target_os = "bitrig", target_os = "android"))]
-fn errno() -> i32 { unsafe { *libc::__errno() } }
+fn errno() -> i32 {
+    unsafe { *libc::__errno() }
+}
 
 #[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
-fn errno() -> i32 { unsafe { *libc::__error() } }
+fn errno() -> i32 {
+    unsafe { *libc::__error() }
+}
 
 #[cfg(target_os = "dragonfly")]
-fn errno() -> i32 { unsafe { *errno_dragonfly::errno_location() } }
+fn errno() -> i32 {
+    unsafe { *errno_dragonfly::errno_location() }
+}
 
 pub fn strerror(errno: i32) -> &'static str {
     unsafe {
@@ -39,21 +47,47 @@ pub fn waitpid(pid: i32, status: &mut i32, options: i32) -> Result<i32, i32> {
     }
 }
 
-pub fn wexitstatus(status: i32) -> i32 { unsafe { libc::WEXITSTATUS(status) } }
-pub fn wifexited(status: i32) -> bool { unsafe { libc::WIFEXITED(status) } }
-pub fn wifstopped(status: i32) -> bool { unsafe { libc::WIFSTOPPED(status) } }
-pub fn wifcontinued(status: i32) -> bool { unsafe { libc::WIFCONTINUED(status) } }
-pub fn wifsignaled(status: i32) -> bool { unsafe { libc::WIFSIGNALED(status) } }
-pub fn wcoredump(status: i32) -> bool { unsafe { libc::WCOREDUMP(status) } }
-pub fn wtermsig(status: i32) -> i32 { unsafe { libc::WTERMSIG(status) } }
-pub fn wstopsig(status: i32) -> i32 { unsafe { libc::WSTOPSIG(status) } }
+pub fn wexitstatus(status: i32) -> i32 {
+    unsafe { libc::WEXITSTATUS(status) }
+}
+pub fn wifexited(status: i32) -> bool {
+    unsafe { libc::WIFEXITED(status) }
+}
+pub fn wifstopped(status: i32) -> bool {
+    unsafe { libc::WIFSTOPPED(status) }
+}
+pub fn wifcontinued(status: i32) -> bool {
+    unsafe { libc::WIFCONTINUED(status) }
+}
+pub fn wifsignaled(status: i32) -> bool {
+    unsafe { libc::WIFSIGNALED(status) }
+}
+pub fn wcoredump(status: i32) -> bool {
+    unsafe { libc::WCOREDUMP(status) }
+}
+pub fn wtermsig(status: i32) -> i32 {
+    unsafe { libc::WTERMSIG(status) }
+}
+pub fn wstopsig(status: i32) -> i32 {
+    unsafe { libc::WSTOPSIG(status) }
+}
 
-pub fn getpid() -> io::Result<u32> { cvt(unsafe { libc::getpid() }).map(|pid| pid as u32) }
-pub fn geteuid() -> io::Result<u32> { Ok(unsafe { libc::geteuid() } as u32) }
-pub fn getuid() -> io::Result<u32> { Ok(unsafe { libc::getuid() } as u32) }
+pub fn getpid() -> io::Result<u32> {
+    cvt(unsafe { libc::getpid() }).map(|pid| pid as u32)
+}
+pub fn geteuid() -> io::Result<u32> {
+    Ok(unsafe { libc::geteuid() } as u32)
+}
+pub fn getuid() -> io::Result<u32> {
+    Ok(unsafe { libc::getuid() } as u32)
+}
 
-pub unsafe fn fork() -> io::Result<u32> { cvt(libc::fork()).map(|pid| pid as u32) }
-pub fn fork_exit(exit_status: i32) -> ! { unsafe { libc::_exit(exit_status) } }
+pub unsafe fn fork() -> io::Result<u32> {
+    cvt(libc::fork()).map(|pid| pid as u32)
+}
+pub fn fork_exit(exit_status: i32) -> ! {
+    unsafe { libc::_exit(exit_status) }
+}
 
 pub fn kill(pid: u32, signal: i32) -> io::Result<()> {
     cvt(unsafe { libc::kill(pid as pid_t, signal as c_int) }).and(Ok(()))
@@ -86,10 +120,18 @@ pub fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
     cvt(unsafe { libc::tcsetpgrp(fd as c_int, pgrp as pid_t) }).and(Ok(()))
 }
 
-pub fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup(fd) }) }
-pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup2(old, new) }) }
-pub fn close(fd: RawFd) -> io::Result<()> { cvt(unsafe { libc::close(fd) }).and(Ok(())) }
-pub fn isatty(fd: RawFd) -> bool { unsafe { libc::isatty(fd) == 1 } }
+pub fn dup(fd: RawFd) -> io::Result<RawFd> {
+    cvt(unsafe { libc::dup(fd) })
+}
+pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
+    cvt(unsafe { libc::dup2(old, new) })
+}
+pub fn close(fd: RawFd) -> io::Result<()> {
+    cvt(unsafe { libc::close(fd) }).and(Ok(()))
+}
+pub fn isatty(fd: RawFd) -> bool {
+    unsafe { libc::isatty(fd) == 1 }
+}
 
 pub fn pipe2(flags: i32) -> io::Result<(RawFd, RawFd)> {
     let mut fds = [0; 2];
@@ -149,7 +191,9 @@ pub mod env {
             target_os = "emscripten",
             target_os = "redox"
         ))]
-        unsafe fn fallback() -> Option<OsString> { None }
+        unsafe fn fallback() -> Option<OsString> {
+            None
+        }
         #[cfg(not(any(
             target_os = "android",
             target_os = "ios",

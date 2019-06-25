@@ -19,16 +19,16 @@ fn string_method() {
     let input = "$join(array 'pattern') $join(array 'pattern')";
     let expected = vec![
         WordToken::StringMethod(StringMethod {
-            method:    "join",
-            variable:  "array",
-            pattern:   "'pattern'",
+            method: "join",
+            variable: "array",
+            pattern: "'pattern'",
             selection: Select::All,
         }),
         WordToken::Whitespace(" "),
         WordToken::StringMethod(StringMethod {
-            method:    "join",
-            variable:  "array",
-            pattern:   "'pattern'",
+            method: "join",
+            variable: "array",
+            pattern: "'pattern'",
             selection: Select::All,
         }),
     ];

@@ -63,7 +63,9 @@ fn get_var_string(name: &str, shell: &mut Shell<'_>) -> types::Str {
 
 #[test]
 fn test_is() {
-    fn vec_string(args: &[&str]) -> Vec<types::Str> { args.iter().map(|&s| s.into()).collect() }
+    fn vec_string(args: &[&str]) -> Vec<types::Str> {
+        args.iter().map(|&s| s.into()).collect()
+    }
     let mut shell = Shell::default();
     shell.variables_mut().set("x", "value");
     shell.variables_mut().set("y", "0");

@@ -3,12 +3,16 @@ use crate::{ranges, types};
 
 /// The expression given to a for loop as the value to iterate upon.
 pub enum ForValueExpression {
+    /// A set of values
     Multiple(Vec<types::Str>),
+    /// A single value
     Normal(types::Str),
+    /// A range of numbers
     Range(Box<dyn Iterator<Item = types::Str> + 'static>),
 }
 
 impl ForValueExpression {
+    /// Parse the arguments for the for loop
     pub fn new<E: Expander>(
         expression: &[types::Str],
         expanders: &E,

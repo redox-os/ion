@@ -43,10 +43,10 @@ impl fmt::Display for ProcessState {
 /// process is executing. Note that it is necessary to check if the process exists with the exists
 /// method.
 pub struct BackgroundProcess {
-    pid:           u32,
+    pid: u32,
     ignore_sighup: bool,
-    state:         ProcessState,
-    name:          String,
+    state: ProcessState,
+    name: String,
 }
 
 impl BackgroundProcess {
@@ -55,22 +55,34 @@ impl BackgroundProcess {
     }
 
     /// Get the pid associated with the job
-    pub fn pid(&self) -> u32 { self.pid }
+    pub fn pid(&self) -> u32 {
+        self.pid
+    }
 
     /// Check if the process is still running
-    pub fn is_running(&self) -> bool { self.state == ProcessState::Running }
+    pub fn is_running(&self) -> bool {
+        self.state == ProcessState::Running
+    }
 
     /// Check if this is in fact a process
-    pub fn exists(&self) -> bool { self.state != ProcessState::Empty }
+    pub fn exists(&self) -> bool {
+        self.state != ProcessState::Empty
+    }
 
     /// Stop capturing information about the process. *This action is irreversible*
-    pub fn forget(&mut self) { self.state = ProcessState::Empty }
+    pub fn forget(&mut self) {
+        self.state = ProcessState::Empty
+    }
 
     /// Should the process ignore sighups
-    pub fn set_ignore_sighup(&mut self, ignore: bool) { self.ignore_sighup = ignore }
+    pub fn set_ignore_sighup(&mut self, ignore: bool) {
+        self.ignore_sighup = ignore
+    }
 
     /// resume a stopped job
-    pub fn resume(&self) { signals::resume(self.pid); }
+    pub fn resume(&self) {
+        signals::resume(self.pid);
+    }
 }
 
 impl fmt::Display for BackgroundProcess {

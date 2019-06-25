@@ -53,8 +53,8 @@ pub enum InputError {
 #[derive(Debug)]
 pub struct OutputError {
     redirect: RedirectFrom,
-    file:     String,
-    why:      io::Error,
+    file: String,
+    why: io::Error,
 }
 
 #[derive(Debug, Error)]
@@ -136,23 +136,33 @@ impl fmt::Display for OutputError {
 }
 
 impl std::error::Error for OutputError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { Some(&self.why) }
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.why)
+    }
 }
 
 impl From<OutputError> for RedirectError {
-    fn from(cause: OutputError) -> Self { RedirectError::Output(cause) }
+    fn from(cause: OutputError) -> Self {
+        RedirectError::Output(cause)
+    }
 }
 
 impl From<InputError> for RedirectError {
-    fn from(cause: InputError) -> Self { RedirectError::Input(cause) }
+    fn from(cause: InputError) -> Self {
+        RedirectError::Input(cause)
+    }
 }
 
 impl From<RedirectError> for PipelineError {
-    fn from(cause: RedirectError) -> Self { PipelineError::RedirectPipeError(cause) }
+    fn from(cause: RedirectError) -> Self {
+        PipelineError::RedirectPipeError(cause)
+    }
 }
 
 impl From<FunctionError> for PipelineError {
-    fn from(cause: FunctionError) -> Self { PipelineError::RunFunctionError(cause) }
+    fn from(cause: FunctionError) -> Self {
+        PipelineError::RunFunctionError(cause)
+    }
 }
 
 /// Create an OS pipe and write the contents of a byte slice to one end

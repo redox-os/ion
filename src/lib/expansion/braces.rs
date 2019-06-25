@@ -42,8 +42,8 @@ fn escape_string(output: &mut SmallVec<[u8; 64]>, input: &str) {
 
 pub struct MultipleBraceExpand<'a> {
     permutator: Permutator<'a, str>,
-    tokens:     &'a [BraceToken],
-    buffer:     Vec<&'a str>,
+    tokens: &'a [BraceToken],
+    buffer: Vec<&'a str>,
 }
 
 impl<'a> MultipleBraceExpand<'a> {
@@ -87,8 +87,8 @@ pub struct SingleBraceExpand<'a, 'b, I>
 where
     I: Iterator<Item = &'a str>,
 {
-    elements:   I,
-    tokens:     &'b [BraceToken],
+    elements: I,
+    tokens: &'b [BraceToken],
     loop_count: usize,
 }
 

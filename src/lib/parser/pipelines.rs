@@ -35,7 +35,9 @@ pub enum PipelineParsingError {
 }
 
 impl From<LevelsError> for PipelineParsingError {
-    fn from(cause: LevelsError) -> Self { PipelineParsingError::Paired(cause) }
+    fn from(cause: LevelsError) -> Self {
+        PipelineParsingError::Paired(cause)
+    }
 }
 
 trait AddItem<'a> {
@@ -411,7 +413,9 @@ impl<'a> Collector<'a> {
         Collector::new(data).parse(builtins)
     }
 
-    pub fn new(data: &'a str) -> Self { Collector { data } }
+    pub fn new(data: &'a str) -> Self {
+        Collector { data }
+    }
 }
 
 #[cfg(test)]
@@ -436,8 +440,8 @@ mod tests {
             assert_eq!("HEAD", &pipeline.items[0].job.args[3]);
 
             let expected = vec![Redirection {
-                from:   RedirectFrom::Stderr,
-                file:   "/dev/null".into(),
+                from: RedirectFrom::Stderr,
+                file: "/dev/null".into(),
                 append: false,
             }];
 
@@ -830,36 +834,36 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(args!["cat"], RedirectFrom::Stdout, None),
-                    inputs:  vec![
+                    job: Job::new(args!["cat"], RedirectFrom::Stdout, None),
+                    inputs: vec![
                         Input::File("file1".into()),
                         Input::HereString("\"herestring\"".into()),
                     ],
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(args!["tr", "'x'", "'y'"], RedirectFrom::None, None),
-                    inputs:  Vec::new(),
+                    job: Job::new(args!["tr", "'x'", "'y'"], RedirectFrom::None, None),
+                    inputs: Vec::new(),
                     outputs: vec![
                         Redirection {
-                            from:   RedirectFrom::Stderr,
-                            file:   "err".into(),
+                            from: RedirectFrom::Stderr,
+                            file: "err".into(),
                             append: true,
                         },
                         Redirection {
-                            from:   RedirectFrom::Both,
-                            file:   "both".into(),
+                            from: RedirectFrom::Both,
+                            file: "both".into(),
                             append: false,
                         },
                         Redirection {
-                            from:   RedirectFrom::Stdout,
-                            file:   "out".into(),
+                            from: RedirectFrom::Stdout,
+                            file: "out".into(),
                             append: false,
                         },
                     ],
                 },
             ],
-            pipe:  PipeType::Normal,
+            pipe: PipeType::Normal,
         };
         assert_eq!(parse(input, &BuiltinMap::new()).unwrap(), Statement::Pipeline(expected));
     }
@@ -874,27 +878,27 @@ mod tests {
                 PipeItem {
                     job: Job::new(args!["cat"], RedirectFrom::Stdout, None),
 
-                    inputs:  Vec::new(),
+                    inputs: Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
                     job: Job::new(args!["echo", "hello"], RedirectFrom::Stdout, None),
 
-                    inputs:  Vec::new(),
+                    inputs: Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
                     job: Job::new(args!["cat"], RedirectFrom::None, None),
 
-                    inputs:  vec![Input::File("stuff".into())],
+                    inputs: vec![Input::File("stuff".into())],
                     outputs: vec![Redirection {
-                        from:   RedirectFrom::Stderr,
-                        file:   "other".into(),
+                        from: RedirectFrom::Stderr,
+                        file: "other".into(),
                         append: true,
                     }],
                 },
             ],
-            pipe:  PipeType::Normal,
+            pipe: PipeType::Normal,
         };
         assert_eq!(parse(input, &BuiltinMap::new()).unwrap(), Statement::Pipeline(expected));
     }
@@ -909,27 +913,27 @@ mod tests {
                 PipeItem {
                     job: Job::new(args!["cat"], RedirectFrom::Stdout, None),
 
-                    inputs:  Vec::new(),
+                    inputs: Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
                     job: Job::new(args!["echo", "hello"], RedirectFrom::Stdout, None),
 
-                    inputs:  Vec::new(),
+                    inputs: Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
                     job: Job::new(args!["cat"], RedirectFrom::None, None),
 
-                    inputs:  vec![Input::File("stuff".into())],
+                    inputs: vec![Input::File("stuff".into())],
                     outputs: vec![Redirection {
-                        from:   RedirectFrom::Both,
-                        file:   "other".into(),
+                        from: RedirectFrom::Both,
+                        file: "other".into(),
                         append: true,
                     }],
                 },
             ],
-            pipe:  PipeType::Normal,
+            pipe: PipeType::Normal,
         };
         assert_eq!(parse(input, &BuiltinMap::new()).unwrap(), Statement::Pipeline(expected));
     }
@@ -982,10 +986,10 @@ mod tests {
             items: vec![PipeItem {
                 job: Job::new(args!["calc"], RedirectFrom::None, None),
 
-                inputs:  vec![Input::HereString("$(cat math.txt)".into())],
+                inputs: vec![Input::HereString("$(cat math.txt)".into())],
                 outputs: vec![],
             }],
-            pipe:  PipeType::Normal,
+            pipe: PipeType::Normal,
         };
         assert_eq!(Statement::Pipeline(expected), parse(input, &BuiltinMap::new()).unwrap());
     }
@@ -1000,21 +1004,21 @@ mod tests {
                 PipeItem {
                     job: Job::new(args!["cat"], RedirectFrom::Stdout, None),
 
-                    inputs:  Vec::new(),
+                    inputs: Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
                     job: Job::new(args!["tr", "'o'", "'x'"], RedirectFrom::None, None),
 
-                    inputs:  vec![Input::HereString("$VAR".into())],
+                    inputs: vec![Input::HereString("$VAR".into())],
                     outputs: vec![Redirection {
-                        from:   RedirectFrom::Stdout,
-                        file:   "out.log".into(),
+                        from: RedirectFrom::Stdout,
+                        file: "out.log".into(),
                         append: false,
                     }],
                 },
             ],
-            pipe:  PipeType::Normal,
+            pipe: PipeType::Normal,
         };
         assert_eq!(Statement::Pipeline(expected), parse(input, &BuiltinMap::new()).unwrap());
     }
@@ -1042,14 +1046,14 @@ mod tests {
             items: vec![PipeItem {
                 job: Job::new(args!["echo", "zardoz"], RedirectFrom::None, None),
 
-                inputs:  Vec::new(),
+                inputs: Vec::new(),
                 outputs: vec![Redirection {
-                    from:   RedirectFrom::Stdout,
-                    file:   "foo\\'bar".into(),
+                    from: RedirectFrom::Stdout,
+                    file: "foo\\'bar".into(),
                     append: true,
                 }],
             }],
-            pipe:  PipeType::Normal,
+            pipe: PipeType::Normal,
         };
         assert_eq!(parse(input, &BuiltinMap::new()).unwrap(), Statement::Pipeline(expected));
     }

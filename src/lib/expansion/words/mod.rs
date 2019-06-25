@@ -9,7 +9,7 @@ pub use crate::ranges::{Select, SelectWithSize};
 use crate::{parser::lexers::ArgumentSplitter, types};
 use std::borrow::Cow;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 enum Quotes {
     None,
     Single,
@@ -29,24 +29,36 @@ pub fn unescape(input: &str) -> Cow<'_, str> {
     input
 }
 
+/// Terminal tokens for a Ion script
 #[derive(Debug, PartialEq, Clone)]
 pub enum WordToken<'a> {
     /// Represents a normal string who may contain a globbing character
     /// (the second element) or a tilde expression (the third element)
     Normal(Cow<'a, str>, bool, bool),
+    /// Whitespace
     Whitespace(&'a str),
+    /// Braced alternatives
     Brace(Vec<&'a str>),
+    /// An array literal
     Array(Vec<&'a str>, Select<types::Str>),
+    /// A scalar variable
     Variable(&'a str, Select<types::Str>),
+    /// An array or map-like variable
     ArrayVariable(&'a str, bool, Select<types::Str>),
+    /// A process that should expand to an array
     ArrayProcess(&'a str, bool, Select<types::Str>),
+    /// A process that expands to a scalar value
     Process(&'a str, Select<types::Str>),
+    /// A method on a scalar value
     StringMethod(StringMethod<'a>),
+    /// A method on a array value
     ArrayMethod(ArrayMethod<'a>, bool),
+    /// An arithmetic expression
     Arithmetic(&'a str),
 }
 
-#[derive(Debug)]
+/// Iterate over the terminal tokens of the parsed text
+#[derive(Debug, PartialEq, Clone)]
 pub struct WordIterator<'a, E: Expander> {
     data:      &'a str,
     read:      usize,
@@ -651,6 +663,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         WordToken::Whitespace(&self.data[start..self.read])
     }
 
+    /// Creates a new iterator with a given expander
     pub fn new(data: &'a str, expanders: &'a E, do_glob: bool) -> WordIterator<'a, E> {
         WordIterator { data, backsl: false, read: 0, quotes: Quotes::None, expanders, do_glob }
     }

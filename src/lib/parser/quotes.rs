@@ -15,25 +15,27 @@ enum Quotes {
 /// will only be submitted for execution once a terminated command is supplied.
 #[derive(Debug)]
 pub struct Terminator<I: Iterator<Item = u8>> {
-    inner:      RearPeekable<I>,
-    array:      usize,
-    skip_next:  bool,
-    quotes:     Quotes,
+    inner: RearPeekable<I>,
+    array: usize,
+    skip_next: bool,
+    quotes: Quotes,
     terminated: bool,
-    and_or:     bool,
+    and_or: bool,
     whitespace: bool,
-    empty:      bool,
-    subshell:   usize,
+    empty: bool,
+    subshell: usize,
 }
 
 impl<'a> From<&'a str> for Terminator<std::str::Bytes<'a>> {
-    fn from(string: &'a str) -> Self { Terminator::new(string.bytes()) }
+    fn from(string: &'a str) -> Self {
+        Terminator::new(string.bytes())
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct RearPeekable<I: Iterator> {
     iter: Peekable<I>,
-    now:  Option<I::Item>,
+    now: Option<I::Item>,
     last: Option<I::Item>,
 }
 
@@ -52,22 +54,30 @@ where
     }
 
     #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
 }
 
 impl<I: Iterator> RearPeekable<I> {
     #[inline]
-    pub fn peek(&mut self) -> Option<&I::Item> { self.iter.peek() }
+    pub fn peek(&mut self) -> Option<&I::Item> {
+        self.iter.peek()
+    }
 
     #[inline]
-    pub fn prev(&self) -> Option<&I::Item> { self.last.as_ref() }
+    pub fn prev(&self) -> Option<&I::Item> {
+        self.last.as_ref()
+    }
 }
 
 impl<I: Iterator<Item = u8>> Iterator for Terminator<I> {
     type Item = u8;
 
     #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) { self.inner.size_hint() }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -187,15 +197,15 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
 
     pub fn new(inner: I) -> Terminator<I> {
         Terminator {
-            inner:      RearPeekable { iter: inner.peekable(), now: None, last: None },
-            array:      0,
-            skip_next:  false,
-            quotes:     Quotes::None,
+            inner: RearPeekable { iter: inner.peekable(), now: None, last: None },
+            array: 0,
+            skip_next: false,
+            quotes: Quotes::None,
             terminated: false,
-            and_or:     false,
+            and_or: false,
             whitespace: false,
-            empty:      true,
-            subshell:   0,
+            empty: true,
+            subshell: 0,
         }
     }
 }
