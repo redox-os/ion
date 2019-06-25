@@ -167,11 +167,15 @@ impl<'a, 'b> Expander for Shell<'b> {
         match self.variables.get(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or(ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into()))
+                    .ok_or_else(|| {
+                        ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into())
+                    })
             }
             Some(&Value::BTreeMap(ref map)) => {
                 Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or(ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into()))
+                    .ok_or_else(|| {
+                        ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into())
+                    })
             }
             Some(_) => Err(ExpansionError::NotAMap(name.into())),
             None => Err(ExpansionError::VarNotFound),
@@ -186,11 +190,15 @@ impl<'a, 'b> Expander for Shell<'b> {
         match self.variables.get(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or(ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into()))
+                    .ok_or_else(|| {
+                        ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into())
+                    })
             }
             Some(&Value::BTreeMap(ref map)) => {
                 Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or(ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into()))
+                    .ok_or_else(|| {
+                        ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into())
+                    })
             }
             Some(_) => Err(ExpansionError::NotAMap(name.into())),
             None => Err(ExpansionError::VarNotFound),

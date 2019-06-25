@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 #[derive(Debug)]
 pub enum BackgroundResult {
     Errored,
-    Status(u8),
+    Status(i32),
 }
 
 const REPLIED: u8 = 1;
@@ -32,7 +32,7 @@ impl ForegroundSignals {
         if reply == ERRORED {
             Some(BackgroundResult::Errored)
         } else if reply == REPLIED {
-            Some(BackgroundResult::Status(self.status.load(Ordering::SeqCst) as u8))
+            Some(BackgroundResult::Status(self.status.load(Ordering::SeqCst) as i32))
         } else {
             None
         }

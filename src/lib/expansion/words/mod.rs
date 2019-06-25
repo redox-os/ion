@@ -496,7 +496,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 self.read += 1;
                 return value
                     .parse::<Select<types::Str>>()
-                    .map_err(|_| ExpansionError::IndexParsingError(value.into()));
+                    .map_err(|_| ExpansionError::IndexParsingError(value));
             }
             self.read += 1;
         }

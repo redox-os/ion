@@ -11,11 +11,9 @@ impl Status {
     pub const TERMINATED: Self = Status(143);
     pub const TRUE: Self = Status(0);
 
-    pub fn from_signal(signal: i32) -> Self { Status(128 + signal) }
+    pub fn from_signal(signal: u8) -> Self { Status(i32::from(128 + signal)) }
 
     pub fn from_exit_code(code: i32) -> Self { Status(code) }
-
-    pub fn from_bool(b: bool) -> Self { Status(!b as i32) }
 
     pub fn error<T: AsRef<str>>(err: T) -> Self {
         let err = err.as_ref();
@@ -37,7 +35,7 @@ impl Status {
 
     pub fn is_failure(self) -> bool { self.0 != 0 }
 
-    pub fn as_os_code(self) -> i32 { self.0 }
+    pub fn as_os_code(self) -> i32 { self.0 as i32 }
 
     pub fn toggle(&mut self) { self.0 = if self.is_success() { 1 } else { 0 }; }
 }
@@ -55,6 +53,16 @@ impl From<std::io::Result<()>> for Status {
         match res {
             Ok(_) => Status::SUCCESS,
             Err(err) => Status::error(format!("{}", err)),
+        }
+    }
+}
+
+impl From<bool> for Status {
+    fn from(success: bool) -> Self {
+        if success {
+            Self::TRUE
+        } else {
+            Self::FALSE
         }
     }
 }

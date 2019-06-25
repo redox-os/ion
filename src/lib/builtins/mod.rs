@@ -28,8 +28,8 @@ pub use self::{
     set::builtin_set,
     source::builtin_source,
     status::builtin_status,
-    test::test,
-    variables::{builtin_alias, builtin_unalias, drop_array, drop_variable},
+    test::builtin_test,
+    variables::{builtin_alias, builtin_drop, builtin_unalias},
 };
 use crate as ion_shell;
 use crate::{
@@ -600,29 +600,6 @@ pub fn read(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
 }
 
 #[builtin(
-    desc = "delete some variables or arrays",
-    man = "
-SYNOPSIS
-    drop [ -a ] VARIABLES...
-
-DESCRIPTION
-    Deletes the variables given to it as arguments. The variables name must be supplied.
-    Instead of '$x' use 'x'.
-
-OPTIONS
-    -a
-        Instead of deleting variables deletes arrays.
-"
-)]
-pub fn drop(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if args.len() >= 2 && args[1] == "-a" {
-        drop_array(shell.variables_mut(), args)
-    } else {
-        drop_variable(shell.variables_mut(), args)
-    }
-}
-
-#[builtin(
     desc = "evaluates the specified commands",
     man = "
 SYNOPSIS
@@ -636,16 +613,6 @@ pub fn eval(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     shell.execute_command(args[1..].join(" ").as_bytes()).unwrap_or_else(|_| {
         Status::error("ion: supplied eval expression was not terminated".to_string())
     })
-}
-
-pub fn builtin_test(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    // Do not use `check_help` for the `test` builtin. The
-    // `test` builtin contains a "-h" option.
-    match test(args) {
-        Ok(true) => Status::TRUE,
-        Ok(false) => Status::FALSE,
-        Err(why) => Status::error(why),
-    }
 }
 
 // TODO create manpage.
@@ -776,7 +743,7 @@ pub fn builtin_help(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             println!("Command helper not found [run 'help']...");
         }
     } else {
-        println!("{}", shell.builtins().keys().format(""));
+        println!("{}", shell.builtins().keys().format("\n"));
     }
     Status::SUCCESS
 }

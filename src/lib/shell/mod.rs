@@ -314,7 +314,7 @@ impl<'a> Shell<'a> {
 
         if let Some(block) = self.flow_control.last().map(Statement::to_string) {
             self.previous_status = Status::from_exit_code(1);
-            Err(IonError::UnclosedBlock(block.into()))
+            Err(IonError::UnclosedBlock(block))
         } else {
             Ok(self.previous_status)
         }
@@ -360,7 +360,7 @@ impl<'a> Shell<'a> {
                 self.command_not_found(&command);
                 Status::COULD_NOT_EXEC
             }
-            Err(err) => return Err(err.into()),
+            Err(err) => return Err(err),
         };
 
         if let Some(ref callback) = self.on_command {

@@ -1,14 +1,20 @@
-use small;
 use std::{
     fs,
     os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt},
     path::Path,
     time::SystemTime,
 };
+use crate as ion_shell;
+use builtins_proc::builtin;
+use super::Status;
+use crate::{types, Shell};
 
-pub const MAN_TEST: &str = r#"NAME
-    test - perform tests on files and text
+const QUICK_GUIDE: &str = r#"Usage: test [EXPRESSION]
+Try 'test --help' for more information."#;
 
+#[builtin(
+    desc = "perform tests on files and text",
+    man = r#"
 SYNOPSIS
     test [EXPRESSION]
 
@@ -111,18 +117,17 @@ EXAMPLES
         test $(getconf LONG_BIT) = 64 && echo "64-bit OS" || echo "32-bit OS"
 
 AUTHOR
-    Written by Michael Murphy.
-"#;
-
-const QUICK_GUIDE: &str = r#"Usage: test [EXPRESSION]
-Try 'test --help' for more information."#;
-
-pub fn test(args: &[small::String]) -> Result<bool, small::String> {
-    let arguments = &args[1..];
-    evaluate_arguments(arguments)
+    Written by Michael Murphy."#
+)]
+pub fn test(args: &[types::Str], _: &mut Shell<'_>) -> Status {
+    match evaluate_arguments(&args[1..]) {
+        Ok(true) => Status::TRUE,
+        Ok(false) => Status::FALSE,
+        Err(why) => Status::error(why),
+    }
 }
 
-fn evaluate_arguments(arguments: &[small::String]) -> Result<bool, small::String> {
+fn evaluate_arguments(arguments: &[types::Str]) -> Result<bool, types::Str> {
     match arguments.first() {
         Some(ref s) if s.starts_with('-') && s[1..].starts_with(char::is_alphabetic) => {
             // Access the second character in the flag string: this will be type of the
@@ -136,19 +141,13 @@ fn evaluate_arguments(arguments: &[small::String]) -> Result<bool, small::String
                 })
             })
         }
-        Some(ref s) if *s == "--help" => {
-            // "--help" only makes sense if it is the first option. Only look for it
-            // in the first position.
-            println!("{}", MAN_TEST);
-            Ok(true)
-        }
         Some(arg) => {
             // If there is no operator, check if the first argument is non-zero
             arguments.get(1).map_or(Ok(string_is_nonzero(arg)), |operator| {
                 // If there is no right hand argument, a condition was expected
                 let right_arg = arguments
                     .get(2)
-                    .ok_or_else(|| small::String::from("parse error: condition expected"))?;
+                    .ok_or_else(|| types::Str::from("parse error: condition expected"))?;
                 evaluate_expression(arg, operator, right_arg)
             })
         }
@@ -159,7 +158,7 @@ fn evaluate_arguments(arguments: &[small::String]) -> Result<bool, small::String
     }
 }
 
-fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool, small::String> {
+fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool, types::Str> {
     match operator {
         "=" | "==" => Ok(first == second),
         "!=" => Ok(first != second),
@@ -223,8 +222,8 @@ fn get_modified_file_time(filename: &str) -> Option<SystemTime> {
 fn parse_integers(
     left: &str,
     right: &str,
-) -> Result<(Option<isize>, Option<isize>), small::String> {
-    let parse_integer = |input: &str| -> Result<Option<isize>, small::String> {
+) -> Result<(Option<isize>, Option<isize>), types::Str> {
+    let parse_integer = |input: &str| -> Result<Option<isize>, types::Str> {
         match input
             .parse::<isize>()
             .map_err(|_| format!("test: integer expression expected: {:?}", input))
@@ -375,14 +374,14 @@ fn test_strings() {
 
 #[test]
 fn test_empty_str() {
-    let eval = |args: Vec<small::String>| evaluate_arguments(&args);
+    let eval = |args: Vec<types::Str>| evaluate_arguments(&args);
     assert_eq!(eval(vec!["".into()]), Ok(false));
     assert_eq!(eval(vec!["c".into(), "=".into(), "".into()]), Ok(false));
 }
 
 #[test]
 fn test_integers_arguments() {
-    fn vec_string(args: &[&str]) -> Vec<small::String> {
+    fn vec_string(args: &[&str]) -> Vec<types::Str> {
         args.iter().map(|s| (*s).into()).collect()
     }
     // Equal To

@@ -52,7 +52,7 @@ impl<'a> Iterator for DesignatorLexer<'a> {
                         return Some(DesignatorToken::Text(self.grab_and_shorten(id)));
                     }
                 }
-                b' ' | b'\t' | b'\'' | b'"' | b'a'...b'z' | b'A'...b'Z' if self.design => {
+                b' ' | b'\t' | b'\'' | b'"' | b'a'..=b'z' | b'A'..=b'Z' if self.design => {
                     self.design = false;
                     return Some(DesignatorToken::Designator(self.grab_and_shorten(id)));
                 }
