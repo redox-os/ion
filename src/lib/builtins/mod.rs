@@ -20,7 +20,7 @@ pub use self::{
     command_info::builtin_which,
     conditionals::{contains, ends_with, starts_with},
     echo::builtin_echo,
-    exists::exists,
+    exists::builtin_exists,
     functions::print_functions,
     helpers::Status,
     is::builtin_is,
@@ -781,70 +781,6 @@ pub fn matches(args: &[types::Str], _: &mut Shell<'_>) -> Status {
         Status::TRUE
     } else {
         Status::FALSE
-    }
-}
-
-#[builtin(
-    desc = "check whether items exist",
-    man = r#"
-SYNOPSIS
-    exists [EXPRESSION]
-
-DESCRIPTION
-    Checks whether the given item exists and returns an exit status of 0 if it does, else 1.
-
-OPTIONS
-    -a ARRAY
-        array var is not empty
-
-    -b BINARY
-        binary is in PATH
-
-    -d PATH
-        path is a directory
-        This is the same as test -d
-
-    -f PATH
-        path is a file
-        This is the same as test -f
-
-    --fn FUNCTION
-        function is defined
-
-    -s STRING
-        string var is not empty
-
-    STRING
-        string is not empty
-        This is the same as test -n
-
-EXAMPLES
-    Test if the file exists:
-        exists -f FILE && echo "The FILE exists" || echo "The FILE does not exist"
-
-    Test if some-command exists in the path and is executable:
-        exists -b some-command && echo "some-command exists" || echo "some-command does not exist"
-
-    Test if variable exists AND is not empty
-        exists -s myVar && echo "myVar exists: $myVar" || echo "myVar does not exist or is empty"
-        NOTE: Don't use the '$' sigil, but only the name of the variable to check
-
-    Test if array exists and is not empty
-        exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
-        NOTE: Don't use the '@' sigil, but only the name of the array to check
-
-    Test if a function named 'myFunc' exists
-        exists --fn myFunc && myFunc || echo "No function with name myFunc found"
-
-AUTHOR
-    Written by Fabian Würfl.
-    Heavily based on implementation of the test builtin, which was written by Michael Murphy."#
-)]
-pub fn exists(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    match exists(args, shell) {
-        Ok(true) => Status::TRUE,
-        Ok(false) => Status::FALSE,
-        Err(why) => Status::error(why),
     }
 }
 

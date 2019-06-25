@@ -1,39 +1,99 @@
 use std::{fs, os::unix::fs::PermissionsExt};
 
+use super::Status;
+use crate as ion_shell;
 use crate::{
     shell::{Shell, Value},
     types,
 };
+use builtins_proc::builtin;
 
-pub fn exists(args: &[types::Str], shell: &Shell<'_>) -> Result<bool, types::Str> {
+#[builtin(
+    desc = "check whether items exist",
+    man = r#"
+SYNOPSIS
+    exists [EXPRESSION]
+
+DESCRIPTION
+    Checks whether the given item exists and returns an exit status of 0 if it does, else 1.
+
+OPTIONS
+    -a ARRAY
+        array var is not empty
+
+    -b BINARY
+        binary is in PATH
+
+    -d PATH
+        path is a directory
+        This is the same as test -d
+
+    -f PATH
+        path is a file
+        This is the same as test -f
+
+    --fn FUNCTION
+        function is defined
+
+    -s STRING
+        string var is not empty
+
+    STRING
+        string is not empty
+        This is the same as test -n
+
+EXAMPLES
+    Test if the file exists:
+        exists -f FILE && echo "The FILE exists" || echo "The FILE does not exist"
+
+    Test if some-command exists in the path and is executable:
+        exists -b some-command && echo "some-command exists" || echo "some-command does not exist"
+
+    Test if variable exists AND is not empty
+        exists -s myVar && echo "myVar exists: $myVar" || echo "myVar does not exist or is empty"
+        NOTE: Don't use the '$' sigil, but only the name of the variable to check
+
+    Test if array exists and is not empty
+        exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
+        NOTE: Don't use the '@' sigil, but only the name of the array to check
+
+    Test if a function named 'myFunc' exists
+        exists --fn myFunc && myFunc || echo "No function with name myFunc found"
+
+AUTHOR
+    Written by Fabian Würfl.
+    Heavily based on implementation of the test builtin, which was written by Michael Murphy."#
+)]
+pub fn exists(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match args.get(1) {
         Some(ref s) if s.starts_with("--") => {
             let (_, option) = s.split_at(2);
             // If no argument was given, return `SUCCESS`, as this means a string starting
             // with a dash was given
-            args.get(2).map_or(Ok(true), {
+            args.get(2).map_or(true, {
                 |arg|
                 // Match the correct function to the associated flag
-                Ok(match_option_argument(option, arg, shell))
+                match_option_argument(option, arg, shell)
             })
         }
         Some(ref s) if s.starts_with('-') => {
             // Access the second character in the flag string: this will be type of the
             // flag. If no flag was given, return `SUCCESS`, as this means a
             // string with value "-" was checked.
-            s.chars().nth(1).map_or(Ok(true), |flag| {
+            s.chars().nth(1).map_or(true, |flag| {
                 // If no argument was given, return `SUCCESS`, as this means a string starting
                 // with a dash was given
-                args.get(2).map_or(Ok(true), {
+                args.get(2).map_or(true, {
                     |arg|
                     // Match the correct function to the associated flag
-                    Ok(match_flag_argument(flag, arg, shell))
+                    match_flag_argument(flag, arg, shell)
                 })
             })
         }
-        Some(string) => Ok(string_is_nonzero(string)),
-        None => Ok(false),
+        Some(string) => string_is_nonzero(string),
+        None => false,
     }
+    .into()
 }
 
 /// Matches flag arguments to their respective functionaity when the `-`
@@ -148,45 +208,54 @@ mod tests {
 
         // assert_eq!(exists(&["ion".into(), ], &mut sink, &shell), Ok(false));
         // no parameters
-        assert_eq!(exists(&["ion".into()], &shell), Ok(false));
+        assert!(builtin_exists(&["ion".into()], &mut shell).is_failure());
         // multiple arguments
         // ignores all but the first argument
-        assert_eq!(exists(&["ion".into(), "foo".into(), "bar".into()], &shell), Ok(true));
+        assert!(
+            builtin_exists(&["ion".into(), "foo".into(), "bar".into()], &mut shell).is_success()
+        );
 
         // check `exists STRING`
-        assert_eq!(exists(&["ion".into(), "".into()], &shell), Ok(false));
-        assert_eq!(exists(&["ion".into(), "string".into()], &shell), Ok(true));
-        assert_eq!(exists(&["ion".into(), "string with space".into()], &shell), Ok(true));
-        assert_eq!(exists(&["ion".into(), "-startswithdash".into()], &shell), Ok(true));
+        assert!(builtin_exists(&["ion".into(), "".into()], &mut shell).is_failure());
+        assert!(builtin_exists(&["ion".into(), "string".into()], &mut shell).is_success());
+        assert!(
+            builtin_exists(&["ion".into(), "string with space".into()], &mut shell).is_success()
+        );
+        assert!(builtin_exists(&["ion".into(), "-startswithdash".into()], &mut shell).is_success());
 
         // check `exists -a`
         // no argument means we treat it as a string
-        assert_eq!(exists(&["ion".into(), "-a".into()], &shell), Ok(true));
+        assert!(builtin_exists(&["ion".into(), "-a".into()], &mut shell).is_success());
         shell.variables_mut().set("emptyarray", types::Array::new());
-        assert_eq!(exists(&["ion".into(), "-a".into(), "emptyarray".into()], &shell), Ok(false));
+        assert!(builtin_exists(&["ion".into(), "-a".into(), "emptyarray".into()], &mut shell)
+            .is_failure());
         let mut array = types::Array::new();
         array.push("element".into());
         shell.variables_mut().set("array", array);
-        assert_eq!(exists(&["ion".into(), "-a".into(), "array".into()], &shell), Ok(true));
+        assert!(
+            builtin_exists(&["ion".into(), "-a".into(), "array".into()], &mut shell).is_success()
+        );
         shell.variables_mut().remove("array");
-        assert_eq!(exists(&["ion".into(), "-a".into(), "array".into()], &shell), Ok(false));
+        assert!(
+            builtin_exists(&["ion".into(), "-a".into(), "array".into()], &mut shell).is_failure()
+        );
 
         // check `exists -b`
         // TODO: see test_binary_is_in_path()
         // no argument means we treat it as a string
-        assert_eq!(exists(&["ion".into(), "-b".into()], &shell), Ok(true));
+        assert!(builtin_exists(&["ion".into(), "-b".into()], &mut shell).is_success());
         let oldpath = shell.variables().get_str("PATH").unwrap_or_else(|_| "/usr/bin".into());
         shell.variables_mut().set("PATH", "testing/");
 
-        assert_eq!(
-            exists(&["ion".into(), "-b".into(), "executable_file".into()], &shell),
-            Ok(true)
-        );
-        assert_eq!(exists(&["ion".into(), "-b".into(), "empty_file".into()], &shell), Ok(false));
-        assert_eq!(
-            exists(&["ion".into(), "-b".into(), "file_does_not_exist".into()], &shell),
-            Ok(false)
-        );
+        assert!(builtin_exists(&["ion".into(), "-b".into(), "executable_file".into()], &mut shell)
+            .is_success());
+        assert!(builtin_exists(&["ion".into(), "-b".into(), "empty_file".into()], &mut shell)
+            .is_failure());
+        assert!(builtin_exists(
+            &["ion".into(), "-b".into(), "file_does_not_exist".into()],
+            &mut shell
+        )
+        .is_failure());
 
         // restore original PATH. Not necessary for the currently defined test cases
         // but this might change in the future? Better safe than sorry!
@@ -194,45 +263,52 @@ mod tests {
 
         // check `exists -d`
         // no argument means we treat it as a string
-        assert_eq!(exists(&["ion".into(), "-d".into()], &shell), Ok(true));
-        assert_eq!(exists(&["ion".into(), "-d".into(), "testing/".into()], &shell), Ok(true));
-        assert_eq!(
-            exists(&["ion".into(), "-d".into(), "testing/empty_file".into()], &shell),
-            Ok(false)
-        );
-        assert_eq!(
-            exists(&["ion".into(), "-d".into(), "does/not/exist/".into()], &shell),
-            Ok(false)
-        );
+        assert!(builtin_exists(&["ion".into(), "-d".into()], &mut shell).is_success());
+        assert!(builtin_exists(&["ion".into(), "-d".into(), "testing/".into()], &mut shell)
+            .is_success());
+        assert!(builtin_exists(
+            &["ion".into(), "-d".into(), "testing/empty_file".into()],
+            &mut shell
+        )
+        .is_failure());
+        assert!(builtin_exists(&["ion".into(), "-d".into(), "does/not/exist/".into()], &mut shell)
+            .is_failure());
 
         // check `exists -f`
         // no argument means we treat it as a string
-        assert_eq!(exists(&["ion".into(), "-f".into()], &shell), Ok(true));
-        assert_eq!(exists(&["ion".into(), "-f".into(), "testing/".into()], &shell), Ok(false));
-        assert_eq!(
-            exists(&["ion".into(), "-f".into(), "testing/empty_file".into()], &shell),
-            Ok(true)
-        );
-        assert_eq!(
-            exists(&["ion".into(), "-f".into(), "does-not-exist".into()], &shell),
-            Ok(false)
-        );
+        assert!(builtin_exists(&["ion".into(), "-f".into()], &mut shell).is_success());
+        assert!(builtin_exists(&["ion".into(), "-f".into(), "testing/".into()], &mut shell)
+            .is_failure());
+        assert!(builtin_exists(
+            &["ion".into(), "-f".into(), "testing/empty_file".into()],
+            &mut shell
+        )
+        .is_success());
+        assert!(builtin_exists(&["ion".into(), "-f".into(), "does-not-exist".into()], &mut shell)
+            .is_failure());
 
         // check `exists -s`
         // no argument means we treat it as a string
-        assert_eq!(exists(&["ion".into(), "-s".into()], &shell), Ok(true));
+        assert!(builtin_exists(&["ion".into(), "-s".into()], &mut shell).is_success());
         shell.variables_mut().set("emptyvar", "".to_string());
-        assert_eq!(exists(&["ion".into(), "-s".into(), "emptyvar".into()], &shell), Ok(false));
+        assert!(builtin_exists(&["ion".into(), "-s".into(), "emptyvar".into()], &mut shell)
+            .is_failure());
         shell.variables_mut().set("testvar", "foobar".to_string());
-        assert_eq!(exists(&["ion".into(), "-s".into(), "testvar".into()], &shell), Ok(true));
+        assert!(
+            builtin_exists(&["ion".into(), "-s".into(), "testvar".into()], &mut shell).is_success()
+        );
         shell.variables_mut().remove("testvar");
-        assert_eq!(exists(&["ion".into(), "-s".into(), "testvar".into()], &shell), Ok(false));
+        assert!(
+            builtin_exists(&["ion".into(), "-s".into(), "testvar".into()], &mut shell).is_failure()
+        );
         // also check that it doesn't trigger on arrays
         let mut array = types::Array::new();
         array.push("element".into());
         shell.variables_mut().remove("array");
         shell.variables_mut().set("array", array);
-        assert_eq!(exists(&["ion".into(), "-s".into(), "array".into()], &shell), Ok(false));
+        assert!(
+            builtin_exists(&["ion".into(), "-s".into(), "array".into()], &mut shell).is_failure()
+        );
 
         // check `exists --fn`
         let name_str = "test_function";
@@ -248,14 +324,16 @@ mod tests {
             Value::Function(Function::new(Some(description), name.clone(), args, statements)),
         );
 
-        assert_eq!(exists(&["ion".into(), "--fn".into(), name_str.into()], &shell), Ok(true));
+        assert!(builtin_exists(&["ion".into(), "--fn".into(), name_str.into()], &mut shell)
+            .is_success());
         shell.variables_mut().remove(name_str);
-        assert_eq!(exists(&["ion".into(), "--fn".into(), name_str.into()], &shell), Ok(false));
+        assert!(builtin_exists(&["ion".into(), "--fn".into(), name_str.into()], &mut shell)
+            .is_failure());
 
         // check invalid flags / parameters (should all be treated as strings and
         // therefore succeed)
-        assert_eq!(exists(&["ion".into(), "--foo".into()], &shell), Ok(true));
-        assert_eq!(exists(&["ion".into(), "-x".into()], &shell), Ok(true));
+        assert!(builtin_exists(&["ion".into(), "--foo".into()], &mut shell).is_success());
+        assert!(builtin_exists(&["ion".into(), "-x".into()], &mut shell).is_success());
     }
 
     #[test]
