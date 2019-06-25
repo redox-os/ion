@@ -1,3 +1,4 @@
+/// helpers for creating help
 pub mod man_pages;
 
 mod calc;
@@ -21,7 +22,7 @@ pub use self::{
     conditionals::{contains, ends_with, starts_with},
     echo::builtin_echo,
     exists::builtin_exists,
-    functions::print_functions,
+    functions::builtin_fn_,
     helpers::Status,
     is::builtin_is,
     man_pages::check_help,
@@ -156,7 +157,7 @@ impl<'a> BuiltinMap<'a> {
     ///
     /// Contains `fn`, `alias`, `unalias`, `drop`, `read`
     pub fn with_variables(&mut self) -> &mut Self {
-        self.add("fn", &builtin_fn, "Print list of functions")
+        self.add("fn", &builtin_fn_, "Print list of functions")
             .add("alias", &builtin_alias, "View, set or unset aliases")
             .add("unalias", &builtin_unalias, "Delete an alias")
             .add("drop", &builtin_drop, "Delete a variable")
@@ -551,12 +552,6 @@ pub fn popd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     } else {
         Status::error(format!("ion: popd: {}: directory stack index out of range", index))
     }
-}
-
-// TODO There is a man page for fn however the -h and --help flags are not
-// checked for.
-pub fn builtin_fn(_: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    print_functions(shell.variables())
 }
 
 struct EmptyCompleter;

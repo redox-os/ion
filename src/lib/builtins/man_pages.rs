@@ -1,5 +1,6 @@
 use crate::types;
 
+/// Print the given help if the -h or --help argument are found
 pub fn check_help(args: &[types::Str], man_page: &'static str) -> bool {
     for arg in args {
         if arg == "-h" || arg == "--help" {
