@@ -60,7 +60,7 @@
 //! ```
 
 #![allow(unknown_lints)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 use ion_ranges as ranges;
 
 /// The various types used for storing values

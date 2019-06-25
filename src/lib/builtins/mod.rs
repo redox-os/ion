@@ -18,6 +18,7 @@ mod test;
 mod variables;
 
 pub use self::{
+    calc::builtin_calc,
     command_info::builtin_which,
     conditionals::{builtin_contains, builtin_ends_with, builtin_starts_with},
     echo::builtin_echo,
@@ -617,14 +618,6 @@ pub fn eval(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     shell.execute_command(args[1..].join(" ").as_bytes()).unwrap_or_else(|_| {
         Status::error("ion: supplied eval expression was not terminated".to_string())
     })
-}
-
-// TODO create manpage.
-pub fn builtin_calc(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    match calc::calc(&args[1..]) {
-        Ok(()) => Status::SUCCESS,
-        Err(why) => Status::error(why),
-    }
 }
 
 #[builtin(

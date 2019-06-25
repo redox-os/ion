@@ -1,14 +1,23 @@
+use super::Status;
+use crate as ion_shell;
+use builtins_proc::builtin;
 use calc::{eval, eval_polish, CalcError, Value};
-use small;
 use std::io::{self, Write};
 
 const REPL_GUIDE: &str = r#"ion-calc
 Type in expressions to have them evaluated.
 Type "help" for help."#;
 
-pub const MAN_CALC: &str = r#"NAME
-    calc - Floating point calculator
+fn calc_or_polish_calc(args: &str) -> Result<Value, CalcError> {
+    match eval(&args) {
+        Ok(t) => Ok(t),
+        Err(_) => eval_polish(&args),
+    }
+}
 
+#[builtin(
+    desc = "Floating-point calculator",
+    man = "
 SYNOPSIS
     calc [EXPRESSION]
 
@@ -40,33 +49,21 @@ EXAMPLES
         calc + 2 2
 
 AUTHOR
-    Written by Hunter Goldstein.
-"#;
-
-fn calc_or_polish_calc(args: &str) -> Result<Value, CalcError> {
-    match eval(&args) {
-        Ok(t) => Ok(t),
-        Err(_) => eval_polish(&args),
-    }
-}
-
-pub fn calc(args: &[small::String]) -> Result<(), String> {
+    Written by Hunter Goldstein."
+)]
+pub fn calc(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    match args.first() {
-        Some(ref s) if (*s == "--help") => {
-            // "--help" only makes sense if it is the first option. Only look for it
-            // in the first position.
-            println!("{}", MAN_CALC);
-            Ok(())
-        }
+    match args.get(1) {
         Some(_) => {
-            let result = calc_or_polish_calc(&args.join(" "));
-            let _ = match result {
-                Ok(v) => writeln!(stdout, "{}", v),
-                Err(e) => writeln!(stdout, "{}", e),
-            };
-            Ok(())
+            let result = calc_or_polish_calc(&args[1..].join(" "));
+            match result {
+                Ok(v) => {
+                    println!("{}", v);
+                    Status::SUCCESS
+                }
+                Err(e) => Status::error(format!("{}", e)),
+            }
         }
         None => {
             let prompt = b"ion-calc: ";
@@ -77,23 +74,21 @@ pub fn calc(args: &[small::String]) -> Result<(), String> {
                 let mut input = String::new();
                 let _ = io::stdin().read_line(&mut input);
                 if input.is_empty() {
-                    break;
+                    return Status::SUCCESS;
                 } else {
                     match input.trim() {
                         "" => (),
-                        "exit" => break,
-                        "help" => println!("{}", MAN_CALC),
+                        "exit" => return Status::SUCCESS,
                         s => {
                             let result = calc_or_polish_calc(s);
-                            let _ = match result {
-                                Ok(v) => writeln!(stdout, "{}", v),
-                                Err(e) => writeln!(stdout, "{}", e),
-                            };
+                            match result {
+                                Ok(v) => println!("{}", v),
+                                Err(e) => eprintln!("{}", e),
+                            }
                         }
                     }
                 }
             }
-            Ok(())
         }
     }
 }
