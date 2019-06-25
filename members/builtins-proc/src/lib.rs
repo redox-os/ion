@@ -12,6 +12,7 @@ pub fn builtin(attr: TokenStream, item: TokenStream) -> TokenStream {
     let syn::FnDecl { ref fn_token, ref inputs, ref output, .. } = **decl;
     let mut help = None;
     let mut short_description = None;
+    let mut names = None;
 
     let name = syn::Ident::new(&format!("builtin_{}", &ident), input.ident.span());
 
@@ -29,6 +30,12 @@ pub fn builtin(attr: TokenStream, item: TokenStream) -> TokenStream {
                 } else {
                     panic!("`desc` attribute should be a string variable");
                 }
+            } else if attr.ident == "names" {
+                if let syn::Lit::Str(h) = &attr.lit {
+                    names = Some(h.value());
+                } else {
+                    panic!("`desc` attribute should be a string variable");
+                }
             } else {
                 panic!("Only the `man` and `desc` attributes are allowed");
             }
@@ -40,8 +47,9 @@ pub fn builtin(attr: TokenStream, item: TokenStream) -> TokenStream {
     let help = help.trim();
     let short_description = short_description
         .expect("A short description is required! Please add an attribute with name `desc`");
-    let man = format!("NAME\n    {} - {}\n\n{}", ident, short_description, help);
-    let help = format!("{}\n\n```txt\n{}\n```", short_description, help);
+    let names = names.unwrap_or_else(|| ident.to_string());
+    let man = format!("NAME\n    {} - {}\n\n{}", names, short_description, help);
+    let help = format!("{} - {}\n\n```txt\n{}\n```", names, short_description, help);
 
     let result = quote! {
         #[doc = #help]

@@ -169,11 +169,12 @@ impl<'a> InteractiveBinary<'a> {
         // change the lifetime to allow adding local builtins
         let InteractiveBinary { context, shell } = self;
         let mut shell = shell.into_inner();
-        let builtins = shell.builtins_mut();
-        builtins.add("history", history, "Display a log of all commands previously executed");
-        builtins.add("keybindings", keybindings, "Change the keybindings");
-        builtins.add("exit", exit, "Exits the current session");
-        builtins.add("exec", exec, "Replace the shell with the given command.");
+        shell
+            .builtins_mut()
+            .add("history", history, "Display a log of all commands previously executed")
+            .add("keybindings", keybindings, "Change the keybindings")
+            .add("exit", exit, "Exits the current session")
+            .add("exec", exec, "Replace the shell with the given command.");
 
         Self::exec_init_file(&mut shell);
 

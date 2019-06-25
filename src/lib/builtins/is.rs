@@ -5,6 +5,7 @@ use builtins_proc::builtin;
 
 // TODO: Add support for multiple name in builtins man
 #[builtin(
+    names = "eq, is",
     desc = "checks if two arguments are the same",
     man = "
 SYNOPSIS

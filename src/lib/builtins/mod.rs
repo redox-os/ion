@@ -16,21 +16,21 @@ mod status;
 mod test;
 mod variables;
 
-use self::{
-    command_info::{find_type, which},
+pub use self::{
+    command_info::{builtin_type, builtin_which},
     conditionals::{contains, ends_with, starts_with},
     echo::builtin_echo,
     exists::exists,
     functions::print_functions,
+    helpers::Status,
     is::builtin_is,
-    man_pages::*,
+    man_pages::check_help,
     set::builtin_set,
     source::builtin_source,
     status::builtin_status,
     test::test,
     variables::{alias, drop_alias, drop_array, drop_variable},
 };
-pub use self::{helpers::Status, man_pages::check_help};
 use crate as ion_shell;
 use crate::{
     shell::{sys, Capture, Shell, Value},
@@ -202,8 +202,8 @@ impl<'a> BuiltinMap<'a> {
             .add("calc", &builtin_calc, "Calculate a mathematical expression")
             .add("eq", &builtin_is, "Simple alternative to == and !=")
             .add("is", &builtin_is, "Simple alternative to == and !=")
-            .add("true", &builtin_tru, "Do nothing, successfully")
-            .add("false", &builtin_fals, "Do nothing, unsuccessfully")
+            .add("true", &builtin_true_, "Do nothing, successfully")
+            .add("false", &builtin_false_, "Do nothing, unsuccessfully")
             .add(
                 "starts-with",
                 &starts_with,
@@ -234,17 +234,15 @@ impl<'a> BuiltinMap<'a> {
             .add("type", &builtin_type, "indicates how a command would be interpreted")
     }
 
-    /// Utilities specific for a shell, that should probably not be included in an embedded context
+    /// Utilities that may be a security risk. Not included by default
     ///
-    /// Contains `eval`, `exec`, `exit`, `set`, `suspend`
-    pub fn with_shell_unsafe(&mut self) -> &mut Self {
-        self.add("eval", &builtin_eval, "Evaluates the evaluated expression")
-            .add(
-                "set",
-                &builtin_set,
-                "Set or unset values of shell options and positional parameters.",
-            )
-            .add("suspend", &builtin_suspend, "Suspends the shell with a SIGTSTOP signal")
+    /// Contains `eval`, `set`
+    pub fn with_unsafe(&mut self) -> &mut Self {
+        self.add("eval", &builtin_eval, "Evaluates the evaluated expression").add(
+            "set",
+            &builtin_set,
+            "Set or unset values of shell options and positional parameters.",
+        )
     }
 }
 
@@ -667,18 +665,28 @@ pub fn builtin_calc(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_random(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_RANDOM) {
-        return Status::SUCCESS;
-    }
+#[builtin(
+    desc = "generate a random number",
+    man = "
+SYNOPSIS
+    random
+    random START END
+
+DESCRIPTION
+    random generates a pseudo-random integer. IT IS NOT SECURE.
+    The range depends on what arguments you pass. If no arguments are given the range is [0, \
+           32767].
+    If two arguments are given the range is [START, END]."
+)]
+pub fn random(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     match random::random(&args[1..]) {
         Ok(()) => Status::SUCCESS,
         Err(why) => Status::error(why),
     }
 }
 
-// TODO: Find a workaround
 #[builtin(
+    names = "true",
     desc = "does nothing sucessfully",
     man = "
 SYNOPSIS
@@ -687,11 +695,10 @@ SYNOPSIS
 DESCRIPTION
     Sets the exit status to 0."
 )]
-pub fn tru(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    Status::SUCCESS
-}
+pub fn true_(args: &[types::Str], _: &mut Shell<'_>) -> Status { Status::SUCCESS }
 
 #[builtin(
+    names = "false",
     desc = "does nothing unsuccessfully",
     man = "
 SYNOPSIS
@@ -700,9 +707,7 @@ SYNOPSIS
 DESCRIPTION
     Sets the exit status to 1."
 )]
-pub fn fals(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    Status::error("")
-}
+pub fn false_(args: &[types::Str], _: &mut Shell<'_>) -> Status { Status::error("") }
 
 // TODO create a manpage
 pub fn builtin_wait(_: &[types::Str], shell: &mut Shell<'_>) -> Status {
@@ -737,28 +742,35 @@ pub fn bg(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     job_control::bg(shell, &args[1..])
 }
 
-pub fn builtin_fg(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_FG) {
-        return Status::SUCCESS;
-    }
+#[builtin(
+    desc = "bring job to the foreground",
+    man = "
+SYNOPSIS
+    fg PID
+
+DESCRIPTION
+    fg brings the specified job to foreground resuming it if it has stopped."
+)]
+pub fn fg(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     job_control::fg(shell, &args[1..])
 }
 
-pub fn builtin_suspend(args: &[types::Str], _shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_SUSPEND) {
-        return Status::SUCCESS;
-    }
-    let _ = unsafe { libc::kill(0, libc::SIGSTOP) };
-    Status::SUCCESS
-}
+#[builtin(
+    desc = "disown processes",
+    man = "
+SYNOPSIS
+    disown [ --help | -r | -h | -a ][PID...]
 
-pub fn builtin_disown(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    for arg in args {
-        if *arg == "--help" {
-            println!("{}", MAN_DISOWN);
-            return Status::SUCCESS;
-        }
-    }
+DESCRIPTION
+    Disowning a process removes that process from the shell's background process table.
+
+OPTIONS
+    -r  Remove all running jobs from the background process list.
+    -h  Specifies that each job supplied will not receive the SIGHUP signal when the shell \
+           receives a SIGHUP.
+    -a  If no job IDs were supplied, remove all jobs from the background process list."
+)]
+pub fn disown(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match job_control::disown(shell, &args[1..]) {
         Ok(()) => Status::SUCCESS,
         Err(err) => Status::error(format!("ion: disown: {}", err)),
@@ -779,10 +791,23 @@ pub fn builtin_help(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
 }
 
 use regex::Regex;
-pub fn builtin_matches(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_MATCHES) {
-        return Status::SUCCESS;
-    }
+#[builtin(
+    desc = "checks if the second argument contains any proportion of the first",
+    man = "
+SYNOPSIS
+    matches VALUE VALUE
+
+DESCRIPTION
+    Makes the exit status equal 0 if the first argument contains the second.
+    Otherwise matches makes the exit status equal 1.
+
+EXAMPLES
+    Returns true:
+        matches xs x
+    Returns false:
+        matches x xs"
+)]
+pub fn matches(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     if args[1..].len() != 2 {
         return Status::bad_argument("match takes two arguments");
     }
@@ -801,10 +826,63 @@ pub fn builtin_matches(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_exists(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_EXISTS) {
-        return Status::SUCCESS;
-    }
+#[builtin(
+    desc = "check whether items exist",
+    man = r#"
+SYNOPSIS
+    exists [EXPRESSION]
+
+DESCRIPTION
+    Checks whether the given item exists and returns an exit status of 0 if it does, else 1.
+
+OPTIONS
+    -a ARRAY
+        array var is not empty
+
+    -b BINARY
+        binary is in PATH
+
+    -d PATH
+        path is a directory
+        This is the same as test -d
+
+    -f PATH
+        path is a file
+        This is the same as test -f
+
+    --fn FUNCTION
+        function is defined
+
+    -s STRING
+        string var is not empty
+
+    STRING
+        string is not empty
+        This is the same as test -n
+
+EXAMPLES
+    Test if the file exists:
+        exists -f FILE && echo "The FILE exists" || echo "The FILE does not exist"
+
+    Test if some-command exists in the path and is executable:
+        exists -b some-command && echo "some-command exists" || echo "some-command does not exist"
+
+    Test if variable exists AND is not empty
+        exists -s myVar && echo "myVar exists: $myVar" || echo "myVar does not exist or is empty"
+        NOTE: Don't use the '$' sigil, but only the name of the variable to check
+
+    Test if array exists and is not empty
+        exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
+        NOTE: Don't use the '@' sigil, but only the name of the array to check
+
+    Test if a function named 'myFunc' exists
+        exists --fn myFunc && myFunc || echo "No function with name myFunc found"
+
+AUTHOR
+    Written by Fabian Würfl.
+    Heavily based on implementation of the test builtin, which was written by Michael Murphy."#
+)]
+pub fn exists(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match exists(args, shell) {
         Ok(true) => Status::SUCCESS,
         Ok(false) => Status::error(""),
@@ -812,25 +890,16 @@ pub fn builtin_exists(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_which(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    match which(args, shell) {
-        Ok(result) => result,
-        Err(()) => Status::error(""),
-    }
-}
+#[builtin(
+    desc = "checks if the provided file descriptor is a tty",
+    man = "
+SYNOPSIS
+    isatty [FD]
 
-pub fn builtin_type(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    match find_type(args, shell) {
-        Ok(result) => result,
-        Err(()) => Status::error(""),
-    }
-}
-
-pub fn builtin_isatty(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_ISATTY) {
-        return Status::SUCCESS;
-    }
-
+DESCRIPTION
+    Returns 0 exit status if the supplied file descriptor is a tty."
+)]
+pub fn isatty(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     if args.len() > 1 {
         // sys::isatty expects a usize if compiled for redox but otherwise a i32.
         #[cfg(target_os = "redox")]
