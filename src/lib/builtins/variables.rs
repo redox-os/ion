@@ -3,7 +3,7 @@
 use std::io::{self, Write};
 
 use super::Status;
-use crate::{shell::variables::Variables, types};
+use crate::{shell::variables::Variables, types, Shell};
 
 fn print_list(vars: &Variables<'_>) {
     let stdout = io::stdout();
@@ -63,15 +63,15 @@ fn parse_alias(args: &str) -> Binding {
 
 /// The `alias` command will define an alias for another command, and thus may be used as a
 /// command itself.
-pub fn alias(vars: &mut Variables<'_>, args: &str) -> Status {
-    match parse_alias(args) {
+pub fn builtin_alias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
+    match parse_alias(&args[1..].join(" ")) {
         Binding::InvalidKey(key) => {
             return Status::error(format!("ion: alias name, '{}', is invalid", key));
         }
         Binding::KeyValue(key, value) => {
-            vars.set(&key, types::Alias(value));
+            shell.variables_mut().set(&key, types::Alias(value));
         }
-        Binding::ListEntries => print_list(&vars),
+        Binding::ListEntries => print_list(&shell.variables()),
         Binding::KeyOnly(key) => {
             return Status::error(format!("ion: please provide value for alias '{}'", key));
         }
@@ -80,13 +80,13 @@ pub fn alias(vars: &mut Variables<'_>, args: &str) -> Status {
 }
 
 /// Dropping an alias will erase it from the shell.
-pub fn drop_alias<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Status {
+pub fn builtin_unalias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if args.len() <= 1 {
         return Status::error("ion: you must specify an alias name".to_string());
     }
     for alias in args.iter().skip(1) {
-        if vars.remove(alias.as_ref()).is_none() {
-            return Status::error(format!("ion: undefined alias: {}", alias.as_ref()));
+        if shell.variables_mut().remove(alias.as_ref()).is_none() {
+            return Status::error(format!("ion: undefined alias: {}", alias));
         }
     }
     Status::SUCCESS

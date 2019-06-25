@@ -29,7 +29,7 @@ pub use self::{
     source::builtin_source,
     status::builtin_status,
     test::test,
-    variables::{alias, drop_alias, drop_array, drop_variable},
+    variables::{builtin_alias, builtin_unalias, drop_array, drop_variable},
 };
 use crate as ion_shell;
 use crate::{
@@ -383,7 +383,7 @@ pub fn dirs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
         (false, false) => |(_, x)| x.to_string_lossy(),
     };
 
-    let mut iter = shell.dir_stack().dirs().enumerate().map(mapper);
+    let mut iter = shell.dir_stack().dirs();
 
     if let Some(arg) = num_arg {
         let num = match parse_numeric_arg(arg.as_ref()) {
@@ -393,7 +393,7 @@ pub fn dirs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             }
             _ => return Status::error(format!("ion: dirs: {}: invalid argument", arg)),
         };
-        match iter.nth(num) {
+        match iter.nth(num).map(|x| mapper((num, x))) {
             Some(x) => {
                 println!("{}", x);
                 Status::SUCCESS
@@ -401,7 +401,7 @@ pub fn dirs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             None => Status::error(""),
         }
     } else {
-        println!("{}", iter.join(if multiline { "\n" } else { " " }));
+        println!("{}", iter.enumerate().map(mapper).format(if multiline { "\n" } else { " " }));
         Status::SUCCESS
     }
 }
@@ -478,7 +478,7 @@ pub fn pushd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             .dir_stack()
             .dirs()
             .map(|dir| dir.to_str().unwrap_or("ion: no directory found"))
-            .join(" ")
+            .format(" ")
     );
     Status::SUCCESS
 }
@@ -545,21 +545,12 @@ pub fn popd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                 .dir_stack()
                 .dirs()
                 .map(|dir| dir.to_str().unwrap_or("ion: no directory found"))
-                .join(" ")
+                .format(" ")
         );
         Status::SUCCESS
     } else {
         Status::error(format!("ion: popd: {}: directory stack index out of range", index))
     }
-}
-
-pub fn builtin_alias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    let args_str = args[1..].join(" ");
-    alias(shell.variables_mut(), &args_str)
-}
-
-pub fn builtin_unalias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    drop_alias(shell.variables_mut(), args)
 }
 
 // TODO There is a man page for fn however the -h and --help flags are not
@@ -592,7 +583,7 @@ pub fn read(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                 Ok(buffer) => {
                     shell.variables_mut().set(arg.as_ref(), buffer.trim());
                 }
-                Err(_) => return Status::error(""),
+                Err(_) => return Status::FALSE,
             }
         }
     } else {
@@ -651,8 +642,8 @@ pub fn builtin_test(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     // Do not use `check_help` for the `test` builtin. The
     // `test` builtin contains a "-h" option.
     match test(args) {
-        Ok(true) => Status::SUCCESS,
-        Ok(false) => Status::error(""),
+        Ok(true) => Status::TRUE,
+        Ok(false) => Status::FALSE,
         Err(why) => Status::error(why),
     }
 }
@@ -707,7 +698,7 @@ SYNOPSIS
 DESCRIPTION
     Sets the exit status to 1."
 )]
-pub fn false_(args: &[types::Str], _: &mut Shell<'_>) -> Status { Status::error("") }
+pub fn false_(args: &[types::Str], _: &mut Shell<'_>) -> Status { Status::FALSE }
 
 // TODO create a manpage
 pub fn builtin_wait(_: &[types::Str], shell: &mut Shell<'_>) -> Status {
@@ -785,7 +776,7 @@ pub fn builtin_help(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             println!("Command helper not found [run 'help']...");
         }
     } else {
-        println!("{}", shell.builtins().keys().join(""));
+        println!("{}", shell.builtins().keys().format(""));
     }
     Status::SUCCESS
 }
@@ -820,9 +811,9 @@ pub fn matches(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     };
 
     if re.is_match(input) {
-        Status::SUCCESS
+        Status::TRUE
     } else {
-        Status::error("")
+        Status::FALSE
     }
 }
 
@@ -884,8 +875,8 @@ AUTHOR
 )]
 pub fn exists(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match exists(args, shell) {
-        Ok(true) => Status::SUCCESS,
-        Ok(false) => Status::error(""),
+        Ok(true) => Status::TRUE,
+        Ok(false) => Status::FALSE,
         Err(why) => Status::error(why),
     }
 }
@@ -910,9 +901,9 @@ pub fn isatty(args: &[types::Str], _: &mut Shell<'_>) -> Status {
         match pid {
             Ok(r) => {
                 if sys::isatty(r) {
-                    Status::SUCCESS
+                    Status::TRUE
                 } else {
-                    Status::error("")
+                    Status::FALSE
                 }
             }
             Err(_) => Status::error("ion: isatty given bad number"),

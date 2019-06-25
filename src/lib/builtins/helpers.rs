@@ -5,9 +5,11 @@ pub struct Status(i32);
 
 impl Status {
     pub const COULD_NOT_EXEC: Self = Status(126);
+    pub const FALSE: Self = Status(1);
     pub const NO_SUCH_COMMAND: Self = Status(127);
     pub const SUCCESS: Self = Status(0);
     pub const TERMINATED: Self = Status(143);
+    pub const TRUE: Self = Status(0);
 
     pub fn from_signal(signal: i32) -> Self { Status(128 + signal) }
 
