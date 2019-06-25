@@ -55,6 +55,13 @@ EXAMPLES
 AUTHOR
     Written by Fabian Würfl.
     Heavily based on implementation of the test builtin, which was written by Michael Murphy.
+
+BUGS
+    Please report all bugs at https://gitlab.redox-os.org/redox-os/ion/issues.
+    Ion is still in active development and help in finding bugs is much appreciated!
+
+AUTHORS
+    The Ion developers, under the Redox OS organisation
 0
 NAME
     exists - check whether items exist
@@ -111,6 +118,13 @@ EXAMPLES
 AUTHOR
     Written by Fabian Würfl.
     Heavily based on implementation of the test builtin, which was written by Michael Murphy.
+
+BUGS
+    Please report all bugs at https://gitlab.redox-os.org/redox-os/ion/issues.
+    Ion is still in active development and help in finding bugs is much appreciated!
+
+AUTHORS
+    The Ion developers, under the Redox OS organisation
 0
 1
 0

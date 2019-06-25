@@ -3,6 +3,7 @@ use smallvec::SmallVec;
 pub use types_rs::types::*;
 
 pub use crate::shell::flow_control::Function;
+/// A owned version of a set of arguments for spawning a command
 pub type Args = SmallVec<[small::String; 4]>;
 /// Construct a new Array containing the given arguments
 ///

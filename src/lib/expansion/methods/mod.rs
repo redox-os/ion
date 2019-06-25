@@ -20,16 +20,22 @@ pub struct MethodArgs<'a, 'b, E: Expander> {
     expand: &'b E,
 }
 
+/// Error during method expansion
+///
+/// Ex: `$join($scalar)` (can't join a scala) or `$unknown(@variable)` (unknown method)
 #[derive(Debug, Clone, Error)]
 pub enum MethodError {
+    /// Unknown array method
     #[error(display = "'{}' is an unknown array method", _0)]
     InvalidArrayMethod(String),
+    /// Unknown scalar method
     #[error(display = "'{}' is an unknown string method", _0)]
     InvalidScalarMethod(String),
+    /// A wrong argumeng was given to the method (extra, missing, or wrong type)
     #[error(display = "{}: {}", _0, _1)]
     WrongArgument(&'static str, &'static str),
 
-    // specific to some builtins
+    /// An invalid regex was provided. This is specific to the `matches` method
     #[error(display = "regex_replace: error in regular expression '{}': {}", _0, _1)]
     InvalidRegex(String, #[error(cause)] regex::Error),
 }

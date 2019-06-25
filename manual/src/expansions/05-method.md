@@ -82,6 +82,7 @@ The following are the currently-supported string methods:
 - [to_uppercase](#to_uppercase)
 - [escape](#escape)
 - [unescape](#unescape)
+- [or](#or)
 
 ### ends_with
 
@@ -451,6 +452,25 @@ echo $unescape($line)
 	 lamb
 ```
 
+### or
+
+Defaults to string variables. Fallback to a given value if the variable is not defined
+
+#### Example
+
+```
+echo $or($unknown_variable "Fallback")
+let var = 42
+echo $or($var "Not displayed")
+```
+
+#### Output
+
+```
+Fallback
+42
+```
+
 ## Array Methods
 
 The following are the currently-supported array methods.
@@ -612,3 +632,4 @@ echo @reverse([1 2 3])
 ```
 3 2 1
 ```
+

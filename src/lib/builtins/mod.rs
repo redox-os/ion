@@ -1,3 +1,4 @@
+/// helpers for creating help
 pub mod man_pages;
 
 mod calc;
@@ -17,11 +18,12 @@ mod test;
 mod variables;
 
 pub use self::{
+    calc::builtin_calc,
     command_info::builtin_which,
-    conditionals::{contains, ends_with, starts_with},
+    conditionals::{builtin_contains, builtin_ends_with, builtin_starts_with},
     echo::builtin_echo,
     exists::builtin_exists,
-    functions::print_functions,
+    functions::builtin_fn_,
     helpers::Status,
     is::builtin_is,
     man_pages::check_help,
@@ -156,7 +158,7 @@ impl<'a> BuiltinMap<'a> {
     ///
     /// Contains `fn`, `alias`, `unalias`, `drop`, `read`
     pub fn with_variables(&mut self) -> &mut Self {
-        self.add("fn", &builtin_fn, "Print list of functions")
+        self.add("fn", &builtin_fn_, "Print list of functions")
             .add("alias", &builtin_alias, "View, set or unset aliases")
             .add("unalias", &builtin_unalias, "Delete an alias")
             .add("drop", &builtin_drop, "Delete a variable")
@@ -205,17 +207,17 @@ impl<'a> BuiltinMap<'a> {
             .add("false", &builtin_false_, "Do nothing, unsuccessfully")
             .add(
                 "starts-with",
-                &starts_with,
+                &builtin_starts_with,
                 "Evaluates if the supplied argument starts with a given string",
             )
             .add(
                 "ends-with",
-                &ends_with,
+                &builtin_ends_with,
                 "Evaluates if the supplied argument ends with a given string",
             )
             .add(
                 "contains",
-                &contains,
+                &builtin_contains,
                 "Evaluates if the supplied argument contains a given string",
             )
             .add("matches", &builtin_matches, "Checks if a string matches a given regex")
@@ -246,7 +248,16 @@ impl<'a> BuiltinMap<'a> {
     }
 }
 
-pub fn builtin_dir_depth(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
+#[builtin(
+    desc = "set the dir stack depth",
+    man = "
+SYNOPSYS
+    dir_depth [DEPTH]
+
+DESCRIPTION
+    If DEPTH is given, set the dir stack max depth to DEPTH, else remove the limit"
+)]
+pub fn dir_depth(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let depth = match args.get(1) {
         None => None,
         Some(arg) => match arg.parse::<usize>() {
@@ -553,12 +564,6 @@ pub fn popd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-// TODO There is a man page for fn however the -h and --help flags are not
-// checked for.
-pub fn builtin_fn(_: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    print_functions(shell.variables())
-}
-
 struct EmptyCompleter;
 
 impl Completer for EmptyCompleter {
@@ -615,14 +620,6 @@ pub fn eval(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     })
 }
 
-// TODO create manpage.
-pub fn builtin_calc(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    match calc::calc(&args[1..]) {
-        Ok(()) => Status::SUCCESS,
-        Err(why) => Status::error(why),
-    }
-}
-
 #[builtin(
     desc = "generate a random number",
     man = "
@@ -667,8 +664,16 @@ DESCRIPTION
 )]
 pub fn false_(args: &[types::Str], _: &mut Shell<'_>) -> Status { Status::FALSE }
 
-// TODO create a manpage
-pub fn builtin_wait(_: &[types::Str], shell: &mut Shell<'_>) -> Status {
+#[builtin(
+    desc = "wait for a background job",
+    man = "
+SYNOPSIS
+    wait
+
+DESCRIPTION
+    Wait for the background jobs to finish"
+)]
+pub fn wait(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let _ = shell.wait_for_background();
     Status::SUCCESS
 }
@@ -735,7 +740,16 @@ pub fn disown(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_help(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
+#[builtin(
+    desc = "get help for builtins",
+    man = "
+SYNOPSIS
+    help [BUILTIN]
+
+DESCRIPTION
+    Get the short description for BUILTIN. If no argument is provided, list all the builtins"
+)]
+pub fn help(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if let Some(command) = args.get(1) {
         if let Some(help) = shell.builtins().get_help(command) {
             println!("{}", help);

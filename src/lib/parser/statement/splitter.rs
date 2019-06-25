@@ -11,22 +11,31 @@ enum LogicalOp {
     None,
 }
 
+/// Error during statement parsing
 #[derive(Debug, PartialEq, Error)]
 pub enum StatementError {
+    /// The command name is illegal
     #[error(display = "illegal command name: {}", _0)]
     IllegalCommandName(String),
+    /// Invalid character found
     #[error(display = "syntax error: '{}' at position {} is out of place", _0, _1)]
     InvalidCharacter(char, usize),
+    /// Unterminated subshell
     #[error(display = "syntax error: unterminated subshell")]
     UnterminatedSubshell,
+    /// Unterminated namespaced variable
     #[error(display = "syntax error: unterminated brace")]
     UnterminatedBracedVar,
+    /// Unterminated brace expansion
     #[error(display = "syntax error: unterminated braced var")]
     UnterminatedBrace,
+    /// Unterminated method
     #[error(display = "syntax error: unterminated method")]
     UnterminatedMethod,
+    /// Unterminated arithmetic expression
     #[error(display = "syntax error: unterminated arithmetic subexpression")]
     UnterminatedArithmetic,
+    /// Expected command but found ...
     #[error(display = "expected command, but found {}", _0)]
     ExpectedCommandButFound(&'static str),
 }
@@ -38,6 +47,7 @@ pub enum StatementVariant<'a> {
     Default(&'a str),
 }
 
+/// Split an input data into a set of statements
 #[derive(Debug)]
 pub struct StatementSplitter<'a> {
     data:             &'a str,
@@ -53,6 +63,7 @@ pub struct StatementSplitter<'a> {
 }
 
 impl<'a> StatementSplitter<'a> {
+    /// Create a new statement splitter on data
     pub fn new(data: &'a str) -> Self {
         StatementSplitter {
             data,

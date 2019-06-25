@@ -13,34 +13,37 @@ pub fn builtin(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut help = None;
     let mut short_description = None;
     let mut names = None;
+    let mut authors = true;
 
     let name = syn::Ident::new(&format!("builtin_{}", &ident), input.ident.span());
 
     for attr in attrs {
-        if let syn::NestedMeta::Meta(syn::Meta::NameValue(attr)) = attr {
-            if attr.ident == "man" {
+        match attr {
+            syn::NestedMeta::Meta(syn::Meta::NameValue(ref attr)) if attr.ident == "man" => {
                 if let syn::Lit::Str(h) = &attr.lit {
                     help = Some(h.value());
                 } else {
                     panic!("`man` attribute should be a string variable");
                 }
-            } else if attr.ident == "desc" {
+            }
+            syn::NestedMeta::Meta(syn::Meta::NameValue(ref attr)) if attr.ident == "desc" => {
                 if let syn::Lit::Str(h) = &attr.lit {
                     short_description = Some(h.value());
                 } else {
                     panic!("`desc` attribute should be a string variable");
                 }
-            } else if attr.ident == "names" {
+            }
+            syn::NestedMeta::Meta(syn::Meta::NameValue(ref attr)) if attr.ident == "names" => {
                 if let syn::Lit::Str(h) = &attr.lit {
                     names = Some(h.value());
                 } else {
                     panic!("`desc` attribute should be a string variable");
                 }
-            } else {
-                panic!("Only the `man` and `desc` attributes are allowed");
             }
-        } else {
-            panic!("Only the `man` and `desc` attributes are allowed");
+            syn::NestedMeta::Meta(syn::Meta::Word(ref ident)) if ident == "no_authors" => {
+                authors = false;
+            }
+            _ => panic!("Only the `man` and `desc` attributes are allowed"),
         }
     }
     let help = help.expect("A man page is required! Please add an attribute with name `man`");
@@ -48,7 +51,25 @@ pub fn builtin(attr: TokenStream, item: TokenStream) -> TokenStream {
     let short_description = short_description
         .expect("A short description is required! Please add an attribute with name `desc`");
     let names = names.unwrap_or_else(|| ident.to_string());
-    let man = format!("NAME\n    {} - {}\n\n{}", names, short_description, help);
+
+    let bugs = "BUGS
+    Please report all bugs at https://gitlab.redox-os.org/redox-os/ion/issues.
+    Ion is still in active development and help in finding bugs is much appreciated!";
+
+    let extra = format!(
+        "
+
+AUTHORS
+    The Ion developers, under the Redox OS organisation"
+    );
+    let man = format!(
+        "NAME\n    {names} - {short_description}\n\n{help}\n\n{bugs}{extra}",
+        names = names,
+        short_description = short_description,
+        help = help,
+        bugs = bugs,
+        extra = if authors { &extra } else { "" },
+    );
     let help = format!("{} - {}\n\n```txt\n{}\n```", names, short_description, help);
 
     let result = quote! {

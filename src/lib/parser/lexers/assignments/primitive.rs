@@ -3,16 +3,27 @@ use std::fmt::{self, Display, Formatter};
 /// A primitive defines the type that a requested value should satisfy.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Primitive {
+    /// A plain string (ex: `"a string"`)
     Str,
+    /// An array of string (ex: `["-" b c d]`)
     StrArray,
+    /// A true-false value
     Boolean,
+    /// An array of booleans
     BooleanArray,
+    /// An integer numeric type
     Integer,
+    /// An array of integer numeric type
     IntegerArray,
+    /// A floating-point value
     Float,
+    /// A floating-point value array
     FloatArray,
+    /// A hash map
     HashMap(Box<Primitive>),
+    /// A btreemap
     BTreeMap(Box<Primitive>),
+    /// An index variable (ex: `$array[0]`)
     Indexed(String, Box<Primitive>),
 }
 
