@@ -19,7 +19,7 @@ mod variables;
 
 pub use self::{
     command_info::builtin_which,
-    conditionals::{contains, ends_with, starts_with},
+    conditionals::{builtin_contains, builtin_ends_with, builtin_starts_with},
     echo::builtin_echo,
     exists::builtin_exists,
     functions::builtin_fn_,
@@ -206,17 +206,17 @@ impl<'a> BuiltinMap<'a> {
             .add("false", &builtin_false_, "Do nothing, unsuccessfully")
             .add(
                 "starts-with",
-                &starts_with,
+                &builtin_starts_with,
                 "Evaluates if the supplied argument starts with a given string",
             )
             .add(
                 "ends-with",
-                &ends_with,
+                &builtin_ends_with,
                 "Evaluates if the supplied argument ends with a given string",
             )
             .add(
                 "contains",
-                &contains,
+                &builtin_contains,
                 "Evaluates if the supplied argument contains a given string",
             )
             .add("matches", &builtin_matches, "Checks if a string matches a given regex")
