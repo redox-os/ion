@@ -11,25 +11,33 @@ use crate::{
 
 const ARG_DEFAULT_SIZE: usize = 10;
 
+/// An error produced during pipeline parsing
 #[derive(Debug, Error)]
 pub enum PipelineParsingError {
     // redirections
+    /// No file was provided after the redirection output
     #[error(display = "expected file argument after redirection for output")]
     NoRedirection,
+    /// Heredocs are deprecated and were used
     #[error(display = "heredocs are not a part of Ion. Use redirection and/or cat instead")]
     HeredocsDeprecated,
+    /// No string was given to the herestring
     #[error(display = "expected string argument after '<<<'")]
     NoHereStringArg,
+    /// No file was provided after the input redirection
     #[error(display = "expected file argument after redirection for input")]
     NoRedirectionArg,
 
     // quotes
+    /// Unterminated double quotes
     #[error(display = "unterminated double quote")]
     UnterminatedDoubleQuote,
+    /// Unterminated single quotes
     #[error(display = "unterminated single quote")]
     UnterminatedSingleQuote,
 
     // paired
+    /// Error with paired tokens (parens, brackets & braces)
     #[error(display = "{}", _0)]
     Paired(#[error(cause)] LevelsError),
 }
@@ -65,7 +73,8 @@ impl<'a> AddItem<'a> for Pipeline<'a> {
     }
 }
 
-#[derive(Debug)]
+/// Collect pipelines in the input
+#[derive(Debug, Clone)]
 pub struct Collector<'a> {
     data: &'a str,
 }
@@ -107,7 +116,7 @@ impl<'a> Collector<'a> {
             .map(|file| outputs.push(Redirection { from, file: file.into(), append }))
     }
 
-    pub fn parse<'builtins>(
+    fn parse<'builtins>(
         &self,
         builtins: &BuiltinMap<'builtins>,
     ) -> Result<Pipeline<'builtins>, PipelineParsingError> {
@@ -264,7 +273,7 @@ impl<'a> Collector<'a> {
                     bytes.next();
                 }
                 b')' => {
-                    levels.down(Field::Proc);
+                    levels.down(Field::Proc)?;
                     bytes.next();
                 }
                 b'[' => {
@@ -273,7 +282,7 @@ impl<'a> Collector<'a> {
                     bytes.next();
                 }
                 b']' => {
-                    levels.down(Field::Array);
+                    levels.down(Field::Array)?;
                     if array_brace_counter % 2 == 1 {
                         array_brace_counter = (array_brace_counter - 1) / 2;
                         bytes.next();
@@ -288,7 +297,7 @@ impl<'a> Collector<'a> {
                 }
                 b'}' => {
                     if array_brace_counter % 2 == 0 {
-                        levels.down(Field::Braces);
+                        levels.down(Field::Braces)?;
                         array_brace_counter /= 2;
                         bytes.next();
                     } else {
@@ -404,6 +413,7 @@ impl<'a> Collector<'a> {
         }
     }
 
+    /// Collect a pipeline on the given data
     pub fn run<'builtins>(
         data: &'a str,
         builtins: &BuiltinMap<'builtins>,
@@ -411,7 +421,7 @@ impl<'a> Collector<'a> {
         Collector::new(data).parse(builtins)
     }
 
-    pub fn new(data: &'a str) -> Self { Collector { data } }
+    fn new(data: &'a str) -> Self { Collector { data } }
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use std::{iter::Peekable, str};
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Quotes {
     Single,
     Double,
@@ -8,8 +8,6 @@ enum Quotes {
 }
 
 /// Serves as a buffer for storing a string until that string can be terminated.
-///
-/// # Examples
 ///
 /// This example comes from the shell's REPL, which ensures that the user's input
 /// will only be submitted for execution once a terminated command is supplied.
@@ -185,6 +183,7 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
         }
     }
 
+    /// Create a new reader on the provided input
     pub fn new(inner: I) -> Terminator<I> {
         Terminator {
             inner:      RearPeekable { iter: inner.peekable(), now: None, last: None },

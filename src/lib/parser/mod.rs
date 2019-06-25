@@ -1,4 +1,6 @@
+/// The terminal tokens associated with the parsing process
 pub mod lexers;
+/// Parse the pipelines to a Pipeline struct
 pub mod pipelines;
 mod quotes;
 mod statement;

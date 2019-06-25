@@ -155,8 +155,8 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 b'[' if self.quotes == Quotes::None => level += 1,
                 b']' if self.quotes == Quotes::None => {
                     if level == 0 {
-                        let elements = ArgumentSplitter::new(&self.data[start..self.read])
-                            .collect::<Vec<&str>>();
+                        let elements =
+                            ArgumentSplitter::new(&self.data[start..self.read]).collect::<Vec<_>>();
                         self.read += 1;
 
                         return if let Some(&b'[') = self.data.as_bytes().get(self.read) {

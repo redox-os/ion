@@ -5,7 +5,9 @@ use err_derive::Error;
 /// types are being assigned.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Key<'a> {
+    /// What should be the type of the literal
     pub kind: Primitive,
+    /// What name should be given to the variable
     pub name: &'a str,
 }
 
@@ -13,14 +15,19 @@ pub struct Key<'a> {
 /// by eliminating the lifetime requirements via allocating a `String`.
 #[derive(Debug, PartialEq, Clone)]
 pub struct KeyBuf {
+    /// What type should the literal be
     pub kind: Primitive,
+    /// What name should be given to the variable
     pub name: String,
 }
 
+/// Failed to parse the literal as a variable corresponding to key
 #[derive(Debug, PartialEq, Error, Eq)]
 pub enum TypeError {
+    /// The value supplied is invalid
     #[error(display = "invalid type supplied: {}", _0)]
     Invalid(String),
+    /// The primitive type does not correspond to that of the function argument
     #[error(display = "expected {}", _0)]
     BadValue(Primitive),
 }
@@ -114,6 +121,7 @@ impl<'a> KeyIterator<'a> {
         }
     }
 
+    /// Create a new iterator based on given data
     pub fn new(data: &'a str) -> KeyIterator<'a> { KeyIterator { data, read: 0 } }
 }
 

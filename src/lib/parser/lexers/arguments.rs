@@ -7,39 +7,54 @@ enum Comm {
     None,
 }
 
+/// A type of paired token
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Field {
+    /// Processes (ex: `$(..)`)
     Proc,
+    /// Literal array (ex: `[ 1 .. 3 ]`)
     Array,
+    /// Brace expansion (ex: `{a,b,c,d}`)
     Braces,
 }
 use self::Field::*;
 
+/// The depth of various paired structures
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Levels {
-    parens: i32,
-    array:  i32,
-    braces: i32,
+    /// Parentheses
+    parens: u8,
+    /// Array literals
+    array: u8,
+    /// Braces
+    braces: u8,
 }
 
+/// Error with paired tokens
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
 pub enum LevelsError {
-    // paired
-    #[error(display = "unmatched left paren")]
+    /// Unmatched opening parenthese
+    #[error(display = "unmatched opening parenthese")]
     UnmatchedParen,
-    #[error(display = "unmatched left bracket")]
+    /// Unmatched opening bracket
+    #[error(display = "unmatched opening bracket")]
     UnmatchedBracket,
-    #[error(display = "unmatched left brace")]
+    /// Unmatched opening brace
+    #[error(display = "unmatched opening brace")]
     UnmatchedBrace,
-    #[error(display = "extra right paren(s)")]
+    /// Extra closing parenthese(s)
+    #[error(display = "extra closing parenthese(s)")]
     ExtraParen,
-    #[error(display = "extra right bracket(s)")]
+    /// Extra closing bracket(s)
+    #[error(display = "extra closing bracket(s)")]
     ExtraBracket,
-    #[error(display = "extra right brace(s)")]
+    /// Extra closing brace(s)
+    #[error(display = "extra closing brace(s)")]
     ExtraBrace,
 }
 
 impl Levels {
+    /// Add a new depth level
     pub fn up(&mut self, field: Field) {
         let level = match field {
             Proc => &mut self.parens,
@@ -49,17 +64,26 @@ impl Levels {
         *level += 1;
     }
 
-    pub fn down(&mut self, field: Field) {
+    /// Close paired tokens
+    pub fn down(&mut self, field: Field) -> Result<(), LevelsError> {
         let level = match field {
-            Proc => &mut self.parens,
-            Array => &mut self.array,
-            Braces => &mut self.braces,
+            Proc if self.parens > 0 => &mut self.parens,
+            Array if self.array > 0 => &mut self.array,
+            Braces if self.braces > 0 => &mut self.braces,
+
+            // errors
+            Proc => return Err(LevelsError::ExtraParen),
+            Array => return Err(LevelsError::ExtraBracket),
+            Braces => return Err(LevelsError::ExtraBrace),
         };
         *level -= 1;
+        Ok(())
     }
 
+    /// Check if all parens where matched
     pub fn are_rooted(&self) -> bool { self.parens == 0 && self.array == 0 && self.braces == 0 }
 
+    /// Check if all is ok
     pub fn check(&self) -> Result<(), LevelsError> {
         if self.parens > 0 {
             Err(LevelsError::UnmatchedParen)
@@ -67,12 +91,6 @@ impl Levels {
             Err(LevelsError::UnmatchedBracket)
         } else if self.braces > 0 {
             Err(LevelsError::UnmatchedBrace)
-        } else if self.parens < 0 {
-            Err(LevelsError::ExtraParen)
-        } else if self.array < 0 {
-            Err(LevelsError::ExtraBracket)
-        } else if self.braces < 0 {
-            Err(LevelsError::ExtraBrace)
         } else {
             Ok(())
         }
@@ -93,6 +111,7 @@ pub struct ArgumentSplitter<'a> {
 }
 
 impl<'a> ArgumentSplitter<'a> {
+    /// Create a new argument splitter based on the provided data
     pub fn new(data: &'a str) -> ArgumentSplitter<'a> {
         ArgumentSplitter {
             data,
@@ -156,9 +175,14 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                     continue;
                 }
                 b'[' => levels.up(Array),
-                b']' => levels.down(Array),
+                b']' => {
+                    let _ = levels.down(Array);
+                }
                 b'{' => levels.up(Braces),
-                b'}' => levels.down(Braces),
+                b'}' => {
+                    // TODO: handle errors here
+                    let _ = levels.down(Braces);
+                }
                 b'(' => {
                     // Disable VARIAB + ARRAY and enable METHOD.
                     // if variab or array are set
@@ -171,7 +195,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 }
                 b')' => {
                     self.method = false;
-                    levels.down(Proc)
+                    let _ = levels.down(Proc);
                 }
 
                 // Toggle double quote rules.

@@ -16,34 +16,45 @@ use crate::{
 use err_derive::Error;
 use std::char;
 
+/// Check if the given name is valid for functions, aliases & variables
 pub fn is_valid_name(name: &str) -> bool {
     let mut chars = name.chars();
     chars.next().map_or(false, |b| char::is_alphabetic(b) || b == '_')
         && chars.all(|b| b.is_alphanumeric() || b == '_')
 }
 
+/// An Error occured during parsing
 #[derive(Debug, Error)]
 pub enum ParseError {
+    /// The blocks were in a wrong order
     #[error(display = "incomplete control flow statement")]
     IncompleteFlowControl,
+    /// No keys were supplied for assignment
     #[error(display = "no key supplied for assignment")]
     NoKeySupplied,
+    /// No operator was supplied for assignment
     #[error(display = "no operator supplied for assignment")]
     NoOperatorSupplied,
+    /// No value supplied for assignment
     #[error(display = "no values supplied for assignment")]
     NoValueSupplied,
+    /// No value given for iteration in a for loop
     #[error(display = "no value supplied for iteration in for loop")]
     NoInKeyword,
+    /// Error with match statements
     #[error(display = "case error: {}", _0)]
     CaseError(#[error(cause)] CaseError),
+    /// The provided function name was invalid
     #[error(
-        display = "'{}' is not a valid function name\n     Function names may only contain \
-                   alphanumeric characters",
+        display = "'{}' is not a valid function name
+        Function names may only contain alphanumeric characters",
         _0
     )]
     InvalidFunctionName(String),
+    /// The arguments did not match the function's signature
     #[error(display = "function argument error: {}", _0)]
     InvalidFunctionArgument(#[error(cause)] FunctionParseError),
+    /// Error occured during parsing of a pipeline
     #[error(display = "{}", _0)]
     PipelineParsingError(#[error(cause)] PipelineParsingError),
 }
