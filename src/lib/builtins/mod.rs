@@ -247,7 +247,16 @@ impl<'a> BuiltinMap<'a> {
     }
 }
 
-pub fn builtin_dir_depth(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
+#[builtin(
+    desc = "set the dir stack depth",
+    man = "
+SYNOPSYS
+    dir_depth [DEPTH]
+
+DESCRIPTION
+    If DEPTH is given, set the dir stack max depth to DEPTH, else remove the limit"
+)]
+pub fn dir_depth(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let depth = match args.get(1) {
         None => None,
         Some(arg) => match arg.parse::<usize>() {
@@ -662,8 +671,16 @@ DESCRIPTION
 )]
 pub fn false_(args: &[types::Str], _: &mut Shell<'_>) -> Status { Status::FALSE }
 
-// TODO create a manpage
-pub fn builtin_wait(_: &[types::Str], shell: &mut Shell<'_>) -> Status {
+#[builtin(
+    desc = "wait for a background job",
+    man = "
+SYNOPSIS
+    wait
+
+DESCRIPTION
+    Wait for the background jobs to finish"
+)]
+pub fn wait(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let _ = shell.wait_for_background();
     Status::SUCCESS
 }
@@ -730,7 +747,16 @@ pub fn disown(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_help(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
+#[builtin(
+    desc = "get help for builtins",
+    man = "
+SYNOPSIS
+    help [BUILTIN]
+
+DESCRIPTION
+    Get the short description for BUILTIN. If no argument is provided, list all the builtins"
+)]
+pub fn help(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if let Some(command) = args.get(1) {
         if let Some(help) = shell.builtins().get_help(command) {
             println!("{}", help);
