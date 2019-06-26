@@ -3,7 +3,7 @@ use atty::Stream;
 use ion_shell::{BuiltinMap, IonError, PipelineError, Shell, Value};
 use liner::KeyBindings;
 use std::{
-    io::{stdin, BufReader},
+    io::{self, stdin, BufReader},
     process,
 };
 
@@ -125,6 +125,16 @@ fn parse_args() -> CommandLineArgs {
     }
 }
 
+fn set_unique_pid() -> io::Result<()> {
+    unsafe {
+        let pgid = libc::getpid();
+        libc::setpgid(0, pgid);
+        libc::signal(libc::SIGTTOU, libc::SIG_IGN);
+        libc::tcsetpgrp(libc::STDIN_FILENO, pgid);
+    }
+    Ok(())
+}
+
 fn main() {
     let command_line_args = parse_args();
 
@@ -142,6 +152,12 @@ fn main() {
 
     let stdin_is_a_tty = atty::is(Stream::Stdin);
     let mut shell = Shell::with_builtins(builtins);
+
+    if stdin_is_a_tty {
+        if let Err(err) = set_unique_pid() {
+            println!("ion: could not bring shell to foreground: {}", err);
+        }
+    }
 
     shell.opts_mut().print_comms = command_line_args.print_commands;
     shell.opts_mut().no_exec = command_line_args.no_execute;
