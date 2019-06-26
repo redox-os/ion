@@ -185,10 +185,7 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
             // And then we will need to take those completions and remove the expanded form
             // of the tilde pattern and replace it with that pattern yet again.
             completions
-                .map(|completion| {
-                    println!("'{}' : {}", completion, e_index);
-                    escape(&[tilde, &completion[e_index..]].concat())
-                })
+                .map(|completion| escape(&[tilde, &completion[e_index..]].concat()))
                 .collect()
         } else {
             Vec::new()
