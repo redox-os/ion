@@ -14,7 +14,7 @@ pub type Args = SmallVec<[small::String; 4]>;
 /// ```
 /// Additionally it will call `Into::into` on each of its members so that one
 /// can pass in any type with some `To<SmallString>` implementation; they will
-/// automatically be converted to owned SmallStrings.
+/// automatically be converted to owned `SmallString`s.
 /// ```ignore,rust
 /// let verbose = Array::from_vec(vec![
 ///     "foo".into(),

@@ -1,4 +1,4 @@
-use super::InteractiveBinary;
+use super::InteractiveShell;
 use ion_shell::{builtins::Status, Value};
 
 use regex::Regex;
@@ -22,7 +22,7 @@ pub struct IgnoreSetting {
 }
 
 /// Contains all history-related functionality for the `Shell`.
-impl<'a> InteractiveBinary<'a> {
+impl<'a> InteractiveShell<'a> {
     /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE
     /// is changed.
     pub fn ignore_patterns(&self) -> IgnoreSetting {

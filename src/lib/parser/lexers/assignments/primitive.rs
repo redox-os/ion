@@ -45,9 +45,9 @@ impl Primitive {
                 let inner = &data[open_bracket + 1..close_bracket];
 
                 if kind == "hmap" {
-                    Some(Primitive::HashMap(Box::new(Primitive::parse(inner)?)))
+                    Some(Primitive::HashMap(Box::new(Self::parse(inner)?)))
                 } else if kind == "bmap" {
-                    Some(Primitive::BTreeMap(Box::new(Primitive::parse(inner)?)))
+                    Some(Primitive::BTreeMap(Box::new(Self::parse(inner)?)))
                 } else {
                     None
                 }

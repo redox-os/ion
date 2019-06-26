@@ -22,7 +22,7 @@ pub fn resume(pid: u32) { let _ = sys::killpg(pid, libc::SIGCONT); }
 pub struct SignalHandler;
 
 impl SignalHandler {
-    pub fn new() -> SignalHandler {
+    pub fn new() -> Self {
         block();
         SignalHandler
     }

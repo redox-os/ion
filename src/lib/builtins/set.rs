@@ -7,12 +7,11 @@ use crate::{
 use builtins_proc::builtin;
 use std::iter;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum PositionalArgs {
     UnsetIfNone,
     RetainIfNone,
 }
-
-use self::PositionalArgs::*;
 
 #[builtin(
     desc = "Set or unset values of shell options and positional parameters.",
@@ -44,13 +43,13 @@ pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     while let Some(arg) = args_iter.next() {
         if arg.starts_with("--") {
             if arg.len() == 2 {
-                positionals = Some(UnsetIfNone);
+                positionals = Some(PositionalArgs::UnsetIfNone);
                 break;
             }
             return Status::SUCCESS;
         } else if arg.starts_with('-') {
             if arg.len() == 1 {
-                positionals = Some(RetainIfNone);
+                positionals = Some(PositionalArgs::RetainIfNone);
                 break;
             }
             for flag in arg.bytes().skip(1) {
@@ -89,15 +88,8 @@ pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                 // hasn't got any slower.
                 let arguments: types::Array<types::Function<'_>> =
                     iter::once(command).chain(args_iter.cloned().map(Value::Str)).collect();
-                match kind {
-                    UnsetIfNone => {
-                        shell.variables_mut().set("args", arguments);
-                    }
-                    RetainIfNone => {
-                        if arguments.len() != 1 {
-                            shell.variables_mut().set("args", arguments);
-                        }
-                    }
+                if !(kind == PositionalArgs::RetainIfNone && arguments.len() == 1) {
+                    shell.variables_mut().set("args", arguments);
                 }
             }
         }

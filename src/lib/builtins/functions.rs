@@ -19,8 +19,7 @@ pub fn fn_(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let stdout = &mut stdout.lock();
     let _ = writeln!(stdout, "# Functions");
     for (fn_name, function) in shell.variables().functions() {
-        let description = function.description();
-        if let Some(ref description) = description {
+        if let Some(description) = function.description() {
             let _ = writeln!(stdout, "    {} -- {}", fn_name, description);
         } else {
             let _ = writeln!(stdout, "    {}", fn_name);

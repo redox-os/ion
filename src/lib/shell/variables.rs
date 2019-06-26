@@ -1,8 +1,8 @@
 use super::{colors::Colors, flow_control::Function};
 use crate::{
-    expansion::ExpansionError,
+    expansion,
     shell::{
-        sys::{env as sys_env, geteuid, getpid, getuid, variables as self_sys},
+        sys::{geteuid, getpid, getuid, variables as self_sys},
         IonError,
     },
     types::{self, Array},
@@ -129,7 +129,7 @@ impl<'a> Variables<'a> {
                     }
                     output.push('/');
                 }
-                output.push_str(&elements[elements.len() - 1]);
+                output.push_str(elements[elements.len() - 1]);
                 return output;
             }
         }
@@ -167,7 +167,8 @@ impl<'a> Variables<'a> {
 
     /// Get the string value associated with a name on the current scope. This includes fetching
     /// env vars, colors & hexes and some extra values like MWD and SWD
-    pub fn get_str(&self, name: &str) -> Result<types::Str, ExpansionError<IonError>> {
+    pub fn get_str(&self, name: &str) -> expansion::Result<types::Str, IonError> {
+        use expansion::Error;
         match name {
             "MWD" => return Ok(self.get_minimal_directory()),
             "SWD" => return Ok(self.get_simplified_directory()),
@@ -181,20 +182,20 @@ impl<'a> Variables<'a> {
             }
             Some(("x", variable)) | Some(("hex", variable)) => {
                 let c = u8::from_str_radix(variable, 16)
-                    .map_err(|cause| ExpansionError::InvalidHex(variable.into(), cause))?;
+                    .map_err(|cause| Error::InvalidHex(variable.into(), cause))?;
                 Ok((c as char).to_string().into())
             }
-            Some(("env", variable)) => env::var(variable)
-                .map(Into::into)
-                .map_err(|_| ExpansionError::UnknownEnv(variable.into())),
+            Some(("env", variable)) => {
+                env::var(variable).map(Into::into).map_err(|_| Error::UnknownEnv(variable.into()))
+            }
             Some(("super", _)) | Some(("global", _)) | None => {
                 // Otherwise, it's just a simple variable name.
                 match self.get(name) {
                     Some(Value::Str(val)) => Ok(val.clone()),
-                    _ => env::var(name).map(|s| s.into()).map_err(|_| ExpansionError::VarNotFound),
+                    _ => env::var(name).map(Into::into).map_err(|_| Error::VarNotFound),
                 }
             }
-            Some((..)) => Err(ExpansionError::UnsupportedNamespace(name.into())),
+            Some((..)) => Err(Error::UnsupportedNamespace(name.into())),
         }
     }
 
@@ -264,7 +265,7 @@ impl<'a> Default for Variables<'a> {
         map.set("CDPATH", Array::new());
 
         // Initialize the HOME variable
-        sys_env::home_dir().map_or_else(
+        dirs::home_dir().map_or_else(
             || env::set_var("HOME", "?"),
             |path| env::set_var("HOME", path.to_str().unwrap_or("?")),
         );
@@ -297,7 +298,7 @@ pub(crate) mod tests {
             _variable: &str,
             _selection: &Select<types::Str>,
         ) -> Result<types::Args, Self::Error> {
-            Err(ExpansionError::VarNotFound)
+            Err(expansion::Error::VarNotFound)
         }
 
         fn command(&self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
@@ -309,7 +310,7 @@ pub(crate) mod tests {
             _name: &str,
             _select: &Select<types::Str>,
         ) -> Result<types::Args, Self::Error> {
-            Err(ExpansionError::VarNotFound)
+            Err(expansion::Error::VarNotFound)
         }
 
         fn map_values(
@@ -317,7 +318,7 @@ pub(crate) mod tests {
             _name: &str,
             _select: &Select<types::Str>,
         ) -> Result<types::Args, Self::Error> {
-            Err(ExpansionError::VarNotFound)
+            Err(expansion::Error::VarNotFound)
         }
     }
 

@@ -10,7 +10,7 @@ use builtins_proc::builtin;
 
 #[builtin(
     desc = "check whether items exist",
-    man = r#"
+    man = "
 SYNOPSIS
     exists [EXPRESSION]
 
@@ -44,29 +44,29 @@ OPTIONS
 
 EXAMPLES
     Test if the file exists:
-        exists -f FILE && echo "The FILE exists" || echo "The FILE does not exist"
+        exists -f FILE && echo 'The FILE exists' || echo 'The FILE does not exist'
 
     Test if some-command exists in the path and is executable:
-        exists -b some-command && echo "some-command exists" || echo "some-command does not exist"
+        exists -b some-command && echo 'some-command exists' || echo 'some-command does not exist'
 
     Test if variable exists AND is not empty
-        exists -s myVar && echo "myVar exists: $myVar" || echo "myVar does not exist or is empty"
+        exists -s myVar && echo \"myVar exists: $myVar\" || echo 'myVar does not exist or is empty'
         NOTE: Don't use the '$' sigil, but only the name of the variable to check
 
     Test if array exists and is not empty
-        exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
+        exists -a myArr && echo \"myArr exists: @myArr\" || echo 'myArr does not exist or is empty'
         NOTE: Don't use the '@' sigil, but only the name of the array to check
 
     Test if a function named 'myFunc' exists
-        exists --fn myFunc && myFunc || echo "No function with name myFunc found"
+        exists --fn myFunc && myFunc || echo 'No function with name myFunc found'
 
 AUTHOR
-    Written by Fabian Würfl.
-    Heavily based on implementation of the test builtin, which was written by Michael Murphy."#
+    Written by Fabian W\u{00FC}rfl.
+    Heavily based on implementation of the test builtin, which was written by Michael Murphy."
 )]
 pub fn exists(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match args.get(1) {
-        Some(ref s) if s.starts_with("--") => {
+        Some(s) if s.starts_with("--") => {
             let (_, option) = s.split_at(2);
             // If no argument was given, return `SUCCESS`, as this means a string starting
             // with a dash was given
@@ -76,7 +76,7 @@ pub fn exists(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                 match_option_argument(option, arg, shell)
             })
         }
-        Some(ref s) if s.starts_with('-') => {
+        Some(s) if s.starts_with('-') => {
             // Access the second character in the flag string: this will be type of the
             // flag. If no flag was given, return `SUCCESS`, as this means a
             // string with value "-" was checked.
@@ -90,7 +90,7 @@ pub fn exists(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                 })
             })
         }
-        Some(string) => string_is_nonzero(string),
+        Some(string) => !string.is_empty(),
         None => false,
     }
     .into()
@@ -112,7 +112,7 @@ fn match_flag_argument(flag: char, argument: &str, shell: &Shell<'_>) -> bool {
 // Matches option arguments to their respective functionality
 fn match_option_argument(option: &str, argument: &str, shell: &Shell<'_>) -> bool {
     match option {
-        "fn" => function_is_defined(argument, &shell),
+        "fn" => function_is_defined(argument, shell),
         _ => false,
     }
 }
@@ -150,7 +150,7 @@ fn binary_is_in_path(binaryname: &str, shell: &Shell<'_>) -> bool {
 /// Rust currently does not have a higher level abstraction for obtaining non-standard file modes.
 /// To extract the permissions from the mode, the bitwise AND operator will be used and compared
 /// with the respective execute bits.
-/// Note: This function is 1:1 the same as src/builtins/test.rs:file_has_execute_permission
+/// Note: This function is 1:1 the same as `src/builtins/test.rs:file_has_execute_permission`
 /// If you change the following function, please also update the one in src/builtins/test.rs
 fn file_has_execute_permission(filepath: &str) -> bool {
     const USER: u32 = 0b100_0000;
@@ -164,9 +164,6 @@ fn file_has_execute_permission(filepath: &str) -> bool {
         // If the mode is equal to any of the above, return `SUCCESS`
         .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
 }
-
-/// Returns true if the string is not empty
-fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
 
 /// Returns true if the variable is an array and the array is not empty
 fn array_var_is_not_empty(arrayvar: &str, shell: &Shell<'_>) -> bool {
@@ -405,12 +402,6 @@ mod tests {
         assert_eq!(file_has_execute_permission("testing"), true);
         assert_eq!(file_has_execute_permission("testing/empty_file"), false);
         assert_eq!(file_has_execute_permission("this-does-not-exist"), false);
-    }
-
-    #[test]
-    fn test_string_is_nonzero() {
-        assert_eq!(string_is_nonzero("NOT ZERO"), true);
-        assert_eq!(string_is_nonzero(""), false);
     }
 
     #[test]

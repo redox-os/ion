@@ -421,7 +421,7 @@ impl<'a> Collector<'a> {
         Collector::new(data).parse(builtins)
     }
 
-    fn new(data: &'a str) -> Self { Collector { data } }
+    const fn new(data: &'a str) -> Self { Self { data } }
 }
 
 #[cfg(test)]

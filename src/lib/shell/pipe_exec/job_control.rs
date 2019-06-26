@@ -1,6 +1,6 @@
 use super::{
     super::{signals, Shell},
-    foreground::{BackgroundResult, ForegroundSignals},
+    foreground::{BackgroundResult, Signals},
     sys::{
         self, kill, strerror, waitpid, wcoredump, wexitstatus, wifcontinued, wifexited,
         wifsignaled, wifstopped, wstopsig, wtermsig,
@@ -50,12 +50,12 @@ pub struct BackgroundProcess {
 }
 
 impl BackgroundProcess {
-    pub(super) fn new(pid: u32, state: ProcessState, name: String) -> Self {
-        BackgroundProcess { pid, ignore_sighup: false, state, name }
+    pub(super) const fn new(pid: u32, state: ProcessState, name: String) -> Self {
+        Self { pid, ignore_sighup: false, state, name }
     }
 
     /// Get the pid associated with the job
-    pub fn pid(&self) -> u32 { self.pid }
+    pub const fn pid(&self) -> u32 { self.pid }
 
     /// Check if the process is still running
     pub fn is_running(&self) -> bool { self.state == ProcessState::Running }
@@ -93,21 +93,18 @@ impl<'a> Shell<'a> {
 
     fn add_to_background(&mut self, job: BackgroundProcess) -> usize {
         let mut processes = self.background_jobs_mut();
-        match processes.iter().position(|x| !x.exists()) {
-            Some(id) => {
-                processes[id] = job;
-                id
-            }
-            None => {
-                let njobs = processes.len();
-                processes.push(job);
-                njobs
-            }
+        if let Some(id) = processes.iter().position(|x| !x.exists()) {
+            processes[id] = job;
+            id
+        } else {
+            let njobs = processes.len();
+            processes.push(job);
+            njobs
         }
     }
 
     fn watch_background(
-        fg: &ForegroundSignals,
+        fg: &Signals,
         processes: &Mutex<Vec<BackgroundProcess>>,
         pgid: u32,
         njob: usize,
@@ -117,7 +114,7 @@ impl<'a> Shell<'a> {
         macro_rules! get_process {
             (| $ident:ident | $func:expr) => {
                 let mut processes = processes.lock().unwrap();
-                let $ident = &mut processes.get_mut(njob).unwrap();
+                let $ident = processes.get_mut(njob).unwrap();
                 $func
             };
         }
@@ -242,13 +239,10 @@ impl<'a> Shell<'a> {
                     } else if wcoredump(status) {
                         signaled = Some(PipelineError::CoreDump(pid as u32));
                     } else {
-                        match signal {
-                            SIGINT => {
-                                let _ = kill(pid as u32, signal as i32);
-                            }
-                            _ => {
-                                self.handle_signal(signal);
-                            }
+                        if signal == SIGINT {
+                            let _ = kill(pid as u32, signal as i32);
+                        } else {
+                            self.handle_signal(signal);
                         }
                         signaled = Some(PipelineError::Interrupted(pid as u32, signal));
                     }

@@ -1,11 +1,11 @@
 use super::{
     fork::Capture,
-    sys::{self, env as sys_env, variables as self_sys},
+    sys::{self, variables},
     variables::Value,
     IonError, Shell,
 };
 use crate::{
-    expansion::{self, Expander, ExpansionError, Select},
+    expansion::{Error, Expander, Result, Select},
     types,
 };
 use std::{env, io::Read, iter::FromIterator, process};
@@ -14,7 +14,7 @@ impl<'a, 'b> Expander for Shell<'b> {
     type Error = IonError;
 
     /// Uses a subshell to expand a given command.
-    fn command(&self, command: &str) -> expansion::Result<types::Str, Self::Error> {
+    fn command(&self, command: &str) -> Result<types::Str, Self::Error> {
         let output = self
             .fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command))
             .and_then(|result| {
@@ -27,11 +27,11 @@ impl<'a, 'b> Expander for Shell<'b> {
 
         // Ensure that the parent retains ownership of the terminal before exiting.
         let _ = sys::tcsetpgrp(libc::STDIN_FILENO, process::id());
-        output.map(Into::into).map_err(|err| ExpansionError::Subprocess(Box::new(err)))
+        output.map(Into::into).map_err(|err| Error::Subprocess(Box::new(err)))
     }
 
     /// Expand a string variable given if its quoted / unquoted
-    fn string(&self, name: &str) -> expansion::Result<types::Str, Self::Error> {
+    fn string(&self, name: &str) -> Result<types::Str, Self::Error> {
         if name == "?" {
             Ok(self.previous_status.into())
         } else {
@@ -44,7 +44,7 @@ impl<'a, 'b> Expander for Shell<'b> {
         &self,
         name: &str,
         selection: &Select<types::Str>,
-    ) -> expansion::Result<types::Args, Self::Error> {
+    ) -> Result<types::Args, Self::Error> {
         match self.variables.get(name) {
             Some(Value::Array(array)) => match selection {
                 Select::All => {
@@ -54,7 +54,7 @@ impl<'a, 'b> Expander for Shell<'b> {
                     .resolve(array.len())
                     .and_then(|n| array.get(n))
                     .map(|x| args![types::Str::from(format!("{}", x))])
-                    .ok_or(ExpansionError::OutOfBound),
+                    .ok_or(Error::OutOfBound),
                 Select::Range(ref range) => range
                     .bounds(array.len())
                     .and_then(|(start, length)| {
@@ -71,10 +71,8 @@ impl<'a, 'b> Expander for Shell<'b> {
                             None
                         }
                     })
-                    .ok_or(ExpansionError::OutOfBound),
-                Select::Key(_) => {
-                    Err(ExpansionError::InvalidIndex(selection.clone(), "array", name.into()))
-                }
+                    .ok_or(Error::OutOfBound),
+                Select::Key(_) => Err(Error::InvalidIndex(selection.clone(), "array", name.into())),
             },
             Some(Value::HashMap(hmap)) => match selection {
                 Select::All => {
@@ -112,7 +110,7 @@ impl<'a, 'b> Expander for Shell<'b> {
                     )])
                 }
                 Select::Range(_) => {
-                    Err(ExpansionError::InvalidIndex(selection.clone(), "hashmap", name.into()))
+                    Err(Error::InvalidIndex(selection.clone(), "hashmap", name.into()))
                 }
             },
             Some(Value::BTreeMap(bmap)) => match selection {
@@ -151,61 +149,45 @@ impl<'a, 'b> Expander for Shell<'b> {
                     )])
                 }
                 Select::Range(_) => {
-                    Err(ExpansionError::InvalidIndex(selection.clone(), "btreemap", name.into()))
+                    Err(Error::InvalidIndex(selection.clone(), "btreemap", name.into()))
                 }
             },
-            None => Err(ExpansionError::VarNotFound),
-            _ => Err(ExpansionError::ScalarAsArray(name.into())),
+            None => Err(Error::VarNotFound),
+            _ => Err(Error::ScalarAsArray(name.into())),
         }
     }
 
-    fn map_keys(
-        &self,
-        name: &str,
-        sel: &Select<types::Str>,
-    ) -> expansion::Result<types::Args, Self::Error> {
+    fn map_keys(&self, name: &str, sel: &Select<types::Str>) -> Result<types::Args, Self::Error> {
         match self.variables.get(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or_else(|| {
-                        ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into())
-                    })
+                    .ok_or_else(|| Error::InvalidIndex(sel.clone(), "map-like", name.into()))
             }
             Some(&Value::BTreeMap(ref map)) => {
                 Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or_else(|| {
-                        ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into())
-                    })
+                    .ok_or_else(|| Error::InvalidIndex(sel.clone(), "map-like", name.into()))
             }
-            Some(_) => Err(ExpansionError::NotAMap(name.into())),
-            None => Err(ExpansionError::VarNotFound),
+            Some(_) => Err(Error::NotAMap(name.into())),
+            None => Err(Error::VarNotFound),
         }
     }
 
-    fn map_values(
-        &self,
-        name: &str,
-        sel: &Select<types::Str>,
-    ) -> expansion::Result<types::Args, Self::Error> {
+    fn map_values(&self, name: &str, sel: &Select<types::Str>) -> Result<types::Args, Self::Error> {
         match self.variables.get(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or_else(|| {
-                        ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into())
-                    })
+                    .ok_or_else(|| Error::InvalidIndex(sel.clone(), "map-like", name.into()))
             }
             Some(&Value::BTreeMap(ref map)) => {
                 Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or_else(|| {
-                        ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into())
-                    })
+                    .ok_or_else(|| Error::InvalidIndex(sel.clone(), "map-like", name.into()))
             }
-            Some(_) => Err(ExpansionError::NotAMap(name.into())),
-            None => Err(ExpansionError::VarNotFound),
+            Some(_) => Err(Error::NotAMap(name.into())),
+            None => Err(Error::VarNotFound),
         }
     }
 
-    fn tilde(&self, input: &str) -> expansion::Result<types::Str, Self::Error> {
+    fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> {
         // Only if the first character is a tilde character will we perform expansions
         if !input.starts_with('~') {
             return Ok(input.into());
@@ -215,9 +197,9 @@ impl<'a, 'b> Expander for Shell<'b> {
         let (tilde_prefix, rest) = input[1..].split_at(separator.unwrap_or(input.len() - 1));
 
         match tilde_prefix {
-            "" => sys_env::home_dir()
+            "" => dirs::home_dir()
                 .map(|home| types::Str::from(home.to_string_lossy().as_ref()) + rest)
-                .ok_or(ExpansionError::HomeNotFound),
+                .ok_or(Error::HomeNotFound),
             "+" => Ok((env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest).into()),
             "-" => Ok((self.variables.get_str("OLDPWD")?.to_string() + rest).into()),
             _ => {
@@ -236,10 +218,10 @@ impl<'a, 'b> Expander for Shell<'b> {
                         self.directory_stack.dir_from_bottom(num)
                     }
                     .map(|path| path.to_str().unwrap().into())
-                    .ok_or_else(|| ExpansionError::OutOfStack(num)),
-                    Err(_) => self_sys::get_user_home(tilde_prefix)
+                    .ok_or_else(|| Error::OutOfStack(num)),
+                    Err(_) => variables::get_user_home(tilde_prefix)
                         .map(|home| (home + rest).into())
-                        .ok_or(ExpansionError::HomeNotFound),
+                        .ok_or(Error::HomeNotFound),
                 }
             }
         }

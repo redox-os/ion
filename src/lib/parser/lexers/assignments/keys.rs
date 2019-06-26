@@ -94,10 +94,10 @@ impl<'a> KeyIterator<'a> {
                 };
 
                 break Ok(Key { name, kind });
-            } else if !eol {
-                self.read += 1;
-            } else {
+            } else if eol {
                 break Err(TypeError::Invalid(self.data[self.read..].into()));
+            } else {
+                self.read += 1;
             }
         }
     }

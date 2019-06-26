@@ -33,7 +33,7 @@ fn list_vars(shell: &Shell<'_>) -> Result<(), io::Error> {
     for (key, val) in shell.variables.arrays() {
         write!(buffer, "{} = [ ", key)?;
         let mut vars = val.iter();
-        if let Some(ref var) = vars.next() {
+        if let Some(var) = vars.next() {
             write!(buffer, "'{}' ", var)?;
             vars.map(|var| write!(buffer, ", '{}' ", var)).collect::<Result<Vec<_>, _>>()?;
         }
@@ -54,7 +54,7 @@ impl<'b> Shell<'b> {
                 for action in actions {
                     let err = action.map_err(|e| e.to_string()).and_then(|act| {
                         let Action(key, operator, expression) = act;
-                        value_check(self, &expression, &key.kind)
+                        value_check(self, expression, &key.kind)
                             .map_err(|e| format!("{}: {}", key.name, e))
                             // TODO: handle operators here in the same way as local
                             .and_then(|rhs| match &rhs {
@@ -127,7 +127,7 @@ impl<'b> Shell<'b> {
                 continue;
             }
 
-            let rhs = value_check(self, &expression, &key.kind)
+            let rhs = value_check(self, expression, &key.kind)
                 .map_err(|why| format!("{}: {}", key.name, why))?;
 
             match (&rhs, &key.kind) {
@@ -147,7 +147,7 @@ impl<'b> Shell<'b> {
                     let lhs = self.variables.get(key.name).ok_or_else(|| {
                         format!("cannot update non existing variable `{}`", key.name)
                     })?;
-                    let val = apply(operator, &lhs, rhs).map_err(|_| {
+                    let val = apply(operator, lhs, rhs).map_err(|_| {
                         format!(
                             "type error: variable `{}` of type `{}` does not support operator",
                             key.name, key.kind
@@ -164,7 +164,7 @@ impl<'b> Shell<'b> {
     pub fn local(&mut self, action: &LocalAction) -> Status {
         match action {
             LocalAction::List => {
-                let _ = list_vars(&self);
+                let _ = list_vars(self);
                 Status::SUCCESS
             }
             LocalAction::Assign(ref keys, op, ref vals) => {

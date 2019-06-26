@@ -55,10 +55,10 @@ fn parse_alias(args: &str) -> Binding {
         let value: String = char_iter.skip_while(|&x| x == ' ').collect();
         if value.is_empty() {
             Binding::KeyOnly(key)
-        } else if !Variables::is_valid_variable_name(&key) {
-            Binding::InvalidKey(key)
-        } else {
+        } else if Variables::is_valid_variable_name(&key) {
             Binding::KeyValue(key, value.into())
+        } else {
+            Binding::InvalidKey(key)
         }
     }
 }
@@ -73,7 +73,7 @@ pub fn builtin_alias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
         Binding::KeyValue(key, value) => {
             shell.variables_mut().set(&key, types::Alias(value));
         }
-        Binding::ListEntries => print_list(&shell.variables()),
+        Binding::ListEntries => print_list(shell.variables()),
         Binding::KeyOnly(key) => {
             return Status::error(format!("ion: please provide value for alias '{}'", key));
         }

@@ -50,8 +50,7 @@ fn get_map_of<E: Expander>(
     let array = shell.expand_string(expression)?;
 
     let inner_kind = match primitive_type {
-        Primitive::HashMap(ref inner) => inner,
-        Primitive::BTreeMap(ref inner) => inner,
+        Primitive::HashMap(ref inner) | Primitive::BTreeMap(ref inner) => inner,
         _ => unreachable!(),
     };
 
@@ -73,7 +72,7 @@ fn get_map_of<E: Expander>(
 
     match primitive_type {
         Primitive::HashMap(_) => {
-            let mut hmap = types::HashMap::with_capacity_and_hasher(size, Default::default());
+            let mut hmap = types::HashMap::with_capacity(size);
             for item in iter {
                 let (key, value) = item?;
                 hmap.insert(key, value);

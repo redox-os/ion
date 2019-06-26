@@ -129,7 +129,7 @@ pub fn test(args: &[types::Str], _: &mut Shell<'_>) -> Status {
 
 fn evaluate_arguments(arguments: &[types::Str]) -> Result<bool, types::Str> {
     match arguments.first() {
-        Some(ref s) if s.starts_with('-') && s[1..].starts_with(char::is_alphabetic) => {
+        Some(s) if s.starts_with('-') && s[1..].starts_with(char::is_alphabetic) => {
             // Access the second character in the flag string: this will be type of the
             // flag. If no flag was given, return `SUCCESS`
             s.chars().nth(1).map_or(Ok(true), |flag| {
@@ -143,13 +143,16 @@ fn evaluate_arguments(arguments: &[types::Str]) -> Result<bool, types::Str> {
         }
         Some(arg) => {
             // If there is no operator, check if the first argument is non-zero
-            arguments.get(1).map_or(Ok(string_is_nonzero(arg)), |operator| {
-                // If there is no right hand argument, a condition was expected
-                let right_arg = arguments
-                    .get(2)
-                    .ok_or_else(|| types::Str::from("parse error: condition expected"))?;
-                evaluate_expression(arg, operator, right_arg)
-            })
+            arguments.get(1).map_or_else(
+                || Ok(!arg.is_empty()),
+                |operator| {
+                    // If there is no right hand argument, a condition was expected
+                    let right_arg = arguments
+                        .get(2)
+                        .ok_or_else(|| types::Str::from("parse error: condition expected"))?;
+                    evaluate_expression(arg, operator, right_arg)
+                },
+            )
         }
         None => {
             println!("{}", QUICK_GUIDE);
@@ -258,8 +261,8 @@ fn match_flag_argument(flag: char, argument: &str) -> bool {
         //'t' => file_descriptor_is_opened_on_a_terminal(argument),
         'w' => file_has_write_permission(argument),
         'x' => file_has_execute_permission(argument),
-        'n' => string_is_nonzero(argument),
-        'z' => string_is_zero(argument),
+        'n' => !argument.is_empty(),
+        'z' => argument.is_empty(),
         _ => true,
     }
 }
@@ -307,7 +310,7 @@ fn file_has_write_permission(filepath: &str) -> bool {
 /// Rust currently does not have a higher level abstraction for obtaining non-standard file modes.
 /// To extract the permissions from the mode, the bitwise AND operator will be used and compared
 /// with the respective execute bits.
-/// Note: This function is 1:1 the same as src/builtins/exists.rs:file_has_execute_permission
+/// Note: This function is 1:1 the same as `src/builtins/exists.rs:file_has_execute_permission`
 /// If you change the following function, please also update the one in src/builtins/exists.rs
 fn file_has_execute_permission(filepath: &str) -> bool {
     const USER: u32 = 0b100_0000;
@@ -353,20 +356,6 @@ fn file_is_directory(filepath: &str) -> bool {
 /// Exits SUCCESS if the file is a symbolic link
 fn file_is_symlink(filepath: &str) -> bool {
     fs::symlink_metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_symlink())
-}
-
-/// Exits SUCCESS if the string is not empty
-fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
-
-/// Exits SUCCESS if the string is empty
-fn string_is_zero(string: &str) -> bool { string.is_empty() }
-
-#[test]
-fn test_strings() {
-    assert_eq!(string_is_zero("NOT ZERO"), false);
-    assert_eq!(string_is_zero(""), true);
-    assert_eq!(string_is_nonzero("NOT ZERO"), true);
-    assert_eq!(string_is_nonzero(""), false);
 }
 
 #[test]

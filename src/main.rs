@@ -1,4 +1,4 @@
-use self::binary::{builtins, InteractiveBinary};
+use self::binary::{builtins, InteractiveShell};
 use atty::Stream;
 use ion_shell::{BuiltinMap, IonError, PipelineError, Shell, Value};
 use liner::KeyBindings;
@@ -160,7 +160,7 @@ fn main() {
     } else if let Some(path) = script_path {
         shell.execute_file(path)
     } else if stdin_is_a_tty || command_line_args.interactive {
-        let mut interactive = InteractiveBinary::new(shell);
+        let mut interactive = InteractiveShell::new(shell);
         if let Some(key_bindings) = command_line_args.key_bindings {
             interactive.set_keybindings(key_bindings.0);
         }

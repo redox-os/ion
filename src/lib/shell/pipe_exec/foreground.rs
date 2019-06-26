@@ -17,13 +17,13 @@ const ERRORED: u8 = 2;
 /// communication between the shell and background threads. The `fg` command uses this
 /// structure to notify a background thread that it needs to wait for and return
 /// the exit status back to the `fg` function.
-pub struct ForegroundSignals {
+pub struct Signals {
     grab:   AtomicUsize, // AtomicU32,
     status: AtomicUsize, // AtomicU8,
     reply:  AtomicUsize, // AtomicU8,
 }
 
-impl ForegroundSignals {
+impl Signals {
     pub fn was_grabbed(&self, pid: u32) -> bool { self.grab.load(Ordering::SeqCst) as u32 == pid }
 
     pub fn was_processed(&self) -> Option<BackgroundResult> {
@@ -51,8 +51,8 @@ impl ForegroundSignals {
 
     pub fn signal_to_grab(&self, pid: u32) { self.grab.store(pid as usize, Ordering::SeqCst); }
 
-    pub fn new() -> ForegroundSignals {
-        ForegroundSignals {
+    pub const fn new() -> Self {
+        Self {
             grab:   AtomicUsize::new(0),
             status: AtomicUsize::new(0),
             reply:  AtomicUsize::new(0),

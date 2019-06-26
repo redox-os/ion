@@ -40,7 +40,7 @@ pub enum StatementError {
     ExpectedCommandButFound(&'static str),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum StatementVariant<'a> {
     And(&'a str),
     Or(&'a str),
@@ -64,8 +64,8 @@ pub struct StatementSplitter<'a> {
 
 impl<'a> StatementSplitter<'a> {
     /// Create a new statement splitter on data
-    pub fn new(data: &'a str) -> Self {
-        StatementSplitter {
+    pub const fn new(data: &'a str) -> Self {
+        Self {
             data,
             read: 0,
             paren_level: 0,
@@ -81,11 +81,11 @@ impl<'a> StatementSplitter<'a> {
 
     fn get_statement(&self, start: usize, end: usize) -> StatementVariant<'a> {
         if self.logical == LogicalOp::And {
-            StatementVariant::And(&self.data[start + 1..end].trim())
+            StatementVariant::And(self.data[start + 1..end].trim())
         } else if self.logical == LogicalOp::Or {
-            StatementVariant::Or(&self.data[start + 1..end].trim())
+            StatementVariant::Or(self.data[start + 1..end].trim())
         } else {
-            StatementVariant::Default(&self.data[start..end].trim())
+            StatementVariant::Default(self.data[start..end].trim())
         }
     }
 

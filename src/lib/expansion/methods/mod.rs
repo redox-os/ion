@@ -43,8 +43,7 @@ pub enum MethodError {
 impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
     pub fn array<'c>(&'c self) -> impl Iterator<Item = types::Str> + 'c {
         ArgumentSplitter::new(self.args)
-            .filter_map(move |x| self.expand.expand_string(x).ok())
-            .flat_map(|x| x)
+            .flat_map(move |x| self.expand.expand_string(x).unwrap_or_else(|_| types::Args::new()))
             .map(|s| unescape(&s))
     }
 

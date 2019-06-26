@@ -17,7 +17,7 @@ fn redir(old: &Option<File>, new: RawFd) {
 /// Duplicates STDIN, STDOUT, and STDERR; in that order; and returns them as `File`s.
 /// Why, you ask? A simple safety mechanism to ensure that the duplicated FDs are closed
 /// when dropped.
-pub fn duplicate_streams() -> io::Result<(Option<File>, File, File)> {
+pub fn duplicate() -> io::Result<(Option<File>, File, File)> {
     // STDIN may have been closed for a background shell, so it is ok if it cannot be duplicated.
     let stdin = sys::dup(libc::STDIN_FILENO).ok().map(|fd| unsafe { File::from_raw_fd(fd) });
 
@@ -28,7 +28,7 @@ pub fn duplicate_streams() -> io::Result<(Option<File>, File, File)> {
 }
 
 #[inline]
-pub fn redirect_streams(inp: &Option<File>, out: &Option<File>, err: &Option<File>) {
+pub fn redirect(inp: &Option<File>, out: &Option<File>, err: &Option<File>) {
     redir(inp, libc::STDIN_FILENO);
     redir(out, libc::STDOUT_FILENO);
     redir(err, libc::STDERR_FILENO);

@@ -293,12 +293,12 @@ impl<'a> Function<'a> {
     pub fn description(&self) -> Option<&types::Str> { self.description.as_ref() }
 
     /// Create a new function
-    pub fn new(
+    pub const fn new(
         description: Option<types::Str>,
         name: types::Str,
         args: Vec<KeyBuf>,
         statements: Vec<Statement<'a>>,
     ) -> Self {
-        Function { description, name, args, statements }
+        Self { description, name, args, statements }
     }
 }

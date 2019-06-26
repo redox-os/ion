@@ -9,9 +9,9 @@ Type in expressions to have them evaluated.
 Type "help" for help."#;
 
 fn calc_or_polish_calc(args: &str) -> Result<Value, CalcError> {
-    match eval(&args) {
+    match eval(args) {
         Ok(t) => Ok(t),
-        Err(_) => eval_polish(&args),
+        Err(_) => eval_polish(args),
     }
 }
 
@@ -54,37 +54,34 @@ AUTHOR
 pub fn calc(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    match args.get(1) {
-        Some(_) => {
-            let result = calc_or_polish_calc(&args[1..].join(" "));
-            match result {
-                Ok(v) => {
-                    println!("{}", v);
-                    Status::SUCCESS
-                }
-                Err(e) => Status::error(format!("{}", e)),
+    if args.get(1).is_some() {
+        let result = calc_or_polish_calc(&args[1..].join(" "));
+        match result {
+            Ok(v) => {
+                println!("{}", v);
+                Status::SUCCESS
             }
+            Err(e) => Status::error(format!("{}", e)),
         }
-        None => {
-            let prompt = b"ion-calc: ";
-            println!("{}", REPL_GUIDE);
-            loop {
-                let _ = stdout.write(prompt);
-                let _ = stdout.flush();
-                let mut input = String::new();
-                let _ = io::stdin().read_line(&mut input);
-                if input.is_empty() {
-                    return Status::SUCCESS;
-                } else {
-                    match input.trim() {
-                        "" => (),
-                        "exit" => return Status::SUCCESS,
-                        s => {
-                            let result = calc_or_polish_calc(s);
-                            match result {
-                                Ok(v) => println!("{}", v),
-                                Err(e) => eprintln!("{}", e),
-                            }
+    } else {
+        let prompt = b"ion-calc: ";
+        println!("{}", REPL_GUIDE);
+        loop {
+            let _ = stdout.write(prompt);
+            let _ = stdout.flush();
+            let mut input = String::new();
+            let _ = io::stdin().read_line(&mut input);
+            if input.is_empty() {
+                return Status::SUCCESS;
+            } else {
+                match input.trim() {
+                    "" => (),
+                    "exit" => return Status::SUCCESS,
+                    s => {
+                        let result = calc_or_polish_calc(s);
+                        match result {
+                            Ok(v) => println!("{}", v),
+                            Err(e) => eprintln!("{}", e),
                         }
                     }
                 }

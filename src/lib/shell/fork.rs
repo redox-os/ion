@@ -151,5 +151,5 @@ impl<'a, 'b> Fork<'a, 'b> {
     }
 
     /// Creates a new `Fork` state from an existing shell.
-    pub fn new(shell: &'a Shell<'b>, capture: Capture) -> Fork<'a, 'b> { Fork { shell, capture } }
+    pub const fn new(shell: &'a Shell<'b>, capture: Capture) -> Self { Self { shell, capture } }
 }

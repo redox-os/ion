@@ -19,6 +19,13 @@ readme = "README.md"
 repository = "https://gitlab.redox-os.org/redox-os/ion"
 version = "1.0.0-alpha"
 edition = "2018"
+keywords = ["shell", "script", "program", "config", "configuration"]
+categories = ["command-line-utilities", "config"]
+documentation = "https://doc.redox-os.org/ion-manual/"
+
+[badges]
+gitlab = { repository = "https://gitlab.redox-os.org/redox-os/ion", branch = "master" }
+maintenance = { status = "experimental" }
 
 [features]
 advanced_arg_parsing = []
@@ -76,6 +83,7 @@ structopt = "^0.2"
 libc = "0.2"
 atty = "0.2"
 permutate = "0.3"
+dirs = "1.0"
 
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
 users = "0.9"

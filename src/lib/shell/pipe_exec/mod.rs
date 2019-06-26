@@ -11,14 +11,10 @@ pub mod job_control;
 mod pipes;
 pub mod streams;
 
-use self::{
-    job_control::ProcessState,
-    pipes::TeePipe,
-    streams::{duplicate_streams, redirect_streams},
-};
+use self::{job_control::ProcessState, pipes::TeePipe};
 use super::{
     flow_control::FunctionError,
-    job::{Job, JobVariant, RefinedJob, TeeItem},
+    job::{Job, RefinedJob, TeeItem, Variant},
     signals::{self, SignalHandler},
     sys, Shell, Value,
 };
@@ -281,7 +277,7 @@ fn prepare<'a, 'b>(
     // Real logic begins here
     let mut new_commands = SmallVec::<[_; 16]>::with_capacity(2 * pipeline.items.len());
     let mut prev_kind = RedirectFrom::None;
-    for PipeItem { job, outputs, mut inputs } in pipeline.items.into_iter() {
+    for PipeItem { job, outputs, mut inputs } in pipeline.items {
         let kind = job.redirection;
         let mut job = shell.generate_command(job);
         match (inputs.len(), prev_kind) {
@@ -398,14 +394,14 @@ impl<'b> Shell<'b> {
     fn exec_job(&mut self, job: &RefinedJob<'b>) -> Result<Status, PipelineError> {
         // Duplicate file descriptors, execute command, and redirect back.
         let (stdin_bk, stdout_bk, stderr_bk) =
-            duplicate_streams().map_err(PipelineError::CreatePipeError)?;
-        redirect_streams(&job.stdin, &job.stdout, &job.stderr);
+            streams::duplicate().map_err(PipelineError::CreatePipeError)?;
+        streams::redirect(&job.stdin, &job.stdout, &job.stderr);
         let code = match job.var {
-            JobVariant::Builtin { ref main } => main(job.args(), self),
-            JobVariant::Function => self.exec_function(job.command(), job.args()),
+            Variant::Builtin { main } => main(job.args(), self),
+            Variant::Function => self.exec_function(job.command(), job.args()),
             _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
         };
-        redirect_streams(&stdin_bk, &Some(stdout_bk), &Some(stderr_bk));
+        streams::redirect(&stdin_bk, &Some(stdout_bk), &Some(stderr_bk));
         Ok(code)
     }
 
@@ -490,12 +486,12 @@ impl<'b> Shell<'b> {
                     // output pipes, so we can properly close them after the job has been
                     // spawned.
                     let is_external =
-                        if let JobVariant::External { .. } = parent.var { true } else { false };
+                        if let Variant::External { .. } = parent.var { true } else { false };
 
                     // TODO: Refactor this part
                     // If we need to tee both stdout and stderr, we directly connect pipes to
                     // the relevant sources in both of them.
-                    if let JobVariant::Tee {
+                    if let Variant::Tee {
                         items: (Some(ref mut tee_out), Some(ref mut tee_err)),
                         ..
                     } = child.var
@@ -576,7 +572,7 @@ fn spawn_proc(
 ) -> Result<(), PipelineError> {
     let RefinedJob { mut var, args, stdin, stdout, stderr } = cmd;
     let pid = match var {
-        JobVariant::External => {
+        Variant::External => {
             let mut command = Command::new(&args[0].as_str());
             command.args(args[1..].iter().map(types::Str::as_str));
 
@@ -597,18 +593,18 @@ fn spawn_proc(
                 }
             }
         }
-        JobVariant::Builtin { main } => {
+        Variant::Builtin { main } => {
             fork_exec_internal(stdout, stderr, stdin, *pgid, |_, _, _| main(&args, shell))
         }
-        JobVariant::Function => fork_exec_internal(stdout, stderr, stdin, *pgid, |_, _, _| {
+        Variant::Function => fork_exec_internal(stdout, stderr, stdin, *pgid, |_, _, _| {
             shell.exec_function(&args[0], &args)
         }),
-        JobVariant::Cat { ref mut sources } => {
+        Variant::Cat { ref mut sources } => {
             fork_exec_internal(stdout, None, stdin, *pgid, |_, _, mut stdin| {
                 shell.exec_multi_in(sources, &mut stdin)
             })
         }
-        JobVariant::Tee { ref mut items } => {
+        Variant::Tee { ref mut items } => {
             fork_exec_internal(stdout, stderr, stdin, *pgid, |_, _, _| {
                 shell.exec_multi_out(items, redirection)
             })
@@ -642,7 +638,7 @@ where
             signals::unblock();
 
             sys::setpgid(0, pgid).expect(" aaaa");
-            redirect_streams(&stdin, &stdout, &stderr);
+            streams::redirect(&stdin, &stdout, &stderr);
             let exit_status = exec_action(stdout, stderr, stdin);
             exit(exit_status.as_os_code())
         }

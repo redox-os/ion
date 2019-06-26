@@ -1,8 +1,8 @@
-use super::InteractiveBinary;
+use super::InteractiveShell;
 use ion_shell::{expansion::Expander, Capture, Shell};
 use std::io::Read;
 
-impl<'a> InteractiveBinary<'a> {
+impl<'a> InteractiveShell<'a> {
     /// Generates the prompt that will be used by Liner.
     pub fn prompt(&self) -> String {
         let shell = self.shell.borrow();
