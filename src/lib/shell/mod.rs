@@ -17,13 +17,13 @@ pub mod variables;
 pub(crate) use self::job::Job;
 use self::{
     directory_stack::DirectoryStack,
-    flow::BlockError,
     flow_control::{Block, Function, FunctionError, Statement},
     fork::{Fork, IonResult},
     pipe_exec::foreground,
     variables::Variables,
 };
 pub use self::{
+    flow::BlockError,
     fork::Capture,
     pipe_exec::{job_control::BackgroundProcess, PipelineError},
     variables::Value,
@@ -31,10 +31,10 @@ pub use self::{
 use crate::{
     assignments::value_check,
     builtins::{BuiltinMap, Status},
-    expansion::{self, pipelines::Pipeline},
+    expansion::{pipelines::Pipeline, Error as ExpansionError},
     parser::{
         lexers::{Key, Primitive},
-        ParseError, Terminator,
+        Error as ParseError, Terminator,
     },
 };
 use err_derive::Error;
@@ -67,7 +67,7 @@ pub enum IonError {
     PipelineExecutionError(#[error(cause)] PipelineError),
     /// Could not properly expand to a pipeline
     #[error(display = "expansion error: {}", _0)]
-    ExpansionError(#[error(cause)] expansion::Error<IonError>),
+    ExpansionError(#[error(cause)] ExpansionError<IonError>),
 }
 
 impl From<ParseError> for IonError {
@@ -86,8 +86,8 @@ impl From<PipelineError> for IonError {
     fn from(cause: PipelineError) -> Self { IonError::PipelineExecutionError(cause) }
 }
 
-impl From<expansion::Error<IonError>> for IonError {
-    fn from(cause: expansion::Error<Self>) -> Self { IonError::ExpansionError(cause) }
+impl From<ExpansionError<IonError>> for IonError {
+    fn from(cause: ExpansionError<Self>) -> Self { IonError::ExpansionError(cause) }
 }
 
 /// Options for the shell

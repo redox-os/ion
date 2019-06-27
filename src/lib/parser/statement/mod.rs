@@ -15,11 +15,11 @@ use crate::{builtins::BuiltinMap, shell::flow_control::Statement};
 use err_derive::Error;
 use std::char;
 
-pub type Result<'a> = std::result::Result<Statement<'a>, ParseError>;
+pub type Result<'a> = std::result::Result<Statement<'a>, Error>;
 
 /// An Error occured during parsing
 #[derive(Debug, Error, PartialEq, Eq, Hash, Clone)]
-pub enum ParseError {
+pub enum Error {
     /// The command name is illegal
     #[error(display = "illegal command name: {}", _0)]
     IllegalCommandName(String),
@@ -61,7 +61,7 @@ pub enum ParseError {
     NoInKeyword,
     /// Error with match statements
     #[error(display = "case error: {}", _0)]
-    CaseError(#[error(cause)] CaseError),
+    Case(#[error(cause)] CaseError),
     /// The provided function name was invalid
     #[error(
         display = "'{}' is not a valid function name
@@ -74,19 +74,19 @@ pub enum ParseError {
     InvalidFunctionArgument(#[error(cause)] FunctionParseError),
     /// Error occured during parsing of a pipeline
     #[error(display = "{}", _0)]
-    PipelineParsingError(#[error(cause)] PipelineParsingError),
+    Pipeline(#[error(cause)] PipelineParsingError),
 }
 
-impl From<FunctionParseError> for ParseError {
-    fn from(cause: FunctionParseError) -> Self { ParseError::InvalidFunctionArgument(cause) }
+impl From<FunctionParseError> for Error {
+    fn from(cause: FunctionParseError) -> Self { Error::InvalidFunctionArgument(cause) }
 }
 
-impl From<CaseError> for ParseError {
-    fn from(cause: CaseError) -> Self { ParseError::CaseError(cause) }
+impl From<CaseError> for Error {
+    fn from(cause: CaseError) -> Self { Error::Case(cause) }
 }
 
-impl From<PipelineParsingError> for ParseError {
-    fn from(cause: PipelineParsingError) -> Self { ParseError::PipelineParsingError(cause) }
+impl From<PipelineParsingError> for Error {
+    fn from(cause: PipelineParsingError) -> Self { Error::Pipeline(cause) }
 }
 
 /// Parses a given statement string and return's the corresponding mapped

@@ -13,7 +13,6 @@ pub mod streams;
 
 use self::{job_control::ProcessState, pipes::TeePipe};
 use super::{
-    flow_control::FunctionError,
     job::{Job, RefinedJob, TeeItem, Variant},
     signals::{self, SignalHandler},
     Shell, Value,
@@ -84,9 +83,6 @@ pub enum PipelineError {
     /// Failed to create a fork
     #[error(display = "could not fork: {}", _0)]
     CreateForkError(#[error(cause)] nix::Error),
-    /// Failed to run function
-    #[error(display = "could not run function: {}", _0)]
-    RunFunctionError(#[error(cause)] FunctionError),
     /// Failed to terminate the jobs after a termination
     #[error(display = "failed to terminate foreground jobs: {}", _0)]
     TerminateJobsError(#[error(cause)] nix::Error),
@@ -156,10 +152,6 @@ impl From<InputError> for RedirectError {
 
 impl From<RedirectError> for PipelineError {
     fn from(cause: RedirectError) -> Self { PipelineError::RedirectPipeError(cause) }
-}
-
-impl From<FunctionError> for PipelineError {
-    fn from(cause: FunctionError) -> Self { PipelineError::RunFunctionError(cause) }
 }
 
 /// Create an OS pipe and write the contents of a byte slice to one end

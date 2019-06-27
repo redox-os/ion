@@ -1,7 +1,7 @@
 use super::{
     super::pipelines,
     functions::{collect_arguments, parse_function},
-    ParseError,
+    Error,
 };
 use crate::{
     builtins::BuiltinMap,
@@ -24,7 +24,7 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
         "end" => Ok(Statement::End),
         "break" => Ok(Statement::Break),
         "continue" => Ok(Statement::Continue),
-        "for" | "match" | "case" => Err(ParseError::IncompleteFlowControl),
+        "for" | "match" | "case" => Err(Error::IncompleteFlowControl),
         "let" => Ok(Statement::Let(LocalAction::List)),
         _ if cmd.starts_with("let ") => {
             // Split the let expression and ensure that the statement is valid.
@@ -38,8 +38,8 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
                         vals.into(),
                     )))
                 }
-                None if op.is_none() => Err(ParseError::NoOperatorSupplied),
-                _ => Err(ParseError::NoValueSupplied),
+                None if op.is_none() => Err(Error::NoOperatorSupplied),
+                _ => Err(Error::NoValueSupplied),
             }
         }
         "export" => Ok(Statement::Export(ExportAction::List)),
@@ -54,8 +54,8 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
                 (None, Some(keys), None) => {
                     Ok(Statement::Export(ExportAction::LocalExport(keys.into())))
                 }
-                (None, Some(_), Some(_)) => Err(ParseError::NoValueSupplied),
-                (None, None, _) => Err(ParseError::NoKeySupplied),
+                (None, Some(_), Some(_)) => Err(Error::NoValueSupplied),
+                (None, None, _) => Err(Error::NoKeySupplied),
                 _ => unreachable!(),
             }
         }
@@ -97,7 +97,7 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
                     values: ArgumentSplitter::new(cmd.trim()).map(types::Str::from).collect(),
                     statements: Vec::new(),
                 }),
-                None => Err(ParseError::NoInKeyword),
+                None => Err(Error::NoInKeyword),
             }
         }
         _ if cmd.starts_with("case ") => {
@@ -112,7 +112,7 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
             let pos = cmd.find(char::is_whitespace).unwrap_or_else(|| cmd.len());
             let name = &cmd[..pos];
             if !is_valid_name(name) {
-                return Err(ParseError::InvalidFunctionName(name.into()));
+                return Err(Error::InvalidFunctionName(name.into()));
             }
 
             let (args, description) = parse_function(&cmd[pos..]);
