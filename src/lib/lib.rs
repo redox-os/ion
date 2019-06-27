@@ -18,8 +18,8 @@
 //! ## Demo
 //!
 //! ```rust
-//! use ion_shell::{builtins::Status, types, BuiltinFunction, BuiltinMap, Shell};
-//! use std::{cell::RefCell, rc::Rc, thread, time};
+//! use ion_shell::{builtins::Status, Value, types, BuiltinFunction, BuiltinMap, Shell};
+//! use std::{cell::RefCell, rc::Rc, thread, time, fs::File};
 //!
 //! enum Layout {
 //!     Simple,
@@ -47,12 +47,20 @@
 //!     shell.builtins_mut().add("layout", set_layout, "Set the application layout");
 //!
 //!     // Read a file and execute it
-//!     shell.execute_file("/home/user/.config/my-application/config.ion");
+//!     if let Ok(file) = File::open("/home/user/.config/my-application/config.ion") {
+//!         if let Err(why) = shell.execute_command(file) {
+//!             println!("ERROR: my-application: error in config file: {}", why);
+//!         }
+//!     }
 //!
 //!     for _ in 0..255 {
 //!         i += 1;
 //!         // call a user-defined callback function named on_update
-//!         let _ = shell.execute_function("on_update", &["ion", &i.to_string()]);
+//!         if let Some(Value::Function(function)) = shell.variables().get("on_update") {
+//!             if let Err(why) = shell.execute_function(&function.clone(), &["ion", &i.to_string()]) {
+//!                 println!("ERROR: my-application: error in on_update callback: {}", why);
+//!             }
+//!         }
 //!
 //!         thread::sleep(time::Duration::from_millis(5));
 //!     }

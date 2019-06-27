@@ -15,7 +15,13 @@ use ion_shell::{
 };
 use itertools::Itertools;
 use liner::{Buffer, Context, KeyBindings};
-use std::{cell::RefCell, fs::OpenOptions, io, io::Write, path::Path, rc::Rc};
+use std::{
+    cell::RefCell,
+    fs::{self, OpenOptions},
+    io,
+    path::Path,
+    rc::Rc,
+};
 use xdg::BaseDirectories;
 
 #[cfg(not(feature = "advanced_arg_parsing"))]
@@ -180,9 +186,9 @@ impl<'a> InteractiveShell<'a> {
                 }
                 None => {
                     print!("{}", context_bis.borrow().history.buffers.iter().format("\n"));
-                    io::stdout().flush().unwrap_or_else(|err| {
+                    /*io::stdout().flush().unwrap_or_else(|err| {
                         eprintln!("ion: history print: {}", err);
-                    });
+                    });*/
                 }
             }
             Status::SUCCESS
@@ -222,11 +228,14 @@ impl<'a> InteractiveShell<'a> {
     fn exec_init_file(shell: &mut Shell) {
         match BaseDirectories::with_prefix("ion") {
             Ok(base_dirs) => match base_dirs.find_config_file(Self::CONFIG_FILE_NAME) {
-                Some(initrc) => {
-                    if let Err(err) = shell.execute_file(&initrc) {
-                        eprintln!("ion: {}", err)
+                Some(initrc) => match fs::File::open(initrc) {
+                    Ok(script) => {
+                        if let Err(err) = shell.execute_command(std::io::BufReader::new(script)) {
+                            eprintln!("ion: {}", err);
+                        }
                     }
-                }
+                    Err(cause) => println!("ion: init file was not found: {}", cause),
+                },
                 None => {
                     if let Err(err) = Self::create_config_file(base_dirs, Self::CONFIG_FILE_NAME) {
                         eprintln!("ion: could not create config file: {}", err);
