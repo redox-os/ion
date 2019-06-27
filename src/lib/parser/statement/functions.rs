@@ -1,4 +1,3 @@
-use super::split_pattern;
 use crate::parser::lexers::assignments::{KeyBuf, KeyIterator, TypeError};
 use err_derive::Error;
 
@@ -14,7 +13,8 @@ pub enum FunctionParseError {
 /// converted into a tuple consisting of a `KeyIterator` iterator, which will collect type
 /// information, and an optional description of the function.
 pub fn parse_function(arg: &str) -> (KeyIterator<'_>, Option<&str>) {
-    let (args, description) = split_pattern(arg, "--");
+    let mut parts = arg.splitn(2, "--");
+    let (args, description) = (parts.next().unwrap().trim(), parts.next().map(str::trim));
     (KeyIterator::new(args), description)
 }
 
