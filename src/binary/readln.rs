@@ -1,8 +1,8 @@
-use super::{completer::IonCompleter, InteractiveBinary};
+use super::{completer::IonCompleter, InteractiveShell};
 use ion_shell::Shell;
 use std::io::ErrorKind;
 
-impl<'a> InteractiveBinary<'a> {
+impl<'a> InteractiveShell<'a> {
     /// Ion's interface to Liner's `read_line` method, which handles everything related to
     /// rendering, controlling, and getting input from the prompt.
     pub fn readln<T: Fn(&mut Shell<'_>)>(&self, prep_for_exit: &T) -> Option<String> {

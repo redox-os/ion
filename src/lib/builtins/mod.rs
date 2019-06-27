@@ -35,7 +35,7 @@ pub use self::{
 };
 use crate as ion_shell;
 use crate::{
-    shell::{sys, Capture, Shell, Value},
+    shell::{Capture, Shell, Value},
     types,
 };
 use builtins_proc::builtin;
@@ -333,15 +333,10 @@ pub fn bool(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let opt = if args[1].is_empty() { None } else { shell.variables().get_str(&args[1][1..]).ok() };
 
     match opt.as_ref().map(types::Str::as_str) {
-        Some("1") => (),
-        Some("true") => (),
-        _ => match &*args[1] {
-            "1" => (),
-            "true" => (),
-            _ => return Status::from_exit_code(1),
-        },
+        Some("1") | Some("true") => Status::TRUE,
+        _ if ["1", "true"].contains(&args[1].as_ref()) => Status::TRUE,
+        _ => Status::FALSE,
     }
-    Status::SUCCESS
 }
 
 #[builtin(
@@ -477,7 +472,7 @@ pub fn pushd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             }
         }
         Action::Push(dir) => {
-            if let Err(why) = shell.dir_stack_mut().pushd(dir, keep_front) {
+            if let Err(why) = shell.dir_stack_mut().pushd(&dir, keep_front) {
                 return Status::error(format!("ion: pushd: {}", why));
             }
         }
@@ -519,14 +514,7 @@ pub fn popd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
         let arg = arg.as_ref();
         if arg == "-n" {
             keep_front = true;
-        } else {
-            let (count_from_front, num) = match parse_numeric_arg(arg) {
-                Some(n) => n,
-                None => {
-                    return Status::error(format!("ion: popd: {}: invalid argument", arg));
-                }
-            };
-
+        } else if let Some((count_from_front, num)) = parse_numeric_arg(arg) {
             index = if count_from_front {
                 // <=> input number is positive
                 num
@@ -536,15 +524,17 @@ pub fn popd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                 return Status::error("ion: popd: negative directory stack index out of range");
             };
         }
-    }
 
-    // apply -n
-    if index == 0 && keep_front {
-        index = 1;
-    } else if index == 0 {
-        // change to new directory, return if not possible
-        if let Err(why) = shell.dir_stack_mut().set_current_dir_by_index(1) {
-            return Status::error(format!("ion: popd: {}", why));
+        // apply -n
+        if index == 0 && keep_front {
+            index = 1;
+        } else if index == 0 {
+            // change to new directory, return if not possible
+            if let Err(why) = shell.dir_stack_mut().set_current_dir_by_index(1) {
+                return Status::error(format!("ion: popd: {}", why));
+            } else {
+                return Status::error(format!("ion: popd: {}: invalid argument", arg));
+            };
         }
     }
 
@@ -816,13 +806,7 @@ pub fn isatty(args: &[types::Str], _: &mut Shell<'_>) -> Status {
         let pid = args[1].parse::<i32>();
 
         match pid {
-            Ok(r) => {
-                if sys::isatty(r) {
-                    Status::TRUE
-                } else {
-                    Status::FALSE
-                }
-            }
+            Ok(r) => nix::unistd::isatty(r).unwrap().into(),
             Err(_) => Status::error("ion: isatty given bad number"),
         }
     } else {

@@ -22,7 +22,7 @@ impl<'a> Job<'a> {
     pub fn expand(&mut self, shell: &Shell<'_>) -> expansion::Result<(), IonError> {
         let mut args = types::Args::new();
         for arg in &self.args {
-            args.extend(expand_arg(&arg, shell)?);
+            args.extend(expand_arg(arg, shell)?);
         }
         match shell.variables.get(&self.args[0]) {
             Some(Value::Function(_)) => {}
@@ -58,7 +58,7 @@ impl<'a> fmt::Debug for Job<'a> {
 
 /// Expands a given argument and returns it as an `Args`.
 fn expand_arg(arg: &str, shell: &Shell<'_>) -> expansion::Result<types::Args, IonError> {
-    let res = shell.expand_string(&arg)?;
+    let res = shell.expand_string(arg)?;
     if res.is_empty() {
         Ok(args![""])
     } else {
@@ -73,10 +73,10 @@ pub struct RefinedJob<'a> {
     pub stdout: Option<File>,
     pub stderr: Option<File>,
     pub args:   types::Args,
-    pub var:    JobVariant<'a>,
+    pub var:    Variant<'a>,
 }
 
-pub enum JobVariant<'a> {
+pub enum Variant<'a> {
     /// An external program that is executed by this shell
     External,
     /// A procedure embedded into Ion
@@ -100,7 +100,7 @@ pub struct TeeItem {
 }
 
 impl TeeItem {
-    pub fn new() -> Self { TeeItem { sinks: Vec::new(), source: None } }
+    pub fn new() -> Self { Self { sinks: Vec::new(), source: None } }
 
     pub fn add(&mut self, sink: File) { self.sinks.push(sink); }
 
@@ -158,10 +158,10 @@ impl TeeItem {
 impl<'a> RefinedJob<'a> {
     pub fn command(&self) -> &types::Str { &self.args[0] }
 
-    pub fn args(&self) -> &types::Args { &self.args }
+    pub const fn args(&self) -> &types::Args { &self.args }
 
     pub fn stderr(&mut self, file: File) {
-        if let JobVariant::Cat { .. } = self.var {
+        if let Variant::Cat { .. } = self.var {
             return;
         }
 
@@ -170,7 +170,7 @@ impl<'a> RefinedJob<'a> {
 
     pub fn needs_forking(&self) -> bool {
         match self.var {
-            JobVariant::Function | JobVariant::Builtin { .. } => false,
+            Variant::Function | Variant::Builtin { .. } => false,
             _ => true,
         }
     }
@@ -180,40 +180,34 @@ impl<'a> RefinedJob<'a> {
     pub fn stdin(&mut self, file: File) { self.stdin = Some(file); }
 
     pub fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
-        RefinedJob {
+        Self {
             stdin:  None,
             stdout: None,
             stderr: None,
             args:   types::Args::new(),
-            var:    JobVariant::Tee { items: (tee_out, tee_err) },
+            var:    Variant::Tee { items: (tee_out, tee_err) },
         }
     }
 
     pub fn cat(sources: Vec<File>) -> Self {
-        RefinedJob {
+        Self {
             stdin:  None,
             stdout: None,
             stderr: None,
             args:   types::Args::new(),
-            var:    JobVariant::Cat { sources },
+            var:    Variant::Cat { sources },
         }
     }
 
-    pub fn function(args: types::Args) -> Self {
-        RefinedJob { stdin: None, stdout: None, stderr: None, args, var: JobVariant::Function }
+    pub const fn function(args: types::Args) -> Self {
+        Self { stdin: None, stdout: None, stderr: None, args, var: Variant::Function }
     }
 
     pub fn builtin(main: BuiltinFunction<'a>, args: types::Args) -> Self {
-        RefinedJob {
-            stdin: None,
-            stdout: None,
-            stderr: None,
-            args,
-            var: JobVariant::Builtin { main },
-        }
+        Self { stdin: None, stdout: None, stderr: None, args, var: Variant::Builtin { main } }
     }
 
-    pub fn external(args: types::Args) -> Self {
-        RefinedJob { stdin: None, stdout: None, stderr: None, args, var: JobVariant::External }
+    pub const fn external(args: types::Args) -> Self {
+        Self { stdin: None, stdout: None, stderr: None, args, var: Variant::External }
     }
 }

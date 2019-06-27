@@ -1,4 +1,3 @@
-use super::sys::env as sys_env;
 use err_derive::Error;
 use std::{
     collections::VecDeque,
@@ -147,7 +146,7 @@ impl DirectoryStack {
     }
 
     pub fn switch_to_home_directory(&mut self) -> Result<(), DirStackError> {
-        sys_env::home_dir().map_or(Err(DirStackError::FailedFetchHome), |home| {
+        dirs::home_dir().map_or(Err(DirStackError::FailedFetchHome), |home| {
             home.to_str().map_or(Err(DirStackError::PathConversionFailed), |home| {
                 self.change_and_push_dir(home)
             })
@@ -162,7 +161,7 @@ impl DirectoryStack {
         self.set_current_dir_by_index(0)
     }
 
-    pub fn pushd(&mut self, path: PathBuf, keep_front: bool) -> Result<(), DirStackError> {
+    pub fn pushd(&mut self, path: &Path, keep_front: bool) -> Result<(), DirStackError> {
         let index = if keep_front { 1 } else { 0 };
         let new_dir = self.normalize_path(path.to_str().unwrap());
         self.insert_dir(index, new_dir);
@@ -177,18 +176,15 @@ impl DirectoryStack {
 
     /// Create a new `DirectoryStack` containing the current working directory,
     /// if available.
-    pub fn new() -> DirectoryStack {
+    pub fn new() -> Self {
         let mut dirs: VecDeque<PathBuf> = VecDeque::new();
-        match env::current_dir() {
-            Ok(curr_dir) => {
-                env::set_var("PWD", curr_dir.to_str().unwrap_or("?"));
-                dirs.push_front(curr_dir);
-            }
-            Err(_) => {
-                eprintln!("ion: failed to get current directory when building directory stack");
-                env::set_var("PWD", "?");
-            }
+        if let Ok(curr_dir) = env::current_dir() {
+            env::set_var("PWD", curr_dir.to_str().unwrap_or("?"));
+            dirs.push_front(curr_dir);
+        } else {
+            eprintln!("ion: failed to get current directory when building directory stack");
+            env::set_var("PWD", "?");
         }
-        DirectoryStack { dirs, max_depth: None }
+        Self { dirs, max_depth: None }
     }
 }

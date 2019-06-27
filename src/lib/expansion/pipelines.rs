@@ -141,8 +141,8 @@ impl<'a> PipeItem<'a> {
     pub fn command(&self) -> &types::Str { self.job.command() }
 
     /// Create a new pipeitem with the given job and redirections
-    pub fn new(job: Job<'a>, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
-        PipeItem { job, outputs, inputs }
+    pub const fn new(job: Job<'a>, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
+        Self { job, outputs, inputs }
     }
 }
 

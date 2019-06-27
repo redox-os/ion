@@ -32,7 +32,7 @@ pub fn assignment_lexer(statement: &str) -> (Option<&str>, Option<Operator>, Opt
         } else if delimiter_stack.is_empty() {
             if b'=' == byte {
                 if bytes.peek().is_none() {
-                    return (Some(&statement[..read].trim()), Some(Operator::Equal), None);
+                    return (Some(statement[..read].trim()), Some(Operator::Equal), None);
                 }
                 start = read;
                 read += 1;
@@ -72,7 +72,7 @@ fn find_operator(bytes: &[u8], read: usize) -> Option<(Operator, usize)> {
     }
 }
 
-fn is_open_delimiter(byte: u8) -> bool { byte == b'[' }
+const fn is_open_delimiter(byte: u8) -> bool { byte == b'[' }
 
 fn delimiters_match(open: u8, close: u8) -> bool {
     match (open, close) {

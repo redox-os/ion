@@ -42,7 +42,7 @@ impl<'a> Key<'a> {
 }
 
 impl<'a> From<Key<'a>> for KeyBuf {
-    fn from(key: Key<'a>) -> KeyBuf { KeyBuf { kind: key.kind, name: key.name.to_owned() } }
+    fn from(key: Key<'a>) -> Self { Self { kind: key.kind, name: key.name.to_owned() } }
 }
 
 /// Quite simply, an iterator that returns keys.
@@ -94,10 +94,10 @@ impl<'a> KeyIterator<'a> {
                 };
 
                 break Ok(Key { name, kind });
-            } else if !eol {
-                self.read += 1;
-            } else {
+            } else if eol {
                 break Err(TypeError::Invalid(self.data[self.read..].into()));
+            } else {
+                self.read += 1;
             }
         }
     }
@@ -109,7 +109,7 @@ impl<'a> KeyIterator<'a> {
             self.read += 1;
             match byte {
                 b' ' if start + 1 == self.read => start += 1,
-                b' ' => return Key::parse(name, &self.data[start..self.read].trim()),
+                b' ' => return Key::parse(name, self.data[start..self.read].trim()),
                 _ => (),
             }
         }
@@ -117,12 +117,12 @@ impl<'a> KeyIterator<'a> {
         if start == self.read {
             Err(TypeError::Invalid(String::new()))
         } else {
-            Key::parse(name, &self.data[start..self.read].trim())
+            Key::parse(name, self.data[start..self.read].trim())
         }
     }
 
     /// Create a new iterator based on given data
-    pub fn new(data: &'a str) -> KeyIterator<'a> { KeyIterator { data, read: 0 } }
+    pub const fn new(data: &'a str) -> KeyIterator<'a> { KeyIterator { data, read: 0 } }
 }
 
 impl<'a> Iterator for KeyIterator<'a> {
@@ -136,17 +136,17 @@ impl<'a> Iterator for KeyIterator<'a> {
                 b' ' if start + 1 == self.read => start += 1,
                 b' ' => {
                     return Some(Ok(Key {
-                        name: &self.data[start..self.read].trim(),
+                        name: self.data[start..self.read].trim(),
                         kind: Primitive::Str,
                     }));
                 }
                 b':' => {
                     let end = self.read - 1;
-                    return Some(self.parse_parameter(&self.data[start..end].trim()));
+                    return Some(self.parse_parameter(self.data[start..end].trim()));
                 }
                 b'[' => {
                     let end = self.read - 1;
-                    return Some(self.parse_array(&self.data[start..end].trim()));
+                    return Some(self.parse_array(self.data[start..end].trim()));
                 }
                 _ => (),
             }
@@ -154,7 +154,7 @@ impl<'a> Iterator for KeyIterator<'a> {
         if start == self.read {
             None
         } else {
-            Some(Ok(Key { name: &self.data[start..self.read].trim(), kind: Primitive::Str }))
+            Some(Ok(Key { name: self.data[start..self.read].trim(), kind: Primitive::Str }))
         }
     }
 }

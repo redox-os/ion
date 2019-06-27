@@ -1,19 +1,18 @@
 use super::{sys, IonError, Shell};
+use nix::{
+    fcntl::OFlag,
+    sys::wait::{self, WaitPidFlag, WaitStatus},
+    unistd::{self, ForkResult, Pid},
+};
 use std::{
     fs::File,
-    io,
     os::unix::io::{AsRawFd, FromRawFd},
 };
 
-pub fn wait_for_child(pid: u32) -> io::Result<u8> {
+pub fn wait_for_child(pid: unistd::Pid) -> nix::Result<i32> {
     loop {
-        let mut status = 0;
-        if let Err(errno) = sys::waitpid(pid as i32, &mut status, libc::WUNTRACED) {
-            break if errno == libc::ECHILD {
-                Ok(sys::wexitstatus(status) as u8)
-            } else {
-                Err(io::Error::from_raw_os_error(errno))
-            };
+        if let WaitStatus::Exited(_, status) = wait::waitpid(pid, Some(WaitPidFlag::WUNTRACED))? {
+            break Ok(status);
         }
     }
 }
@@ -58,10 +57,10 @@ pub struct Fork<'a, 'b: 'a> {
 /// in the future, once there's a better means of obtaining the exit status without having to
 /// wait on the PID.
 pub struct IonResult {
-    pub pid:    u32,
+    pub child:  Pid,
     pub stdout: Option<File>,
     pub stderr: Option<File>,
-    pub status: u8,
+    pub status: i32,
 }
 
 impl<'a, 'b> Fork<'a, 'b> {
@@ -75,7 +74,7 @@ impl<'a, 'b> Fork<'a, 'b> {
 
         // If we are to capture stdout, create a pipe for capturing outputs.
         let outs = if self.capture as u8 & Capture::Stdout as u8 != 0 {
-            let fds = sys::pipe2(libc::O_CLOEXEC)?;
+            let fds = unistd::pipe2(OFlag::O_CLOEXEC)?;
             Some(unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
         } else {
             None
@@ -83,7 +82,7 @@ impl<'a, 'b> Fork<'a, 'b> {
 
         // And if we are to capture stderr, create a pipe for that as well.
         let errs = if self.capture as u8 & Capture::Stderr as u8 != 0 {
-            let fds = sys::pipe2(libc::O_CLOEXEC)?;
+            let fds = unistd::pipe2(OFlag::O_CLOEXEC)?;
             Some(unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
         } else {
             None
@@ -94,27 +93,27 @@ impl<'a, 'b> Fork<'a, 'b> {
         // be repeated.
         let null_file = File::open(sys::NULL_PATH);
 
-        match unsafe { sys::fork() }? {
-            0 => {
+        match unistd::fork()? {
+            ForkResult::Child => {
                 // Allow the child to handle it's own signal handling.
                 sys::signals::unblock();
 
                 // Redirect standard output to a pipe, or /dev/null, if needed.
                 if self.capture as u8 & Capture::IgnoreStdout as u8 != 0 {
                     if let Ok(null) = null_file.as_ref() {
-                        let _ = sys::dup2(null.as_raw_fd(), libc::STDOUT_FILENO);
+                        let _ = unistd::dup2(null.as_raw_fd(), nix::libc::STDOUT_FILENO);
                     }
                 } else if let Some((_, write)) = outs {
-                    let _ = sys::dup2(write.as_raw_fd(), libc::STDOUT_FILENO);
+                    let _ = unistd::dup2(write.as_raw_fd(), nix::libc::STDOUT_FILENO);
                 }
 
                 // Redirect standard error to a pipe, or /dev/null, if needed.
                 if self.capture as u8 & Capture::IgnoreStderr as u8 != 0 {
                     if let Ok(null) = null_file.as_ref() {
-                        let _ = sys::dup2(null.as_raw_fd(), libc::STDERR_FILENO);
+                        let _ = unistd::dup2(null.as_raw_fd(), nix::libc::STDERR_FILENO);
                     }
                 } else if let Some((_, write)) = errs {
-                    let _ = sys::dup2(write.as_raw_fd(), libc::STDERR_FILENO);
+                    let _ = unistd::dup2(write.as_raw_fd(), nix::libc::STDERR_FILENO);
                 }
 
                 // Drop all the file descriptors that we no longer need.
@@ -122,19 +121,19 @@ impl<'a, 'b> Fork<'a, 'b> {
 
                 // Obtain ownership of the child's copy of the shell, and then configure it.
                 let mut shell: Shell<'b> = unsafe { (self.shell as *const Shell<'b>).read() };
-                shell.variables_mut().set("PID", sys::getpid().unwrap_or(0).to_string());
+                shell.variables_mut().set("PID", unistd::getpid().to_string());
 
                 // Execute the given closure within the child's shell.
                 if let Err(why) = child_func(&mut shell) {
                     eprintln!("{}", why);
-                    sys::fork_exit(-1);
+                    unsafe { nix::libc::_exit(-1) };
                 } else {
-                    sys::fork_exit(shell.previous_status.as_os_code());
+                    unsafe { nix::libc::_exit(shell.previous_status.as_os_code()) };
                 }
             }
-            pid => {
+            ForkResult::Parent { child } => {
                 Ok(IonResult {
-                    pid,
+                    child,
                     stdout: outs.map(|(read, write)| {
                         drop(write);
                         read
@@ -144,12 +143,12 @@ impl<'a, 'b> Fork<'a, 'b> {
                         read
                     }),
                     // `waitpid()` is required to reap the child.
-                    status: wait_for_child(pid)?,
+                    status: wait_for_child(child)?,
                 })
             }
         }
     }
 
     /// Creates a new `Fork` state from an existing shell.
-    pub fn new(shell: &'a Shell<'b>, capture: Capture) -> Fork<'a, 'b> { Fork { shell, capture } }
+    pub const fn new(shell: &'a Shell<'b>, capture: Capture) -> Self { Self { shell, capture } }
 }

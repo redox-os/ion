@@ -1,5 +1,5 @@
-use super::{fork::IonResult, sys, variables::Value, Capture, Shell};
-use std::process;
+use super::{fork::IonResult, variables::Value, Capture, Shell};
+use nix::unistd::{self, Pid};
 
 impl<'a> Shell<'a> {
     /// High-level function for executing a function programmatically.
@@ -25,7 +25,7 @@ impl<'a> Shell<'a> {
                 .and_then(result);
 
             // Ensure that the parent retains ownership of the terminal before exiting.
-            let _ = sys::tcsetpgrp(libc::STDIN_FILENO, process::id());
+            let _ = unistd::tcsetpgrp(nix::libc::STDIN_FILENO, Pid::this());
             output
         } else {
             Err(())

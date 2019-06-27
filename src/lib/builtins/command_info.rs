@@ -35,7 +35,7 @@ pub fn which(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                 }
                 "function" => println!("{}: function", command),
                 "builtin" => println!("{}: built-in shell command", command),
-                _path => println!("{}", _path),
+                path => println!("{}", path),
             },
             Err(_) => result = Status::from_exit_code(1),
         }

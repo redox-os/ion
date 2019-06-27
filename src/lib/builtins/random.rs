@@ -1,65 +1,58 @@
+use crate::types;
+use itertools::Itertools;
 use rand::{thread_rng, Rng};
-use small;
-use std::io::{self, Write};
 
 const INVALID: &str = "Invalid argument for random";
 
-#[allow(unused_must_use)]
-fn rand_list(args: &[small::String]) -> Result<(), small::String> {
-    let stdout = io::stdout();
-    let mut stdout = stdout.lock();
-    let mut output = Vec::new();
-    let arg1 = args[0].parse::<usize>().map_err::<small::String, _>(|_| INVALID.into())?;
-    while output.len() < arg1 {
-        let rand_num = thread_rng().gen_range(1, args.len());
-        output.push(&*args[rand_num]);
+fn rand_list(args: &[types::Str]) -> Result<(), types::Str> {
+    let num_random = args[0].parse::<usize>().map_err::<types::Str, _>(|_| INVALID.into())?;
+    let mut output = Vec::with_capacity(num_random);
+    while output.len() < num_random {
+        for _ in 0..(num_random - output.len()) {
+            let rand_num = thread_rng().gen_range(1, args.len());
+            output.push(&*args[rand_num]);
+        }
         output.dedup();
     }
-    for out in output {
-        write!(stdout, "{} ", out);
-    }
-    writeln!(stdout);
+    println!("{}", output.iter().format(" "));
     Ok(())
 }
 
-#[allow(unused_must_use)]
-pub fn random(args: &[small::String]) -> Result<(), small::String> {
-    let stdout = io::stdout();
-    let mut stdout = stdout.lock();
+pub fn random(args: &[types::Str]) -> Result<(), types::Str> {
     match args.len() {
         0 => {
             let rand_num = thread_rng().gen_range(0, 32767);
-            writeln!(stdout, "{}", rand_num);
+            println!("{}", rand_num);
         }
         1 => {
-            writeln!(stdout, "Ion Shell does not currently support changing the seed");
+            eprintln!("Ion Shell does not currently support changing the seed");
         }
         2 => {
-            let arg1: u64 = args[0].parse().map_err::<small::String, _>(|_| INVALID.into())?;
-            let arg2: u64 = args[1].parse().map_err::<small::String, _>(|_| INVALID.into())?;
-            if arg2 <= arg1 {
+            let start: u64 = args[0].parse().map_err::<types::Str, _>(|_| INVALID.into())?;
+            let end: u64 = args[1].parse().map_err::<types::Str, _>(|_| INVALID.into())?;
+            if end <= start {
                 return Err("END must be greater than START".into());
             }
-            let rand_num = thread_rng().gen_range(arg1, arg2);
-            writeln!(stdout, "{}", rand_num);
+            let rand_num = thread_rng().gen_range(start, end);
+            println!("{}", rand_num);
         }
         3 => {
-            let arg1: u64 = args[0].parse().map_err::<small::String, _>(|_| INVALID.into())?;
-            let arg2 = match args[1].parse::<u64>() {
+            let start: u64 = args[0].parse().map_err::<types::Str, _>(|_| INVALID.into())?;
+            let step = match args[1].parse::<u64>() {
                 Ok(v) => v,
                 Err(_) => return rand_list(args),
             };
             match args[2].parse::<u64>() {
-                Ok(v) => {
-                    if arg2 <= arg1 {
+                Ok(end) => {
+                    if step <= start {
                         return Err("END must be greater than START".into());
                     }
-                    let mut end = v / arg2 + 1;
-                    if arg1 / arg2 >= end {
+                    let mut end = end / step + 1;
+                    if start / step >= end {
                         end += 1;
                     }
-                    let rand_num = thread_rng().gen_range(arg1 / arg2, end);
-                    writeln!(stdout, "{}", rand_num * arg2);
+                    let rand_num = thread_rng().gen_range(start / step, end);
+                    println!("{}", rand_num * step);
                 }
                 Err(_) => return rand_list(args),
             };

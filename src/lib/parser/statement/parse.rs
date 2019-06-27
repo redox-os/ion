@@ -99,24 +99,17 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
         _ if cmd.starts_with("export ") => {
             // Split the let expression and ensure that the statement is valid.
             let (keys, op, vals) = assignment_lexer(cmd[7..].trim_start());
-            match vals {
-                Some(vals) => {
+            match (vals, keys, op) {
+                (Some(vals), Some(keys), Some(op)) => {
                     // If the values exist, then the keys and operator also exists.
-                    Ok(Statement::Export(ExportAction::Assign(
-                        keys.unwrap().into(),
-                        op.unwrap(),
-                        vals.into(),
-                    )))
+                    Ok(Statement::Export(ExportAction::Assign(keys.into(), op, vals.into())))
                 }
-                None => {
-                    if keys.is_none() {
-                        Err(ParseError::NoKeySupplied)
-                    } else if op.is_some() {
-                        Err(ParseError::NoValueSupplied)
-                    } else {
-                        Ok(Statement::Export(ExportAction::LocalExport(keys.unwrap().into())))
-                    }
+                (None, Some(keys), None) => {
+                    Ok(Statement::Export(ExportAction::LocalExport(keys.into())))
                 }
+                (None, Some(_), Some(_)) => Err(ParseError::NoValueSupplied),
+                (None, None, _) => Err(ParseError::NoKeySupplied),
+                _ => unreachable!(),
             }
         }
         _ if cmd.starts_with("if ") => Ok(Statement::If {
@@ -178,9 +171,8 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
                     let (value, binding, conditional) = case::parse_case(value)?;
                     let binding = binding.map(Into::into);
                     match value {
-                        Some("_") => (None, binding, conditional),
+                        Some("_") | None => (None, binding, conditional),
                         Some(value) => (Some(value.into()), binding, conditional),
-                        None => (None, binding, conditional),
                     }
                 }
             };

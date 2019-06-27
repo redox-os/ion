@@ -3,7 +3,7 @@ mod tests;
 
 use super::{
     methods::{ArrayMethod, Pattern, StringMethod},
-    Expander, ExpansionError, Result,
+    Expander, Result,
 };
 pub use crate::ranges::{Select, SelectWithSize};
 use crate::{parser::lexers::ArgumentSplitter, types};
@@ -508,7 +508,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 self.read += 1;
                 return value
                     .parse::<Select<types::Str>>()
-                    .map_err(|_| ExpansionError::IndexParsingError(value));
+                    .map_err(|_| super::Error::IndexParsingError(value));
             }
             self.read += 1;
         }
@@ -810,10 +810,10 @@ where
                         let _ = iterator.next();
                         self.read += 1;
                         return Some(Ok(WordToken::Normal(
-                            if !next.map_or(true, |c| [b'$', b'@', b'\\', b'"'].contains(&c)) {
-                                self.data[start..self.read].into()
-                            } else {
+                            if next.map_or(true, |c| [b'$', b'@', b'\\', b'"'].contains(&c)) {
                                 unescape(&self.data[start..self.read])
+                            } else {
+                                self.data[start..self.read].into()
                             },
                             glob,
                             tilde,
@@ -855,11 +855,11 @@ where
                             return Some(Ok(WordToken::Normal(output.into(), glob, tilde)));
                         }
                     }
-                    if self.read != start {
+                    if self.read == start {
+                        return self.next();
+                    } else {
                         let output = &self.data[start..self.read];
                         return Some(Ok(WordToken::Normal(unescape(output), glob, tilde)));
-                    } else {
-                        return self.next();
                     };
                 }
                 b'[' if self.quotes == Quotes::None => {

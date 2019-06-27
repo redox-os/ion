@@ -1,7 +1,11 @@
-use self::binary::{builtins, InteractiveBinary};
+use self::binary::{builtins, InteractiveShell};
 use atty::Stream;
-use ion_shell::{BuiltinMap, IonError, PipelineError, Shell, Value};
+use ion_shell::{BuiltinMap, Shell, Value};
 use liner::KeyBindings;
+use nix::{
+    sys::signal::{self, SigHandler, Signal},
+    unistd,
+};
 use std::{
     io::{stdin, BufReader},
     process,
@@ -125,6 +129,13 @@ fn parse_args() -> CommandLineArgs {
     }
 }
 
+fn set_unique_pid() -> nix::Result<()> {
+    let pgid = unistd::getpid();
+    unistd::setpgid(pgid, pgid)?;
+    unsafe { signal::signal(Signal::SIGTTOU, SigHandler::SigIgn) }?;
+    unistd::tcsetpgrp(nix::libc::STDIN_FILENO, pgid)
+}
+
 fn main() {
     let command_line_args = parse_args();
 
@@ -143,6 +154,12 @@ fn main() {
     let stdin_is_a_tty = atty::is(Stream::Stdin);
     let mut shell = Shell::with_builtins(builtins);
 
+    if stdin_is_a_tty {
+        if let Err(err) = set_unique_pid() {
+            println!("ion: could not bring shell to foreground: {}", err);
+        }
+    }
+
     shell.opts_mut().print_comms = command_line_args.print_commands;
     shell.opts_mut().no_exec = command_line_args.no_execute;
     shell.opts_mut().is_background_shell = !stdin_is_a_tty;
@@ -160,7 +177,7 @@ fn main() {
     } else if let Some(path) = script_path {
         shell.execute_file(path)
     } else if stdin_is_a_tty || command_line_args.interactive {
-        let mut interactive = InteractiveBinary::new(shell);
+        let mut interactive = InteractiveShell::new(shell);
         if let Some(key_bindings) = command_line_args.key_bindings {
             interactive.set_keybindings(key_bindings.0);
         }
@@ -171,17 +188,11 @@ fn main() {
     };
     if let Err(why) = err {
         eprintln!("ion: {}", why);
-        process::exit(
-            if let IonError::PipelineExecutionError(PipelineError::Interrupted(_, signal)) = why {
-                signal
-            } else {
-                1
-            },
-        );
+        process::exit(1);
     }
     if let Err(why) = shell.wait_for_background() {
         eprintln!("ion: {}", why);
-        process::exit(if let PipelineError::Interrupted(_, signal) = why { signal } else { 1 });
+        process::exit(1);
     }
     process::exit(shell.previous_status().as_os_code());
 }

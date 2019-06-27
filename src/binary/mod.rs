@@ -11,10 +11,9 @@ use ion_shell::{
     builtins::{man_pages, Status},
     expansion::Expander,
     parser::Terminator,
-    types, Shell,
+    types, Shell, Signal,
 };
 use itertools::Itertools;
-use libc::SIGHUP;
 use liner::{Buffer, Context, KeyBindings};
 use std::{cell::RefCell, fs::OpenOptions, io, io::Write, path::Path, rc::Rc};
 use xdg::BaseDirectories;
@@ -60,12 +59,12 @@ OPTIONS:
     -duplicates: Do not allow duplicates in history.
 "#;
 
-pub struct InteractiveBinary<'a> {
+pub struct InteractiveShell<'a> {
     context: Rc<RefCell<Context>>,
     shell:   RefCell<Shell<'a>>,
 }
 
-impl<'a> InteractiveBinary<'a> {
+impl<'a> InteractiveShell<'a> {
     const CONFIG_FILE_NAME: &'static str = "initrc";
 
     pub fn new(shell: Shell<'a>) -> Self {
@@ -78,7 +77,7 @@ impl<'a> InteractiveBinary<'a> {
             }
             let _ = context.history.set_file_name_and_load_history(path.as_str());
         }
-        InteractiveBinary { context: Rc::new(RefCell::new(context)), shell: RefCell::new(shell) }
+        InteractiveShell { context: Rc::new(RefCell::new(context)), shell: RefCell::new(shell) }
     }
 
     /// Handles commands given by the REPL, and saves them to history.
@@ -132,7 +131,7 @@ impl<'a> InteractiveBinary<'a> {
             // and waiting for the history thread in the background to finish.
             if shell.opts().huponexit {
                 shell.resume_stopped();
-                shell.background_send(SIGHUP);
+                shell.background_send(Signal::SIGHUP).expect("Failed to prepare for exit");
             }
             context_bis.borrow_mut().history.commit_to_file();
         };
@@ -206,7 +205,7 @@ impl<'a> InteractiveBinary<'a> {
         };
 
         // change the lifetime to allow adding local builtins
-        let InteractiveBinary { context, shell } = self;
+        let InteractiveShell { context, shell } = self;
         let mut shell = shell.into_inner();
         shell
             .builtins_mut()
@@ -217,7 +216,7 @@ impl<'a> InteractiveBinary<'a> {
 
         Self::exec_init_file(&mut shell);
 
-        InteractiveBinary { context, shell: RefCell::new(shell) }.exec(prep_for_exit)
+        InteractiveShell { context, shell: RefCell::new(shell) }.exec(prep_for_exit)
     }
 
     fn exec_init_file(shell: &mut Shell) {

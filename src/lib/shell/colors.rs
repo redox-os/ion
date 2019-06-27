@@ -1,4 +1,4 @@
-use crate::expansion::ExpansionError;
+use crate::expansion;
 use itertools::Itertools;
 use std::fmt;
 
@@ -94,7 +94,7 @@ pub struct Colors {
 impl fmt::Display for Colors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let foreground = self.foreground.as_ref().map(|fg| match fg {
-            Mode::Name(ref string) => (*string).to_owned(),
+            Mode::Name(string) => (*string).to_owned(),
             Mode::Range256(value) => format!("38;5;{}", value),
             Mode::TrueColor(red, green, blue) => format!("38;2;{};{};{}", red, green, blue),
         });
@@ -180,28 +180,28 @@ impl Colors {
     /// `into_string()` method on the newly-created `Colors` structure.
     pub fn collect<T: std::fmt::Display + std::fmt::Debug + std::error::Error>(
         input: &str,
-    ) -> Result<Colors, ExpansionError<T>> {
-        let mut colors = Colors { foreground: None, background: None, attributes: Vec::new() };
+    ) -> expansion::Result<Self, T> {
+        let mut colors = Self { foreground: None, background: None, attributes: Vec::new() };
         for variable in input.split(',') {
             if variable == "reset" {
-                return Ok(Colors { foreground: None, background: None, attributes: vec!["0"] });
-            } else if let Some(attribute) = ATTRIBUTES.get(&variable) {
+                return Ok(Self { foreground: None, background: None, attributes: vec!["0"] });
+            } else if let Some(attribute) = ATTRIBUTES.get(variable) {
                 colors.attributes.push(attribute);
-            } else if let Some(color) = COLORS.get(&variable) {
+            } else if let Some(color) = COLORS.get(variable) {
                 colors.foreground = Some(Mode::Name(color));
-            } else if let Some(color) = BG_COLORS.get(&variable) {
+            } else if let Some(color) = BG_COLORS.get(variable) {
                 colors.background = Some(Mode::Name(color));
             } else {
                 colors
                     .parse_colors(variable)
-                    .map_err(|_| ExpansionError::ColorError(variable.into()))?;
+                    .map_err(|_| expansion::Error::ColorError(variable.into()))?;
             }
         }
         if colors.foreground.is_none()
             && colors.background.is_none()
             && colors.attributes.is_empty()
         {
-            return Err(ExpansionError::EmptyColor);
+            return Err(expansion::Error::EmptyColor);
         }
         Ok(colors)
     }

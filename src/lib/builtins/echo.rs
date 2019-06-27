@@ -86,7 +86,7 @@ pub fn echo(args: &[types::Str], _: &mut Shell<'_>) -> Status {
         let mut first = true;
         for arg in data[1..].iter().map(|x| x.as_bytes()) {
             if spaces && !first {
-                buffer.write_all(&[b' '])?;
+                buffer.write_all(b" ")?;
             }
             first = false;
 
@@ -100,38 +100,38 @@ pub fn echo(args: &[types::Str], _: &mut Shell<'_>) -> Status {
                         }
                         b'\\' => check = true,
                         b'a' if check => {
-                            buffer.write_all(&[7u8])?; // bell
+                            buffer.write_all(&[7])?; // bell
                             check = false;
                         }
                         b'b' if check => {
-                            buffer.write_all(&[8u8])?; // backspace
+                            buffer.write_all(&[8])?; // backspace
                             check = false;
                         }
                         b'c' if check => {
                             return Ok(());
                         }
                         b'e' if check => {
-                            buffer.write_all(&[27u8])?; // escape
+                            buffer.write_all(&[27])?; // escape
                             check = false;
                         }
                         b'f' if check => {
-                            buffer.write_all(&[12u8])?; // form feed
+                            buffer.write_all(&[12])?; // form feed
                             check = false;
                         }
                         b'n' if check => {
-                            buffer.write_all(&[b'\n'])?; // newline
+                            buffer.write_all(b"\n")?; // newline
                             check = false;
                         }
                         b'r' if check => {
-                            buffer.write_all(&[b'\r'])?;
+                            buffer.write_all(b"\r")?;
                             check = false;
                         }
                         b't' if check => {
-                            buffer.write_all(&[b'\t'])?;
+                            buffer.write_all(b"\t")?;
                             check = false;
                         }
                         b'v' if check => {
-                            buffer.write_all(&[11u8])?; // vertical tab
+                            buffer.write_all(&[11])?; // vertical tab
                             check = false;
                         }
                         _ if check => {

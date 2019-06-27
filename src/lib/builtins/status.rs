@@ -33,14 +33,12 @@ pub fn status(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
         0 => {
             for arg in args {
                 match &**arg {
-                    "--help" => (),
                     "--is-login" => login_shell = true,
                     "--is-interactive" => interactive = true,
                     "--current-filename" => filename = true,
                     _ => {
                         if arg.starts_with('-') {
                             match arg.chars().nth(1).unwrap() {
-                                'h' => (),
                                 'l' => login_shell = true,
                                 'i' => interactive = true,
                                 'f' => filename = true,

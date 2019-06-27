@@ -30,7 +30,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 /// Expansion errored
 #[derive(Debug, Error)]
-pub enum ExpansionError<T: fmt::Debug + error::Error + fmt::Display + 'static> {
+pub enum Error<T: fmt::Debug + error::Error + fmt::Display + 'static> {
     /// Error during method expansion
     #[error(display = "{}", _0)]
     MethodError(#[error(cause)] MethodError),
@@ -91,16 +91,16 @@ pub enum ExpansionError<T: fmt::Debug + error::Error + fmt::Display + 'static> {
     NotAMap(String),
 }
 
-impl<T: fmt::Display + fmt::Debug + error::Error> From<TypeError> for ExpansionError<T> {
-    fn from(cause: TypeError) -> Self { ExpansionError::TypeError(cause) }
+impl<T: fmt::Display + fmt::Debug + error::Error> From<TypeError> for Error<T> {
+    fn from(cause: TypeError) -> Self { Error::TypeError(cause) }
 }
 
-impl<T: fmt::Display + fmt::Debug + error::Error> From<MethodError> for ExpansionError<T> {
-    fn from(cause: MethodError) -> Self { ExpansionError::MethodError(cause) }
+impl<T: fmt::Display + fmt::Debug + error::Error> From<MethodError> for Error<T> {
+    fn from(cause: MethodError) -> Self { Error::MethodError(cause) }
 }
 
 /// The result of expansion with a given expander
-pub type Result<T, E> = std::result::Result<T, ExpansionError<E>>;
+pub type Result<T, E> = std::result::Result<T, Error<E>>;
 
 /// Determines whether an input string is expression-like as compared to a
 /// bare word. For example, strings starting with '"', '\'', '@', or '$' are
@@ -175,7 +175,7 @@ pub trait Expander: Sized {
                             for index in keys {
                                 let select = index
                                     .parse::<Select<types::Str>>()
-                                    .map_err(|_| ExpansionError::IndexParsingError(index.into()))?;
+                                    .map_err(|_| Error::IndexParsingError(index.into()))?;
                                 token_buffer.push(WordToken::ArrayVariable(
                                     data,
                                     contains_quote,
@@ -220,7 +220,7 @@ trait ExpanderInternal: Expander {
         selection: &Select<types::Str>,
     ) -> Result<(), Self::Error> {
         self.command(command)
-            .map(|result| Self::slice(current, result.trim_end_matches('\n'), &selection))
+            .map(|result| Self::slice(current, result.trim_end_matches('\n'), selection))
     }
 
     fn expand_brace(
@@ -240,15 +240,15 @@ trait ExpanderInternal: Expander {
                 }
             }
         }
-        if !temp.is_empty() {
+        if temp.is_empty() {
+            current.push_str("{}");
+        } else {
             if !current.is_empty() {
                 tokens.push(BraceToken::Normal(current.clone()));
                 current.clear();
             }
             tokens.push(BraceToken::Expander);
             expanders.push(temp);
-        } else {
-            current.push_str("{}");
         }
         Ok(())
     }
@@ -268,14 +268,13 @@ trait ExpanderInternal: Expander {
             }
             Select::Index(index) => self.array_nth(elements, *index).map(|el| args![el]),
             Select::Range(range) => self.array_range(elements, *range),
-            Select::Key(_) => Err(ExpansionError::OutOfBound),
+            Select::Key(_) => Err(Error::OutOfBound),
         }
     }
 
     fn array_nth(&self, elements: &[&str], index: Index) -> Result<types::Str, Self::Error> {
         let mut i = match index {
-            Index::Forward(n) => n,
-            Index::Backward(n) => n,
+            Index::Forward(n) | Index::Backward(n) => n,
         };
         if let Index::Forward(_) = index {
             for el in elements {
@@ -295,7 +294,7 @@ trait ExpanderInternal: Expander {
                 i -= expanded.len();
             }
         }
-        Err(ExpansionError::OutOfBound)
+        Err(Error::OutOfBound)
     }
 
     fn array_range(&self, elements: &[&str], range: Range) -> Result<Args, Self::Error> {
@@ -306,7 +305,7 @@ trait ExpanderInternal: Expander {
         if let Some((start, length)) = range.bounds(expanded.len()) {
             Ok(expanded.into_iter().skip(start).take(length).collect())
         } else {
-            Err(ExpansionError::OutOfBound)
+            Err(Error::OutOfBound)
         }
     }
 
@@ -360,7 +359,7 @@ trait ExpanderInternal: Expander {
     fn expand_single_array_token(&self, token: &WordToken<'_>) -> Result<Args, Self::Error> {
         match *token {
             WordToken::Array(ref elements, ref index) => {
-                self.array_expand(elements, &index).map_err(Into::into)
+                self.array_expand(elements, index).map_err(Into::into)
             }
             WordToken::ArrayVariable(array, quoted, ref index) => {
                 let array = self.array(array, index)?;
@@ -414,10 +413,10 @@ trait ExpanderInternal: Expander {
             }
             WordToken::Whitespace(text) => output.push_str(text),
             WordToken::Process(command, ref index) => {
-                self.expand_process(&mut output, command, &index)?
+                self.expand_process(&mut output, command, index)?
             }
             WordToken::Variable(text, ref index) => {
-                Self::slice(&mut output, self.string(text)?, &index);
+                Self::slice(&mut output, self.string(text)?, index);
             }
             WordToken::Arithmetic(s) => self.expand_arithmetic(&mut output, s),
             _ => unreachable!(),
@@ -439,14 +438,14 @@ trait ExpanderInternal: Expander {
     ) -> Result<(), Self::Error> {
         let concat: types::Str = match output.rfind(char::is_whitespace) {
             Some(sep) => {
-                if sep != output.len() - 1 {
+                if sep == output.len() - 1 {
+                    text.into()
+                } else {
                     let word_start = sep + 1;
                     let mut t: types::Str = output.split_at(word_start).1.into();
                     t.push_str(text);
                     output.truncate(word_start);
                     t
-                } else {
-                    text.into()
                 }
             }
             None => {
@@ -467,10 +466,8 @@ trait ExpanderInternal: Expander {
             match glob(&expanded) {
                 Ok(var) => {
                     let prev_size = expanded_words.len();
-                    expanded_words.extend(
-                        var.filter_map(std::result::Result::ok)
-                            .map(|path| path.to_string_lossy().as_ref().into()),
-                    );
+                    expanded_words
+                        .extend(var.filter_map(|path| path.ok()?.to_str().map(Into::into)));
                     if expanded_words.len() == prev_size {
                         expanded_words.push(expanded);
                     }
@@ -499,18 +496,19 @@ trait ExpanderInternal: Expander {
         let mut expanders: Vec<Vec<types::Str>> = Vec::new();
 
         for word in token_buffer {
-            match *word {
+            match word {
                 WordToken::Array(ref elements, ref index) => {
                     let _ = write!(
                         &mut output,
                         "{}",
-                        self.array_expand(elements, &index)?.iter().format(" ")
+                        self.array_expand(elements, index)?.iter().format(" ")
                     );
                 }
                 WordToken::ArrayVariable(array, _, ref index) => {
                     let _ = write!(&mut output, "{}", self.array(array, index)?.iter().format(" "));
                 }
-                WordToken::ArrayProcess(command, _, ref index) => {
+                WordToken::ArrayProcess(command, _, ref index)
+                | WordToken::Process(command, ref index) => {
                     self.expand_process(&mut output, command, index)?;
                 }
                 WordToken::ArrayMethod(ref method, _) => {
@@ -527,18 +525,15 @@ trait ExpanderInternal: Expander {
                         &mut output,
                         &mut expanded_words,
                         text.as_ref(),
-                        do_glob && !contains_brace,
-                        tilde,
+                        *do_glob && !contains_brace,
+                        *tilde,
                     )?;
                 }
                 WordToken::Whitespace(text) => {
                     output.push_str(text);
                 }
-                WordToken::Process(command, ref index) => {
-                    self.expand_process(&mut output, command, &index)?;
-                }
                 WordToken::Variable(text, ref index) => {
-                    Self::slice(&mut output, self.string(text)?, &index);
+                    Self::slice(&mut output, self.string(text)?, index);
                 }
                 WordToken::Arithmetic(s) => self.expand_arithmetic(&mut output, s),
             }
@@ -556,7 +551,7 @@ trait ExpanderInternal: Expander {
                     .map(|list| list.iter().map(AsRef::as_ref).collect::<Vec<&str>>())
                     .collect();
                 let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
-                expanded_words.extend(braces::expand(&tokens, &*vector_of_arrays));
+                expanded_words.extend(braces::expand(tokens, &vector_of_arrays));
             }
 
             Ok(expanded_words.into_iter().fold(Args::new(), |mut array, word| {
@@ -597,7 +592,7 @@ trait ExpanderInternal: Expander {
                     if !var.is_empty() {
                         // We have reached the end of a potential variable, so we expand it and push
                         // it onto the result
-                        out.push_str(self.string(&var).as_ref().unwrap_or(var));
+                        out.push_str(self.string(var).as_ref().unwrap_or(var));
                     }
                 };
 
@@ -616,7 +611,7 @@ trait ExpanderInternal: Expander {
 
                 flush(varbuf, intermediate);
 
-                output.push_str(&match calc::eval(&intermediate) {
+                output.push_str(&match calc::eval(intermediate) {
                     Ok(s) => s.to_string(),
                     Err(e) => e.to_string(),
                 });
@@ -651,7 +646,7 @@ pub(crate) mod test {
                 "pkmn2" => Ok("Poke\u{0301}mon".into()),
                 "BAZ" => Ok("  BARBAZ   ".into()),
                 "EMPTY" => Ok("".into()),
-                _ => Err(ExpansionError::VarNotFound),
+                _ => Err(Error::VarNotFound),
             }
         }
 
@@ -662,7 +657,7 @@ pub(crate) mod test {
         ) -> Result<types::Args, Self::Error> {
             match variable {
                 "ARRAY" => Ok(args!["a", "b", "c"].to_owned()),
-                _ => Err(ExpansionError::VarNotFound),
+                _ => Err(Error::VarNotFound),
             }
         }
 
@@ -675,7 +670,7 @@ pub(crate) mod test {
             _name: &str,
             _select: &Select<types::Str>,
         ) -> Result<Args, Self::Error> {
-            Err(ExpansionError::VarNotFound)
+            Err(Error::VarNotFound)
         }
 
         fn map_values<'a>(
@@ -683,7 +678,7 @@ pub(crate) mod test {
             _name: &str,
             _select: &Select<types::Str>,
         ) -> Result<Args, Self::Error> {
-            Err(ExpansionError::VarNotFound)
+            Err(Error::VarNotFound)
         }
     }
 

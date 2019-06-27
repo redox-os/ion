@@ -1,7 +1,7 @@
-use super::{super::Select, MethodArgs, MethodError::*};
+use super::{super::Select, MethodArgs, MethodError};
 use crate::{
     assignments::is_array,
-    expansion::{is_expression, Expander, ExpanderInternal, ExpansionError, Result},
+    expansion::{is_expression, Error, Expander, ExpanderInternal, Result},
     types,
 };
 use regex::Regex;
@@ -11,7 +11,7 @@ use unicode_segmentation::UnicodeSegmentation;
 pub fn unescape(input: &str) -> types::Str {
     let mut check = false;
     // types::Str cannot be created with a capacity of 0 without causing a panic
-    let len = if !input.is_empty() { input.len() } else { 1 };
+    let len = if input.is_empty() { 1 } else { input.len() };
     let mut out = types::Str::with_capacity(len);
     let add_char = |out: &mut types::Str, check: &mut bool, c| {
         out.push(c);
@@ -100,7 +100,7 @@ impl<'a> StringMethod<'a> {
                 let pattern = pattern.join(" ")?;
                 let is_true = match expand.string($variable) {
                     Ok(value) => value.$method(pattern.as_str()),
-                    Err(ExpansionError::VarNotFound) if is_expression($variable) => {
+                    Err(Error::VarNotFound) if is_expression($variable) => {
                         expand.expand_string($variable)?.join(" ").$method(pattern.as_str())
                     }
                     Err(why) => return Err(why),
@@ -118,7 +118,7 @@ impl<'a> StringMethod<'a> {
                             .and_then(|os_str| os_str.to_str())
                             .unwrap_or(value.as_str()),
                     ),
-                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound) if is_expression(variable) => {
                         let word = expand.expand_string(variable)?.join(" ");
                         output.push_str(
                             Path::new(&word)
@@ -136,7 +136,7 @@ impl<'a> StringMethod<'a> {
             ($method:tt) => {{
                 match expand.string(variable) {
                     Ok(value) => output.push_str(value.$method().as_str()),
-                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound) if is_expression(variable) => {
                         let word = expand.expand_string(variable)?.join(" ");
                         output.push_str(word.$method().as_str());
                     }
@@ -149,7 +149,7 @@ impl<'a> StringMethod<'a> {
             () => {{
                 match expand.string(variable) {
                     Ok(value) => value,
-                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound) if is_expression(variable) => {
                         types::Str::from(expand.expand_string(variable)?.join(" "))
                     }
                     Err(why) => return Err(why),
@@ -178,7 +178,10 @@ impl<'a> StringMethod<'a> {
             }
             "repeat" => match pattern.join(" ")?.parse::<usize>() {
                 Ok(repeat) => output.push_str(&get_var!().repeat(repeat)),
-                Err(_) => Err(WrongArgument("repeat", "argument is not a valid positive integer"))?,
+                Err(_) => Err(MethodError::WrongArgument(
+                    "repeat",
+                    "argument is not a valid positive integer",
+                ))?,
             },
             "replace" => {
                 let mut args = pattern.array();
@@ -186,7 +189,7 @@ impl<'a> StringMethod<'a> {
                     (Some(replace), Some(with)) => {
                         output.push_str(&get_var!().replace(replace.as_str(), &with));
                     }
-                    _ => Err(WrongArgument("replace", "two arguments are required"))?,
+                    _ => Err(MethodError::WrongArgument("replace", "two arguments are required"))?,
                 }
             }
             "replacen" => {
@@ -196,10 +199,13 @@ impl<'a> StringMethod<'a> {
                         if let Ok(nth) = nth.parse::<usize>() {
                             output.push_str(&get_var!().replacen(replace.as_str(), &with, nth));
                         } else {
-                            Err(WrongArgument("replacen", "third argument isn't a valid integer"))?
+                            Err(MethodError::WrongArgument(
+                                "replacen",
+                                "third argument isn't a valid integer",
+                            ))?
                         }
                     }
-                    _ => Err(WrongArgument("replacen", "three arguments required"))?,
+                    _ => Err(MethodError::WrongArgument("replacen", "three arguments required"))?,
                 }
             }
             "regex_replace" => {
@@ -207,9 +213,11 @@ impl<'a> StringMethod<'a> {
                 match (args.next(), args.next()) {
                     (Some(replace), Some(with)) => match Regex::new(&replace) {
                         Ok(re) => output.push_str(&re.replace_all(&get_var!(), &with[..])),
-                        Err(why) => Err(InvalidRegex(replace.to_string(), why))?,
+                        Err(why) => Err(MethodError::InvalidRegex(replace.to_string(), why))?,
                     },
-                    _ => Err(WrongArgument("regex_replace", "two arguments required"))?,
+                    _ => {
+                        Err(MethodError::WrongArgument("regex_replace", "two arguments required"))?
+                    }
                 }
             }
             "join" => {
@@ -220,7 +228,7 @@ impl<'a> StringMethod<'a> {
                         array.join(&pattern),
                         &self.selection,
                     ),
-                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound) if is_expression(variable) => {
                         <E as ExpanderInternal>::slice(
                             output,
                             expand.expand_string(variable)?.join(&pattern),
@@ -241,7 +249,7 @@ impl<'a> StringMethod<'a> {
                                 UnicodeSegmentation::graphemes(value.as_str(), true).count();
                             output.push_str(&count.to_string());
                         }
-                        Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                        Err(Error::VarNotFound) if is_expression(variable) => {
                             let word = expand.expand_string(variable)?.join(" ");
                             let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
                             output.push_str(&count.to_string());
@@ -252,7 +260,7 @@ impl<'a> StringMethod<'a> {
             }
             "len_bytes" => match expand.string(variable) {
                 Ok(value) => output.push_str(&value.as_bytes().len().to_string()),
-                Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                Err(Error::VarNotFound) if is_expression(variable) => {
                     let word = expand.expand_string(variable)?.join(" ");
                     output.push_str(&word.as_bytes().len().to_string());
                 }
@@ -263,7 +271,7 @@ impl<'a> StringMethod<'a> {
                     let rev_graphs = UnicodeSegmentation::graphemes(value.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
                 }
-                Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                Err(Error::VarNotFound) if is_expression(variable) => {
                     let word = expand.expand_string(variable)?.join(" ");
                     let rev_graphs = UnicodeSegmentation::graphemes(word.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
@@ -273,17 +281,17 @@ impl<'a> StringMethod<'a> {
             "find" => {
                 let out = match expand.string(variable) {
                     Ok(value) => value.find(pattern.join(" ")?.as_str()),
-                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound) if is_expression(variable) => {
                         expand.expand_string(variable)?.join(" ").find(pattern.join(" ")?.as_str())
                     }
                     Err(why) => return Err(why),
                 };
-                output.push_str(&out.map(|i| i as isize).unwrap_or(-1).to_string());
+                output.push_str(&out.map_or(-1, |i| i as isize).to_string());
             }
             "unescape" => {
                 let out = match expand.string(variable) {
                     Ok(value) => value,
-                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound) if is_expression(variable) => {
                         expand.expand_string(variable)?.join(" ").into()
                     }
                     Err(why) => return Err(why),
@@ -293,7 +301,7 @@ impl<'a> StringMethod<'a> {
             "escape" => {
                 let word = match expand.string(variable) {
                     Ok(value) => value,
-                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound) if is_expression(variable) => {
                         expand.expand_string(variable)?.join(" ").into()
                     }
                     Err(why) => return Err(why),
@@ -303,16 +311,14 @@ impl<'a> StringMethod<'a> {
             "or" => {
                 let first_str = match expand.string(variable) {
                     Ok(value) => value,
-                    Err(ExpansionError::VarNotFound) if is_expression(variable) => expand
+                    Err(Error::VarNotFound) if is_expression(variable) => expand
                         .expand_string(variable)
                         .map(|x| x.join(" ").into())
                         .unwrap_or_default(),
                     Err(why) => return Err(why),
                 };
 
-                if first_str != "" {
-                    output.push_str(&first_str)
-                } else {
+                if first_str.is_empty() {
                     // Note that these commas should probably not be here and that this
                     // is the wrong place to handle this
                     if let Some(elem) = pattern.array().find(|elem| elem != "" && elem != ",") {
@@ -321,14 +327,16 @@ impl<'a> StringMethod<'a> {
                         if elem.ends_with(',') {
                             let comma_pos = elem.rfind(',').unwrap();
                             let (clean, _) = elem.split_at(comma_pos);
-                            output.push_str(&clean);
+                            output.push_str(clean);
                         } else {
                             output.push_str(&elem);
                         }
                     }
+                } else {
+                    output.push_str(&first_str)
                 };
             }
-            _ => Err(ExpansionError::from(InvalidScalarMethod(self.method.to_string())))?,
+            _ => Err(Error::from(MethodError::InvalidScalarMethod(self.method.to_string())))?,
         }
         Ok(())
     }

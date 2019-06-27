@@ -15,6 +15,7 @@ use crate::{
 };
 use err_derive::Error;
 use itertools::Itertools;
+use nix::unistd::Pid;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Condition {
@@ -71,15 +72,16 @@ impl<'a> Shell<'a> {
         };
 
         match block {
-            Statement::Function { ref mut statements, .. } => statements.push(statement),
-            Statement::For { ref mut statements, .. } => statements.push(statement),
-            Statement::While { ref mut statements, .. } => statements.push(statement),
-            Statement::Match { ref mut cases, .. } => match statement {
-                Statement::Case(case) => cases.push(case),
-                _ => {
+            Statement::Function { ref mut statements, .. }
+            | Statement::For { ref mut statements, .. }
+            | Statement::While { ref mut statements, .. } => statements.push(statement),
+            Statement::Match { ref mut cases, .. } => {
+                if let Statement::Case(case) = statement {
+                    cases.push(case)
+                } else {
                     return Err(BlockError::StatementOutsideMatch);
                 }
-            },
+            }
             Statement::Case(ref mut case) => case.statements.push(statement),
             Statement::If {
                 ref mut success,
@@ -154,12 +156,11 @@ impl<'a> Shell<'a> {
                             Self::insert_into_block(block, last_statement)?;
                             // Merge last Case back and pop off Match too
                             let match_stm = block.pop().unwrap();
-                            if !block.is_empty() {
-                                Self::insert_into_block(block, match_stm)?;
-
-                                Ok(None)
-                            } else {
+                            if block.is_empty() {
                                 Ok(Some(match_stm))
+                            } else {
+                                Self::insert_into_block(block, match_stm)?;
+                                Ok(None)
                             }
                         } else {
                             Self::insert_into_block(block, last_statement)?;
@@ -219,22 +220,21 @@ impl<'a> Shell<'a> {
                     Ok(Some(Statement::Time(inner)))
                 }
             }
-            _ => {
-                if !block.is_empty() {
-                    Self::insert_into_block(block, statement)?;
-                    Ok(None)
-                } else {
-                    // Filter out toplevel statements that should produce an error
-                    // otherwise return the statement for immediat execution
-                    match statement {
-                        Statement::ElseIf(_) => Err(BlockError::LoneElseIf),
-                        Statement::Else => Err(BlockError::LoneElse),
-                        Statement::Break => Err(BlockError::UnmatchedBreak),
-                        Statement::Continue => Err(BlockError::UnmatchedContinue),
-                        // Toplevel statement, return to execute immediately
-                        _ => Ok(Some(statement)),
-                    }
+            _ if block.is_empty() => {
+                // Filter out toplevel statements that should produce an error
+                // otherwise return the statement for immediat execution
+                match statement {
+                    Statement::ElseIf(_) => Err(BlockError::LoneElseIf),
+                    Statement::Else => Err(BlockError::LoneElse),
+                    Statement::Break => Err(BlockError::UnmatchedBreak),
+                    Statement::Continue => Err(BlockError::UnmatchedContinue),
+                    // Toplevel statement, return to execute immediately
+                    _ => Ok(Some(statement)),
                 }
+            }
+            _ => {
+                Self::insert_into_block(block, statement)?;
+                Ok(None)
             }
         }
     }
@@ -249,21 +249,21 @@ impl<'a> Shell<'a> {
         failure: &[Statement<'a>],
     ) -> Result {
         // Try execute success branch
-        self.execute_statements(&expression)?;
+        self.execute_statements(expression)?;
         if self.previous_status.is_success() {
-            return self.execute_statements(&success);
+            return self.execute_statements(success);
         }
 
         // Try to execute else_if branches
         for ElseIf { expression, success } in else_if {
-            self.execute_statements(&expression)?;
+            self.execute_statements(expression)?;
 
             if self.previous_status.is_success() {
-                return self.execute_statements(&success);
+                return self.execute_statements(success);
             }
         }
 
-        self.execute_statements(&failure)
+        self.execute_statements(failure)
     }
 
     /// Executes all of the statements within a for block for each value
@@ -298,7 +298,7 @@ impl<'a> Shell<'a> {
             }
             ForValueExpression::Normal(value) => {
                 if &variables[0] != "_" {
-                    self.variables_mut().set(&variables[0], value.clone());
+                    self.variables_mut().set(&variables[0], value);
                 }
 
                 self.execute_statements(statements)?;
@@ -345,13 +345,13 @@ impl<'a> Shell<'a> {
                 self.variables.set("?", self.previous_status);
             }
             Statement::While { expression, statements } => {
-                self.execute_while(&expression, &statements)?;
+                self.execute_while(expression, statements)?;
             }
             Statement::For { variables, values, statements } => {
-                self.execute_for(&variables, &values, &statements)?;
+                self.execute_for(variables, values, statements)?;
             }
             Statement::If { expression, success, else_if, failure, .. } => {
-                let condition = self.execute_if(&expression, &success, &else_if, &failure)?;
+                let condition = self.execute_if(expression, success, else_if, failure)?;
 
                 if condition != Condition::NoOp {
                     return Ok(condition);
@@ -359,7 +359,7 @@ impl<'a> Shell<'a> {
             }
             Statement::Function { name, args, statements, description } => {
                 self.variables.set(
-                    &name,
+                    name,
                     Value::Function(Function::new(
                         description.clone(),
                         name.clone(),
@@ -369,9 +369,9 @@ impl<'a> Shell<'a> {
                 );
             }
             Statement::Pipeline(pipeline) => {
-                let (pipeline, statements) = expand_pipeline(&self, &pipeline)?;
+                let (pipeline, statements) = expand_pipeline(self, pipeline)?;
                 if !pipeline.items.is_empty() {
-                    let status = self.run_pipeline(pipeline)?;
+                    let status = self.run_pipeline(&pipeline)?;
 
                     // Retrieve the exit_status and set the $? variable and
                     // history.previous_status
@@ -431,7 +431,7 @@ impl<'a> Shell<'a> {
             Statement::Break => return Ok(Condition::Break),
             Statement::Continue => return Ok(Condition::Continue),
             Statement::Match { expression, cases } => {
-                let condition = self.execute_match(expression, &cases)?;
+                let condition = self.execute_match(expression, cases)?;
 
                 if condition != Condition::NoOp {
                     return Ok(condition);
@@ -440,8 +440,8 @@ impl<'a> Shell<'a> {
             _ => {}
         }
         if let Some(signal) = signals::SignalHandler.next() {
-            self.handle_signal(signal);
-            Err(IonError::from(PipelineError::Interrupted(0, signal)))
+            self.handle_signal(signal).map_err(PipelineError::KillFailed)?;
+            Err(IonError::from(PipelineError::Interrupted(Pid::this(), signal)))
         } else {
             Ok(Condition::NoOp)
         }
@@ -478,7 +478,7 @@ impl<'a> Shell<'a> {
             if case
                 .value
                 .as_ref()
-                .and_then(|v| self.expand_string(&v).ok())
+                .and_then(|v| self.expand_string(v).ok())
                 .filter(|v| v.iter().all(|v| !value.contains(v)))
                 .is_none()
             {
@@ -492,13 +492,13 @@ impl<'a> Shell<'a> {
                                 None
                             };
                         self.variables_mut().set(
-                            &bind,
+                            bind,
                             value.iter().cloned().map(Value::Str).collect::<Value<Function<'a>>>(),
                         );
                         out
                     } else {
                         let out = self.variables.get_str(bind);
-                        self.variables_mut().set(&bind, value.join(" "));
+                        self.variables_mut().set(bind, value.join(" "));
                         match out {
                             Ok(out) => Some(Value::Str(out)),
                             Err(why) => {
@@ -682,7 +682,7 @@ mod tests {
             assert_eq!(cases.len(), 2);
             assert_eq!(cases.last().unwrap().statements.len(), 1);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -699,7 +699,7 @@ mod tests {
             flow_control.clear();
             assert_eq!(flow_control.len(), 0);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -720,10 +720,7 @@ mod tests {
 
         let errs = vec![Statement::Else, Statement::End, Statement::Break, Statement::Continue];
         for err in errs {
-            let res = Shell::insert_statement(&mut flow_control, err);
-            if res.is_ok() {
-                assert!(false);
-            }
+            assert!(Shell::insert_statement(&mut flow_control, err).is_err());
         }
     }
 }

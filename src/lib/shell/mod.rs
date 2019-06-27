@@ -19,7 +19,6 @@ use self::{
     directory_stack::DirectoryStack,
     flow::BlockError,
     flow_control::{Block, Function, FunctionError, Statement},
-    foreground::ForegroundSignals,
     fork::{Fork, IonResult},
     pipe_exec::foreground,
     variables::Variables,
@@ -32,7 +31,7 @@ pub use self::{
 use crate::{
     assignments::value_check,
     builtins::{BuiltinMap, Status},
-    expansion::{pipelines::Pipeline, ExpansionError},
+    expansion::{self, pipelines::Pipeline},
     parser::{
         lexers::{Key, Primitive},
         ParseError, StatementError, Terminator,
@@ -40,6 +39,7 @@ use crate::{
 };
 use err_derive::Error;
 use itertools::Itertools;
+use nix::sys::signal::{self, SigHandler};
 use std::{
     fs,
     io::{self, Write},
@@ -54,7 +54,7 @@ use std::{
 pub enum IonError {
     /// The fork failed
     #[error(display = "failed to fork: {}", _0)]
-    Fork(#[error(cause)] io::Error),
+    Fork(#[error(cause)] nix::Error),
     /// Failed to setup capturing for function
     #[error(display = "error reading stdout of child: {}", _0)]
     CaptureFailed(#[error(cause)] io::Error),
@@ -95,7 +95,7 @@ pub enum IonError {
     PipelineExecutionError(#[error(cause)] PipelineError),
     /// Could not properly expand to a pipeline
     #[error(display = "expansion error: {}", _0)]
-    ExpansionError(#[error(cause)] ExpansionError<IonError>),
+    ExpansionError(#[error(cause)] expansion::Error<IonError>),
 }
 
 impl From<ParseError> for IonError {
@@ -118,17 +118,17 @@ impl From<PipelineError> for IonError {
     fn from(cause: PipelineError) -> Self { IonError::PipelineExecutionError(cause) }
 }
 
-impl From<io::Error> for IonError {
-    fn from(cause: io::Error) -> Self { IonError::Fork(cause) }
+impl From<nix::Error> for IonError {
+    fn from(cause: nix::Error) -> Self { IonError::Fork(cause) }
 }
 
-impl From<ExpansionError<IonError>> for IonError {
-    fn from(cause: ExpansionError<IonError>) -> Self { IonError::ExpansionError(cause) }
+impl From<expansion::Error<IonError>> for IonError {
+    fn from(cause: expansion::Error<Self>) -> Self { IonError::ExpansionError(cause) }
 }
 
 /// Options for the shell
 #[derive(Debug, Clone, Hash)]
-pub struct ShellOptions {
+pub struct Options {
     /// Exit from the shell on the first error.
     pub err_exit: bool,
     /// Print commands that are to be executed.
@@ -161,7 +161,7 @@ pub struct Shell<'a> {
     /// The job ID of the previous command sent to the background.
     previous_job: usize,
     /// Contains all the options relative to the shell
-    opts: ShellOptions,
+    opts: Options,
     /// Contains information on all of the active background processes that are being managed
     /// by the shell.
     background: Arc<Mutex<Vec<BackgroundProcess>>>,
@@ -169,7 +169,7 @@ pub struct Shell<'a> {
     pub unterminated: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
-    foreground_signals: Arc<ForegroundSignals>,
+    foreground_signals: Arc<foreground::Signals>,
     /// Custom callback for each command call
     on_command: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
 }
@@ -182,27 +182,29 @@ impl<'a> Shell<'a> {
     /// Install signal handlers necessary for the shell to work
     fn install_signal_handler() {
         extern "C" fn handler(signal: i32) {
+            let signal = signal::Signal::from_c_int(signal).unwrap();
             let signal = match signal {
-                libc::SIGINT => signals::SIGINT,
-                libc::SIGHUP => signals::SIGHUP,
-                libc::SIGTERM => signals::SIGTERM,
+                signal::Signal::SIGINT => signals::SIGINT,
+                signal::Signal::SIGHUP => signals::SIGHUP,
+                signal::Signal::SIGTERM => signals::SIGTERM,
                 _ => unreachable!(),
             };
 
             signals::PENDING.store(signal as usize, Ordering::SeqCst);
         }
 
-        let _ = sys::signal(libc::SIGHUP, handler);
-        let _ = sys::signal(libc::SIGINT, handler);
-        let _ = sys::signal(libc::SIGTERM, handler);
-
         extern "C" fn sigpipe_handler(signal: i32) {
             let _ = io::stdout().flush();
             let _ = io::stderr().flush();
-            sys::fork_exit(127 + signal);
+            unsafe { nix::libc::_exit(127 + signal) };
         }
 
-        let _ = sys::signal(libc::SIGPIPE, sigpipe_handler);
+        unsafe {
+            let _ = signal::signal(signal::Signal::SIGHUP, SigHandler::Handler(handler));
+            let _ = signal::signal(signal::Signal::SIGINT, SigHandler::Handler(handler));
+            let _ = signal::signal(signal::Signal::SIGTERM, SigHandler::Handler(handler));
+            let _ = signal::signal(signal::Signal::SIGPIPE, SigHandler::Handler(sigpipe_handler));
+        }
     }
 
     /// Create a new shell with default settings
@@ -223,7 +225,7 @@ impl<'a> Shell<'a> {
             directory_stack: DirectoryStack::new(),
             previous_job: !0,
             previous_status: Status::SUCCESS,
-            opts: ShellOptions {
+            opts: Options {
                 err_exit:            false,
                 print_comms:         false,
                 no_exec:             false,
@@ -231,14 +233,14 @@ impl<'a> Shell<'a> {
                 is_background_shell: true,
             },
             background: Arc::new(Mutex::new(Vec::new())),
-            foreground_signals: Arc::new(ForegroundSignals::new()),
+            foreground_signals: Arc::new(foreground::Signals::new()),
             on_command: None,
             unterminated: false,
         }
     }
 
     /// Access the directory stack
-    pub fn dir_stack(&self) -> &DirectoryStack { &self.directory_stack }
+    pub const fn dir_stack(&self) -> &DirectoryStack { &self.directory_stack }
 
     /// Mutable access to the directory stack
     pub fn dir_stack_mut(&mut self) -> &mut DirectoryStack { &mut self.directory_stack }
@@ -321,7 +323,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub fn run_pipeline(&mut self, pipeline: Pipeline<'a>) -> Result<Status, IonError> {
+    pub fn run_pipeline(&mut self, pipeline: &Pipeline<'a>) -> Result<Status, IonError> {
         let command_start_time = SystemTime::now();
 
         let pipeline = pipeline.expand(self)?;
@@ -336,19 +338,19 @@ impl<'a> Shell<'a> {
         // Branch else if -> input == shell command i.e. echo
         } else if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
             // Run the 'main' of the command and set exit_status
-            if !pipeline.requires_piping() {
-                Ok(main(&pipeline.items[0].job.args, self))
-            } else {
+            if pipeline.requires_piping() {
                 self.execute_pipeline(pipeline).map_err(Into::into)
+            } else {
+                Ok(main(&pipeline.items[0].job.args, self))
             }
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(Value::Function(function)) =
             self.variables.get(&pipeline.items[0].job.args[0]).cloned()
         {
-            if !pipeline.requires_piping() {
-                function.execute(self, &pipeline.items[0].job.args).map(|_| self.previous_status)
-            } else {
+            if pipeline.requires_piping() {
                 self.execute_pipeline(pipeline).map_err(Into::into)
+            } else {
+                function.execute(self, &pipeline.items[0].job.args).map(|_| self.previous_status)
             }
         } else {
             self.execute_pipeline(pipeline).map_err(Into::into)
@@ -401,7 +403,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Get access to the builtins
-    pub fn builtins(&self) -> &BuiltinMap<'a> { &self.builtins }
+    pub const fn builtins(&self) -> &BuiltinMap<'a> { &self.builtins }
 
     /// Get a mutable access to the builtins
     ///
@@ -411,13 +413,13 @@ impl<'a> Shell<'a> {
     pub fn builtins_mut(&mut self) -> &mut BuiltinMap<'a> { &mut self.builtins }
 
     /// Access to the shell options
-    pub fn opts(&self) -> &ShellOptions { &self.opts }
+    pub const fn opts(&self) -> &Options { &self.opts }
 
     /// Mutable access to the shell options
-    pub fn opts_mut(&mut self) -> &mut ShellOptions { &mut self.opts }
+    pub fn opts_mut(&mut self) -> &mut Options { &mut self.opts }
 
     /// Access to the variables
-    pub fn variables(&self) -> &Variables<'a> { &self.variables }
+    pub const fn variables(&self) -> &Variables<'a> { &self.variables }
 
     /// Mutable access to the variables
     pub fn variables_mut(&mut self) -> &mut Variables<'a> { &mut self.variables }
@@ -437,7 +439,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Get the last command's return code and/or the code for the error
-    pub fn previous_status(&self) -> Status { self.previous_status }
+    pub const fn previous_status(&self) -> Status { self.previous_status }
 
     fn assign(&mut self, key: &Key<'_>, value: Value<Function<'a>>) -> Result<(), String> {
         match (&key.kind, &value) {

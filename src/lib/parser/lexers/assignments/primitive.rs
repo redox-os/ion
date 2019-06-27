@@ -28,7 +28,7 @@ pub enum Primitive {
 }
 
 impl Primitive {
-    pub(crate) fn parse(data: &str) -> Option<Primitive> {
+    pub(crate) fn parse(data: &str) -> Option<Self> {
         match data {
             "str" => Some(Primitive::Str),
             "[str]" => Some(Primitive::StrArray),
@@ -45,9 +45,9 @@ impl Primitive {
                 let inner = &data[open_bracket + 1..close_bracket];
 
                 if kind == "hmap" {
-                    Some(Primitive::HashMap(Box::new(Primitive::parse(inner)?)))
+                    Some(Primitive::HashMap(Box::new(Self::parse(inner)?)))
                 } else if kind == "bmap" {
-                    Some(Primitive::BTreeMap(Box::new(Primitive::parse(inner)?)))
+                    Some(Primitive::BTreeMap(Box::new(Self::parse(inner)?)))
                 } else {
                     None
                 }

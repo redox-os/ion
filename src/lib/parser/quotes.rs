@@ -25,7 +25,7 @@ pub struct Terminator<I: Iterator<Item = u8>> {
 }
 
 impl<'a> From<&'a str> for Terminator<std::str::Bytes<'a>> {
-    fn from(string: &'a str) -> Self { Terminator::new(string.bytes()) }
+    fn from(string: &'a str) -> Self { Self::new(string.bytes()) }
 }
 
 #[derive(Clone, Debug)]
@@ -184,8 +184,8 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
     }
 
     /// Create a new reader on the provided input
-    pub fn new(inner: I) -> Terminator<I> {
-        Terminator {
+    pub fn new(inner: I) -> Self {
+        Self {
             inner:      RearPeekable { iter: inner.peekable(), now: None, last: None },
             array:      0,
             skip_next:  false,

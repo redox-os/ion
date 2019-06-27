@@ -36,21 +36,21 @@ OPTIONS
 
 EXAMPLES
     Test if the file exists:
-        exists -f FILE && echo "The FILE exists" || echo "The FILE does not exist"
+        exists -f FILE && echo 'The FILE exists' || echo 'The FILE does not exist'
 
     Test if some-command exists in the path and is executable:
-        exists -b some-command && echo "some-command exists" || echo "some-command does not exist"
+        exists -b some-command && echo 'some-command exists' || echo 'some-command does not exist'
 
     Test if variable exists AND is not empty
-        exists -s myVar && echo "myVar exists: $myVar" || echo "myVar does not exist or is empty"
+        exists -s myVar && echo "myVar exists: $myVar" || echo 'myVar does not exist or is empty'
         NOTE: Don't use the '$' sigil, but only the name of the variable to check
 
     Test if array exists and is not empty
-        exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
+        exists -a myArr && echo "myArr exists: @myArr" || echo 'myArr does not exist or is empty'
         NOTE: Don't use the '@' sigil, but only the name of the array to check
 
     Test if a function named 'myFunc' exists
-        exists --fn myFunc && myFunc || echo "No function with name myFunc found"
+        exists --fn myFunc && myFunc || echo 'No function with name myFunc found'
 
 AUTHOR
     Written by Fabian Würfl.
@@ -99,21 +99,21 @@ OPTIONS
 
 EXAMPLES
     Test if the file exists:
-        exists -f FILE && echo "The FILE exists" || echo "The FILE does not exist"
+        exists -f FILE && echo 'The FILE exists' || echo 'The FILE does not exist'
 
     Test if some-command exists in the path and is executable:
-        exists -b some-command && echo "some-command exists" || echo "some-command does not exist"
+        exists -b some-command && echo 'some-command exists' || echo 'some-command does not exist'
 
     Test if variable exists AND is not empty
-        exists -s myVar && echo "myVar exists: $myVar" || echo "myVar does not exist or is empty"
+        exists -s myVar && echo "myVar exists: $myVar" || echo 'myVar does not exist or is empty'
         NOTE: Don't use the '$' sigil, but only the name of the variable to check
 
     Test if array exists and is not empty
-        exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
+        exists -a myArr && echo "myArr exists: @myArr" || echo 'myArr does not exist or is empty'
         NOTE: Don't use the '@' sigil, but only the name of the array to check
 
     Test if a function named 'myFunc' exists
-        exists --fn myFunc && myFunc || echo "No function with name myFunc found"
+        exists --fn myFunc && myFunc || echo 'No function with name myFunc found'
 
 AUTHOR
     Written by Fabian Würfl.
