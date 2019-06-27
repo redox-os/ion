@@ -36,7 +36,7 @@ use std::fmt;
 /// ```rust,ignore
 /// Case { value: None, ... }
 /// ```
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct Case<'a> {
     /// The value to match with
     pub value: Option<String>,

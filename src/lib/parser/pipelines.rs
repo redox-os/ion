@@ -12,7 +12,7 @@ use crate::{
 const ARG_DEFAULT_SIZE: usize = 10;
 
 /// An error produced during pipeline parsing
-#[derive(Debug, Error)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Error)]
 pub enum PipelineParsingError {
     // redirections
     /// No file was provided after the redirection output

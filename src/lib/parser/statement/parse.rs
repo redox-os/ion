@@ -1,19 +1,14 @@
 use super::{
     super::pipelines,
-    case,
     functions::{collect_arguments, parse_function},
+    ParseError,
 };
 use crate::{
     builtins::BuiltinMap,
-    parser::{
-        lexers::{assignment_lexer, ArgumentSplitter},
-        pipelines::PipelineParsingError,
-        statement::{case::CaseError, functions::FunctionParseError},
-    },
+    parser::lexers::{assignment_lexer, ArgumentSplitter},
     shell::flow_control::{Case, ElseIf, ExportAction, IfMode, LocalAction, Statement},
     types,
 };
-use err_derive::Error;
 use std::char;
 
 /// Check if the given name is valid for functions, aliases & variables
@@ -21,54 +16,6 @@ pub fn is_valid_name(name: &str) -> bool {
     let mut chars = name.chars();
     chars.next().map_or(false, |b| char::is_alphabetic(b) || b == '_')
         && chars.all(|b| b.is_alphanumeric() || b == '_')
-}
-
-/// An Error occured during parsing
-#[derive(Debug, Error)]
-pub enum ParseError {
-    /// The blocks were in a wrong order
-    #[error(display = "incomplete control flow statement")]
-    IncompleteFlowControl,
-    /// No keys were supplied for assignment
-    #[error(display = "no key supplied for assignment")]
-    NoKeySupplied,
-    /// No operator was supplied for assignment
-    #[error(display = "no operator supplied for assignment")]
-    NoOperatorSupplied,
-    /// No value supplied for assignment
-    #[error(display = "no values supplied for assignment")]
-    NoValueSupplied,
-    /// No value given for iteration in a for loop
-    #[error(display = "no value supplied for iteration in for loop")]
-    NoInKeyword,
-    /// Error with match statements
-    #[error(display = "case error: {}", _0)]
-    CaseError(#[error(cause)] CaseError),
-    /// The provided function name was invalid
-    #[error(
-        display = "'{}' is not a valid function name
-        Function names may only contain alphanumeric characters",
-        _0
-    )]
-    InvalidFunctionName(String),
-    /// The arguments did not match the function's signature
-    #[error(display = "function argument error: {}", _0)]
-    InvalidFunctionArgument(#[error(cause)] FunctionParseError),
-    /// Error occured during parsing of a pipeline
-    #[error(display = "{}", _0)]
-    PipelineParsingError(#[error(cause)] PipelineParsingError),
-}
-
-impl From<FunctionParseError> for ParseError {
-    fn from(cause: FunctionParseError) -> Self { ParseError::InvalidFunctionArgument(cause) }
-}
-
-impl From<CaseError> for ParseError {
-    fn from(cause: CaseError) -> Self { ParseError::CaseError(cause) }
-}
-
-impl From<PipelineParsingError> for ParseError {
-    fn from(cause: PipelineParsingError) -> Self { ParseError::PipelineParsingError(cause) }
 }
 
 pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
@@ -139,45 +86,22 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
             })
         }
         _ if cmd.starts_with("for ") => {
-            let mut cmd = cmd[4..].trim_start();
-            let mut variables = None;
+            let cmd = cmd[4..].trim_start();
+            let mut parts = cmd.splitn(2, " in ");
+            let variables = parts.next().unwrap().split_whitespace().map(Into::into).collect();
+            let cmd = parts.next();
 
-            if cmd.len() > 5 {
-                let cmdb = cmd.as_bytes();
-                for start in 0..cmd.len() - 4 {
-                    if &cmdb[start..start + 4] == b" in " {
-                        variables = Some(cmd[..start].split_whitespace().map(Into::into).collect());
-
-                        cmd = cmd[start + 3..].trim();
-
-                        break;
-                    }
-                }
-            }
-
-            match variables {
-                Some(variables) => Ok(Statement::For {
+            match cmd {
+                Some(cmd) => Ok(Statement::For {
                     variables,
-                    values: ArgumentSplitter::new(cmd).map(types::Str::from).collect(),
+                    values: ArgumentSplitter::new(cmd.trim()).map(types::Str::from).collect(),
                     statements: Vec::new(),
                 }),
                 None => Err(ParseError::NoInKeyword),
             }
         }
         _ if cmd.starts_with("case ") => {
-            let (value, binding, conditional) = match cmd[5..].trim_start() {
-                "_" => (None, None, None),
-                value => {
-                    let (value, binding, conditional) = case::parse_case(value)?;
-                    let binding = binding.map(Into::into);
-                    match value {
-                        Some("_") | None => (None, binding, conditional),
-                        Some(value) => (Some(value.into()), binding, conditional),
-                    }
-                }
-            };
-
-            Ok(Statement::Case(Case { value, binding, conditional, statements: Vec::new() }))
+            Ok(Statement::Case(cmd[5..].trim_start().parse::<Case>()?))
         }
         _ if cmd.starts_with("match ") => Ok(Statement::Match {
             expression: cmd[6..].trim_start().into(),
@@ -331,8 +255,8 @@ mod tests {
         let correct_parse = Statement::Function {
             description: None,
             name:        "bob".into(),
-            args:        Default::default(),
-            statements:  Default::default(),
+            args:        Vec::default(),
+            statements:  Vec::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -353,7 +277,7 @@ mod tests {
                 KeyBuf { name: "a".into(), kind: Primitive::Str },
                 KeyBuf { name: "b".into(), kind: Primitive::Str },
             ],
-            statements:  Default::default(),
+            statements:  Vec::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 

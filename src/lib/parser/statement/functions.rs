@@ -2,7 +2,7 @@ use super::split_pattern;
 use crate::parser::lexers::assignments::{KeyBuf, KeyIterator, TypeError};
 use err_derive::Error;
 
-#[derive(Debug, PartialEq, Error)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Error)]
 pub enum FunctionParseError {
     #[error(display = "repeated argument name: '{}'", _0)]
     RepeatedArgument(String),

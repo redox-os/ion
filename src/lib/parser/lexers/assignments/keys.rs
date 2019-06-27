@@ -22,7 +22,7 @@ pub struct KeyBuf {
 }
 
 /// Failed to parse the literal as a variable corresponding to key
-#[derive(Debug, PartialEq, Error, Eq)]
+#[derive(Debug, PartialEq, Error, Eq, Hash, Clone)]
 pub enum TypeError {
     /// The value supplied is invalid
     #[error(display = "invalid type supplied: {}", _0)]

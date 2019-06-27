@@ -1,3 +1,9 @@
+//! Take a Read instance and output statements
+//!
+//! The `Terminator` takes input data and creates string with the good size
+//! The `StatementSplitter` than takes the data and produces statements, with the help of
+//! `parse_and_validate`
+
 /// The terminal tokens associated with the parsing process
 pub mod lexers;
 /// Parse the pipelines to a Pipeline struct
@@ -7,7 +13,7 @@ mod statement;
 
 pub use self::{
     quotes::Terminator,
-    statement::{is_valid_name, parse_and_validate, ParseError, StatementError, StatementSplitter},
+    statement::{is_valid_name, parse_and_validate, ParseError, StatementSplitter},
 };
 
 #[cfg(fuzzing)]

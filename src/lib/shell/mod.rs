@@ -34,7 +34,7 @@ use crate::{
     expansion::{self, pipelines::Pipeline},
     parser::{
         lexers::{Key, Primitive},
-        ParseError, StatementError, Terminator,
+        ParseError, Terminator,
     },
 };
 use err_derive::Error;
@@ -50,22 +50,18 @@ use std::{
 /// Errors from execution
 #[derive(Debug, Error)]
 pub enum IonError {
-    /// Function execution error
-    #[error(display = "function error: {}", _0)]
-    Function(#[error(cause)] FunctionError),
-
+    // Parse-time error
     /// Parsing failed
     #[error(display = "syntax error: {}", _0)]
     InvalidSyntax(#[error(cause)] ParseError),
-
     /// Incorrect order of blocks
     #[error(display = "block error: {}", _0)]
     StatementFlowError(#[error(cause)] BlockError),
 
-    /// Unterminated statement
-    #[error(display = "statement error: {}", _0)]
-    UnterminatedStatementError(#[error(cause)] StatementError),
-
+    // Run time errors
+    /// Function execution error
+    #[error(display = "function error: {}", _0)]
+    Function(#[error(cause)] FunctionError),
     /// Failed to run a pipeline
     #[error(display = "pipeline execution error: {}", _0)]
     PipelineExecutionError(#[error(cause)] PipelineError),
@@ -76,10 +72,6 @@ pub enum IonError {
 
 impl From<ParseError> for IonError {
     fn from(cause: ParseError) -> Self { IonError::InvalidSyntax(cause) }
-}
-
-impl From<StatementError> for IonError {
-    fn from(cause: StatementError) -> Self { IonError::UnterminatedStatementError(cause) }
 }
 
 impl From<FunctionError> for IonError {
