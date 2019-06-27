@@ -79,6 +79,8 @@ pub mod expansion;
 mod memory;
 mod shell;
 
+pub use nix::sys::signal::Signal;
+
 pub(crate) use self::memory::IonPool;
 pub use crate::{
     builtins::{BuiltinFunction, BuiltinMap},

@@ -1,6 +1,6 @@
 use self::binary::{builtins, InteractiveShell};
 use atty::Stream;
-use ion_shell::{BuiltinMap, IonError, PipelineError, Shell, Value};
+use ion_shell::{BuiltinMap, Shell, Value};
 use liner::KeyBindings;
 use std::{
     io::{self, stdin, BufReader},
@@ -187,17 +187,11 @@ fn main() {
     };
     if let Err(why) = err {
         eprintln!("ion: {}", why);
-        process::exit(
-            if let IonError::PipelineExecutionError(PipelineError::Interrupted(_, signal)) = why {
-                signal
-            } else {
-                1
-            },
-        );
+        process::exit(1);
     }
     if let Err(why) = shell.wait_for_background() {
         eprintln!("ion: {}", why);
-        process::exit(if let PipelineError::Interrupted(_, signal) = why { signal } else { 1 });
+        process::exit(1);
     }
     process::exit(shell.previous_status().as_os_code());
 }

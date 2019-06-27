@@ -1,5 +1,7 @@
 //! Contains the logic for enabling foreground management.
 
+use nix::unistd::Pid;
+
 // use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -24,7 +26,9 @@ pub struct Signals {
 }
 
 impl Signals {
-    pub fn was_grabbed(&self, pid: u32) -> bool { self.grab.load(Ordering::SeqCst) as u32 == pid }
+    pub fn was_grabbed(&self, pid: Pid) -> bool {
+        self.grab.load(Ordering::SeqCst) == pid.as_raw() as usize
+    }
 
     pub fn was_processed(&self) -> Option<BackgroundResult> {
         let reply = self.reply.load(Ordering::SeqCst) as u8;
@@ -43,13 +47,15 @@ impl Signals {
         self.reply.store(ERRORED as usize, Ordering::SeqCst);
     }
 
-    pub fn reply_with(&self, status: i8) {
+    pub fn reply_with(&self, status: i32) {
         self.grab.store(0, Ordering::SeqCst);
         self.status.store(status as usize, Ordering::SeqCst);
         self.reply.store(REPLIED as usize, Ordering::SeqCst);
     }
 
-    pub fn signal_to_grab(&self, pid: u32) { self.grab.store(pid as usize, Ordering::SeqCst); }
+    pub fn signal_to_grab(&self, pid: Pid) {
+        self.grab.store(pid.as_raw() as usize, Ordering::SeqCst);
+    }
 
     pub const fn new() -> Self {
         Self {

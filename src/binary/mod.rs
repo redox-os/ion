@@ -11,10 +11,9 @@ use ion_shell::{
     builtins::{man_pages, Status},
     expansion::Expander,
     parser::Terminator,
-    types, Shell,
+    types, Shell, Signal,
 };
 use itertools::Itertools;
-use libc::SIGHUP;
 use liner::{Buffer, Context, KeyBindings};
 use std::{cell::RefCell, fs::OpenOptions, io, path::Path, rc::Rc};
 use xdg::BaseDirectories;
@@ -123,7 +122,7 @@ impl<'a> InteractiveShell<'a> {
             // and waiting for the history thread in the background to finish.
             if shell.opts().huponexit {
                 shell.resume_stopped();
-                shell.background_send(SIGHUP);
+                shell.background_send(Signal::SIGHUP).expect("Failed to prepare for exit");
             }
             context_bis.borrow_mut().history.commit_to_file();
         };

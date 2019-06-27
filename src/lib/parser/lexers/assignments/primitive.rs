@@ -28,7 +28,7 @@ pub enum Primitive {
 }
 
 impl Primitive {
-    pub(crate) fn parse(data: &str) -> Option<Primitive> {
+    pub(crate) fn parse(data: &str) -> Option<Self> {
         match data {
             "str" => Some(Primitive::Str),
             "[str]" => Some(Primitive::StrArray),

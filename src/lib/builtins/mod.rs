@@ -35,7 +35,7 @@ pub use self::{
 };
 use crate as ion_shell;
 use crate::{
-    shell::{sys, Capture, Shell, Value},
+    shell::{Capture, Shell, Value},
     types,
 };
 use builtins_proc::builtin;
@@ -806,13 +806,7 @@ pub fn isatty(args: &[types::Str], _: &mut Shell<'_>) -> Status {
         let pid = args[1].parse::<i32>();
 
         match pid {
-            Ok(r) => {
-                if sys::isatty(r) {
-                    Status::TRUE
-                } else {
-                    Status::FALSE
-                }
-            }
+            Ok(r) => nix::unistd::isatty(r).unwrap().into(),
             Err(_) => Status::error("ion: isatty given bad number"),
         }
     } else {

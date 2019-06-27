@@ -1,22 +1,22 @@
 use super::{
     super::{signals, Shell},
     foreground::{BackgroundResult, Signals},
-    sys::{
-        self, kill, strerror, waitpid, wcoredump, wexitstatus, wifcontinued, wifexited,
-        wifsignaled, wifstopped, wstopsig, wtermsig,
-    },
     PipelineError,
 };
 use crate::builtins::Status;
-use libc::{ECHILD, SIGINT, SIGPIPE, WCONTINUED, WNOHANG, WUNTRACED};
+use nix::{
+    sys::{
+        signal::{self, Signal},
+        wait::{self, WaitPidFlag, WaitStatus},
+    },
+    unistd::{self, Pid},
+};
 use std::{
-    fmt, process,
+    fmt,
     sync::Mutex,
     thread::{sleep, spawn},
     time::Duration,
 };
-
-const OPTS: i32 = WUNTRACED | WCONTINUED | WNOHANG;
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq)]
 /// Defines whether the background process is running or stopped.
@@ -43,19 +43,19 @@ impl fmt::Display for ProcessState {
 /// process is executing. Note that it is necessary to check if the process exists with the exists
 /// method.
 pub struct BackgroundProcess {
-    pid:           u32,
+    pid:           Pid,
     ignore_sighup: bool,
     state:         ProcessState,
     name:          String,
 }
 
 impl BackgroundProcess {
-    pub(super) const fn new(pid: u32, state: ProcessState, name: String) -> Self {
+    pub(super) const fn new(pid: Pid, state: ProcessState, name: String) -> Self {
         Self { pid, ignore_sighup: false, state, name }
     }
 
     /// Get the pid associated with the job
-    pub const fn pid(&self) -> u32 { self.pid }
+    pub const fn pid(&self) -> Pid { self.pid }
 
     /// Check if the process is still running
     pub fn is_running(&self) -> bool { self.state == ProcessState::Running }
@@ -82,12 +82,12 @@ impl fmt::Display for BackgroundProcess {
 impl<'a> Shell<'a> {
     /// If a SIGTERM is received, a SIGTERM will be sent to all background processes
     /// before the shell terminates itself.
-    pub fn handle_signal(&self, signal: i32) -> bool {
-        if signal == libc::SIGTERM || signal == libc::SIGHUP {
-            self.background_send(signal);
-            true
+    pub fn handle_signal(&self, signal: Signal) -> nix::Result<bool> {
+        if signal == Signal::SIGTERM || signal == Signal::SIGHUP {
+            self.background_send(signal)?;
+            Ok(true)
         } else {
-            false
+            Ok(false)
         }
     }
 
@@ -106,7 +106,7 @@ impl<'a> Shell<'a> {
     fn watch_background(
         fg: &Signals,
         processes: &Mutex<Vec<BackgroundProcess>>,
-        pgid: u32,
+        pgid: Pid,
         njob: usize,
     ) {
         let mut exit_status = 0;
@@ -121,17 +121,19 @@ impl<'a> Shell<'a> {
 
         loop {
             let fg_was_grabbed = fg.was_grabbed(pgid);
-            let mut status = 0;
-            match waitpid(-(pgid as i32), &mut status, OPTS) {
-                Err(errno) if errno == ECHILD => {
+            let mut opts = WaitPidFlag::WUNTRACED;
+            opts.insert(WaitPidFlag::WCONTINUED);
+            opts.insert(WaitPidFlag::WNOHANG);
+            match wait::waitpid(Pid::from_raw(-pgid.as_raw()), Some(opts)) {
+                Err(nix::Error::Sys(nix::errno::Errno::ECHILD)) => {
                     if !fg_was_grabbed {
-                        eprintln!("ion: ([{}] {}) exited with {}", njob, pgid, status);
+                        eprintln!("ion: ([{}] {}) exited with {}", njob, pgid, exit_status);
                     }
 
                     get_process!(|process| {
                         process.forget();
                         if fg_was_grabbed {
-                            fg.reply_with(exit_status as i8);
+                            fg.reply_with(exit_status);
                         }
                     });
 
@@ -149,21 +151,20 @@ impl<'a> Shell<'a> {
 
                     break;
                 }
-                Ok(0) => (),
-                Ok(_) if wifexited(status) => exit_status = wexitstatus(status),
-                Ok(_) if wifstopped(status) => {
+                Ok(WaitStatus::Exited(_, status)) => exit_status = status,
+                Ok(WaitStatus::Stopped(..)) => {
                     if !fg_was_grabbed {
                         eprintln!("ion: ([{}] {}) Stopped", njob, pgid);
                     }
 
                     get_process!(|process| {
                         if fg_was_grabbed {
-                            fg.reply_with(Status::TERMINATED.as_os_code() as i8);
+                            fg.reply_with(Status::TERMINATED.as_os_code());
                         }
                         process.state = ProcessState::Stopped;
                     });
                 }
-                Ok(_) if wifcontinued(status) => {
+                Ok(WaitStatus::Continued(_)) => {
                     if !fg_was_grabbed {
                         eprintln!("ion: ([{}] {}) Running", njob, pgid);
                     }
@@ -196,12 +197,15 @@ impl<'a> Shell<'a> {
     }
 
     /// Send a kill signal to all running background tasks.
-    pub fn background_send(&self, signal: i32) {
+    pub fn background_send(&self, signal: Signal) -> nix::Result<()> {
         let filter: fn(&&BackgroundProcess) -> bool =
-            if signal == libc::SIGHUP { |p| !p.ignore_sighup } else { |p| p.is_running() };
-        self.background_jobs().iter().filter(filter).for_each(|p| {
-            let _ = sys::killpg(p.pid(), signal);
-        })
+            if signal == Signal::SIGHUP { |p| !p.ignore_sighup } else { |p| p.is_running() };
+        self.background_jobs()
+            .iter()
+            .filter(filter)
+            .map(|p| signal::killpg(p.pid(), signal))
+            .find(Result::is_err)
+            .unwrap_or_else(|| Ok(()))
     }
 
     /// Resumes all stopped background jobs
@@ -212,48 +216,44 @@ impl<'a> Shell<'a> {
     }
 
     /// Wait for the job in foreground
-    pub fn watch_foreground(&mut self, pgid: u32) -> Result<Status, PipelineError> {
+    pub fn watch_foreground(&mut self, group: Pid) -> Result<Status, PipelineError> {
         let mut signaled = None;
         let mut exit_status = Status::SUCCESS;
 
         loop {
-            let mut status = 0;
-            match waitpid(-(pgid as i32), &mut status, WUNTRACED) {
-                Err(errno) => match errno {
-                    ECHILD => {
+            match wait::waitpid(Pid::from_raw(-group.as_raw()), Some(WaitPidFlag::WUNTRACED)) {
+                Err(err) => match err {
+                    nix::Error::Sys(nix::errno::Errno::ECHILD) => {
                         if let Some(signal) = signaled {
                             break Err(signal);
                         } else {
                             break Ok(exit_status);
                         }
                     }
-                    errno => break Err(PipelineError::WaitPid(strerror(errno))),
+                    err => break Err(PipelineError::WaitPid(err)),
                 },
-                Ok(0) => (),
-                Ok(_) if wifexited(status) => {
-                    exit_status = Status::from_exit_code(wexitstatus(status))
-                }
-                Ok(pid) if wifsignaled(status) => {
-                    let signal = wtermsig(status);
-                    if signal == SIGPIPE {
-                    } else if wcoredump(status) {
-                        signaled = Some(PipelineError::CoreDump(pid as u32));
+                Ok(WaitStatus::Exited(_, status)) => exit_status = Status::from_exit_code(status),
+                Ok(WaitStatus::Signaled(pid, signal, core_dumped)) => {
+                    if signal == signal::Signal::SIGPIPE {
+                    } else if core_dumped {
+                        signaled = Some(PipelineError::CoreDump(pid));
                     } else {
-                        if signal == SIGINT {
-                            let _ = kill(pid as u32, signal as i32);
+                        if signal == Signal::SIGINT {
+                            signal::kill(pid, signal)
                         } else {
-                            self.handle_signal(signal);
+                            self.handle_signal(signal).map(|_| ())
                         }
-                        signaled = Some(PipelineError::Interrupted(pid as u32, signal));
+                        .map_err(PipelineError::KillFailed)?;
+                        signaled = Some(PipelineError::Interrupted(pid, signal));
                     }
                 }
-                Ok(pid) if wifstopped(status) => {
+                Ok(WaitStatus::Stopped(pid, signal)) => {
                     self.send_to_background(BackgroundProcess::new(
-                        pid.abs() as u32,
+                        pid,
                         ProcessState::Stopped,
                         "".to_string(),
                     ));
-                    break Err(PipelineError::Interrupted(pid as u32, wstopsig(status)));
+                    break Err(PipelineError::Interrupted(pid, signal));
                 }
                 Ok(_) => (),
             }
@@ -264,8 +264,8 @@ impl<'a> Shell<'a> {
     /// event that a signal is sent to kill the running tasks.
     pub fn wait_for_background(&mut self) -> Result<(), PipelineError> {
         while let Some(p) = { self.background_jobs().iter().find(|p| p.is_running()) } {
-            if let Some(signal) = signals::SignalHandler.find(|&s| s != libc::SIGTSTP) {
-                self.background_send(signal);
+            if let Some(signal) = signals::SignalHandler.find(|&s| s != Signal::SIGTSTP) {
+                self.background_send(signal).map_err(PipelineError::KillFailed)?;
                 return Err(PipelineError::Interrupted(p.pid(), signal));
             }
             sleep(Duration::from_millis(100));
@@ -275,16 +275,16 @@ impl<'a> Shell<'a> {
 
     /// When given a process ID, that process's group will be assigned as the
     /// foreground process group.
-    fn set_foreground_as(pid: u32) {
+    fn set_foreground_as(pid: Pid) {
         signals::block();
-        let _ = sys::tcsetpgrp(0, pid);
+        unistd::tcsetpgrp(0, pid).unwrap();
         signals::unblock();
     }
 
     /// Takes a background tasks's PID and whether or not it needs to be continued; resumes the
     /// task and sets it as the foreground process. Once the task exits or stops, the exit status
     /// will be returned, and ownership of the TTY given back to the shell.
-    pub fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> Status {
+    pub fn set_bg_task_in_foreground(&self, pid: Pid, cont: bool) -> Status {
         // Pass the TTY to the background job
         Self::set_foreground_as(pid);
         // Signal the background thread that is waiting on this process to stop waiting.
@@ -305,7 +305,7 @@ impl<'a> Shell<'a> {
             }
         };
         // Have the shell reclaim the TTY
-        Self::set_foreground_as(process::id());
+        Self::set_foreground_as(Pid::this());
         status
     }
 }

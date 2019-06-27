@@ -39,6 +39,7 @@ use crate::{
 };
 use err_derive::Error;
 use itertools::Itertools;
+use nix::sys::signal::{self, SigHandler};
 use std::{
     fs,
     io::{self, Write},
@@ -53,7 +54,7 @@ use std::{
 pub enum IonError {
     /// The fork failed
     #[error(display = "failed to fork: {}", _0)]
-    Fork(#[error(cause)] io::Error),
+    Fork(#[error(cause)] nix::Error),
     /// Failed to setup capturing for function
     #[error(display = "error reading stdout of child: {}", _0)]
     CaptureFailed(#[error(cause)] io::Error),
@@ -117,8 +118,8 @@ impl From<PipelineError> for IonError {
     fn from(cause: PipelineError) -> Self { IonError::PipelineExecutionError(cause) }
 }
 
-impl From<io::Error> for IonError {
-    fn from(cause: io::Error) -> Self { IonError::Fork(cause) }
+impl From<nix::Error> for IonError {
+    fn from(cause: nix::Error) -> Self { IonError::Fork(cause) }
 }
 
 impl From<expansion::Error<IonError>> for IonError {
@@ -181,10 +182,11 @@ impl<'a> Shell<'a> {
     /// Install signal handlers necessary for the shell to work
     fn install_signal_handler() {
         extern "C" fn handler(signal: i32) {
+            let signal = signal::Signal::from_c_int(signal).unwrap();
             let signal = match signal {
-                libc::SIGINT => signals::SIGINT,
-                libc::SIGHUP => signals::SIGHUP,
-                libc::SIGTERM => signals::SIGTERM,
+                signal::Signal::SIGINT => signals::SIGINT,
+                signal::Signal::SIGHUP => signals::SIGHUP,
+                signal::Signal::SIGTERM => signals::SIGTERM,
                 _ => unreachable!(),
             };
 
@@ -194,13 +196,15 @@ impl<'a> Shell<'a> {
         extern "C" fn sigpipe_handler(signal: i32) {
             let _ = io::stdout().flush();
             let _ = io::stderr().flush();
-            sys::fork_exit(127 + signal);
+            unsafe { nix::libc::_exit(127 + signal) };
         }
 
-        let _ = sys::signal(libc::SIGHUP, handler);
-        let _ = sys::signal(libc::SIGINT, handler);
-        let _ = sys::signal(libc::SIGTERM, handler);
-        let _ = sys::signal(libc::SIGPIPE, sigpipe_handler);
+        unsafe {
+            let _ = signal::signal(signal::Signal::SIGHUP, SigHandler::Handler(handler));
+            let _ = signal::signal(signal::Signal::SIGINT, SigHandler::Handler(handler));
+            let _ = signal::signal(signal::Signal::SIGTERM, SigHandler::Handler(handler));
+            let _ = signal::signal(signal::Signal::SIGPIPE, SigHandler::Handler(sigpipe_handler));
+        }
     }
 
     /// Create a new shell with default settings

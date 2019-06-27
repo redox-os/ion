@@ -1,12 +1,10 @@
 use super::{colors::Colors, flow_control::Function};
 use crate::{
     expansion,
-    shell::{
-        sys::{geteuid, getpid, getuid, variables as self_sys},
-        IonError,
-    },
+    shell::IonError,
     types::{self, Array},
 };
+use nix::unistd::{geteuid, gethostname, getpid, getuid};
 use scopes::{Namespace, Scope, Scopes};
 use std::env;
 use types_rs::array;
@@ -245,9 +243,9 @@ impl<'a> Default for Variables<'a> {
         );
 
         // Set the PID, UID, and EUID variables.
-        map.set("PID", Value::Str(getpid().ok().map_or("?".into(), |id| id.to_string().into())));
-        map.set("UID", Value::Str(getuid().ok().map_or("?".into(), |id| id.to_string().into())));
-        map.set("EUID", Value::Str(geteuid().ok().map_or("?".into(), |id| id.to_string().into())));
+        map.set("PID", Value::Str(getpid().to_string().into()));
+        map.set("UID", Value::Str(getuid().to_string().into()));
+        map.set("EUID", Value::Str(geteuid().to_string().into()));
 
         // Initialize the HISTFILE variable
         if let Ok(base_dirs) = BaseDirectories::with_prefix("ion") {
@@ -271,7 +269,13 @@ impl<'a> Default for Variables<'a> {
         );
 
         // Initialize the HOST variable
-        env::set_var("HOST", &self_sys::get_host_name().unwrap_or_else(|| "?".to_owned()));
+        let mut host_name = [0_u8; 512];
+        env::set_var(
+            "HOST",
+            &gethostname(&mut host_name)
+                .ok()
+                .map_or("?", |hostname| hostname.to_str().unwrap_or("?")),
+        );
 
         Variables(map)
     }

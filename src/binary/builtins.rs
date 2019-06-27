@@ -1,5 +1,5 @@
-use ion_shell::{builtin, builtins::Status, types::Str, Shell};
-use libc::SIGTERM;
+use ion_shell::{builtin, builtins::Status, types::Str, Shell, Signal};
+use nix::{sys::signal, unistd::Pid};
 use std::{error::Error, os::unix::process::CommandExt, process::Command};
 
 #[builtin(
@@ -13,7 +13,7 @@ DESCRIPTION
     returning to the parent process. It can be resumed by sending it SIGCONT."
 )]
 pub fn suspend(args: &[Str], _shell: &mut Shell<'_>) -> Status {
-    let _ = unsafe { libc::kill(0, libc::SIGSTOP) };
+    signal::kill(Pid::this(), Signal::SIGSTOP).unwrap();
     Status::SUCCESS
 }
 
@@ -28,7 +28,7 @@ DESCRIPTION
 )]
 pub fn exit(args: &[Str], shell: &mut Shell<'_>) -> Status {
     // Kill all active background tasks before exiting the shell.
-    shell.background_send(SIGTERM);
+    shell.background_send(Signal::SIGTERM).expect("Could not terminate background jobs");
     let exit_code = args
         .get(1)
         .and_then(|status| status.parse::<i32>().ok())

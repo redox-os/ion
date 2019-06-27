@@ -1,14 +1,10 @@
-use super::{
-    fork::Capture,
-    sys::{self, variables},
-    variables::Value,
-    IonError, Shell,
-};
+use super::{fork::Capture, sys::variables, variables::Value, IonError, Shell};
 use crate::{
     expansion::{Error, Expander, Result, Select},
     types,
 };
-use std::{env, io::Read, iter::FromIterator, process};
+use nix::unistd::{tcsetpgrp, Pid};
+use std::{env, io::Read, iter::FromIterator};
 
 impl<'a, 'b> Expander for Shell<'b> {
     type Error = IonError;
@@ -26,7 +22,7 @@ impl<'a, 'b> Expander for Shell<'b> {
             });
 
         // Ensure that the parent retains ownership of the terminal before exiting.
-        let _ = sys::tcsetpgrp(libc::STDIN_FILENO, process::id());
+        let _ = tcsetpgrp(nix::libc::STDIN_FILENO, Pid::this());
         output.map(Into::into).map_err(|err| Error::Subprocess(Box::new(err)))
     }
 

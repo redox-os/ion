@@ -15,6 +15,7 @@ use crate::{
 };
 use err_derive::Error;
 use itertools::Itertools;
+use nix::unistd::Pid;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Condition {
@@ -155,12 +156,11 @@ impl<'a> Shell<'a> {
                             Self::insert_into_block(block, last_statement)?;
                             // Merge last Case back and pop off Match too
                             let match_stm = block.pop().unwrap();
-                            if !block.is_empty() {
-                                Self::insert_into_block(block, match_stm)?;
-
-                                Ok(None)
-                            } else {
+                            if block.is_empty() {
                                 Ok(Some(match_stm))
+                            } else {
+                                Self::insert_into_block(block, match_stm)?;
+                                Ok(None)
                             }
                         } else {
                             Self::insert_into_block(block, last_statement)?;
@@ -440,8 +440,8 @@ impl<'a> Shell<'a> {
             _ => {}
         }
         if let Some(signal) = signals::SignalHandler.next() {
-            self.handle_signal(signal);
-            Err(IonError::from(PipelineError::Interrupted(0, signal)))
+            self.handle_signal(signal).map_err(PipelineError::KillFailed)?;
+            Err(IonError::from(PipelineError::Interrupted(Pid::this(), signal)))
         } else {
             Ok(Condition::NoOp)
         }
@@ -682,7 +682,7 @@ mod tests {
             assert_eq!(cases.len(), 2);
             assert_eq!(cases.last().unwrap().statements.len(), 1);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -699,7 +699,7 @@ mod tests {
             flow_control.clear();
             assert_eq!(flow_control.len(), 0);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -720,10 +720,7 @@ mod tests {
 
         let errs = vec![Statement::Else, Statement::End, Statement::Break, Statement::Continue];
         for err in errs {
-            let res = Shell::insert_statement(&mut flow_control, err);
-            if res.is_ok() {
-                assert!(false);
-            }
+            assert!(Shell::insert_statement(&mut flow_control, err).is_err());
         }
     }
 }

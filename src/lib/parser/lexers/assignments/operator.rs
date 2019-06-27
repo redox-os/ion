@@ -28,7 +28,7 @@ pub enum Operator {
 }
 
 impl Operator {
-    pub(crate) fn parse_single(data: u8) -> Option<Operator> {
+    pub(crate) fn parse_single(data: u8) -> Option<Self> {
         match data {
             b'+' => Some(Operator::Add),
             b'-' => Some(Operator::Subtract),
@@ -39,7 +39,7 @@ impl Operator {
         }
     }
 
-    pub(crate) fn parse_double(data: &[u8]) -> Option<Operator> {
+    pub(crate) fn parse_double(data: &[u8]) -> Option<Self> {
         match data {
             b"//" => Some(Operator::IntegerDivide),
             b"**" => Some(Operator::Exponent),
