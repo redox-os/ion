@@ -301,16 +301,7 @@ impl<'a> Shell<'a> {
             }
         } else {
             self.execute_pipeline(pipeline).map_err(Into::into)
-        };
-
-        let exit_status = match exit_status {
-            Ok(exit_status) => exit_status,
-            Err(IonError::PipelineExecutionError(PipelineError::CommandNotFound(command))) => {
-                self.command_not_found(&command);
-                Status::COULD_NOT_EXEC
-            }
-            Err(err) => return Err(err),
-        };
+        }?;
 
         if let Some(ref callback) = self.on_command {
             if let Ok(elapsed_time) = command_start_time.elapsed() {
