@@ -2,8 +2,12 @@ use self::binary::{builtins, InteractiveShell};
 use atty::Stream;
 use ion_shell::{BuiltinMap, Shell, Value};
 use liner::KeyBindings;
+use nix::{
+    sys::signal::{self, SigHandler, Signal},
+    unistd,
+};
 use std::{
-    io::{self, stdin, BufReader},
+    io::{stdin, BufReader},
     process,
 };
 
@@ -125,14 +129,11 @@ fn parse_args() -> CommandLineArgs {
     }
 }
 
-fn set_unique_pid() -> io::Result<()> {
-    unsafe {
-        let pgid = libc::getpid();
-        libc::setpgid(0, pgid);
-        libc::signal(libc::SIGTTOU, libc::SIG_IGN);
-        libc::tcsetpgrp(libc::STDIN_FILENO, pgid);
-    }
-    Ok(())
+fn set_unique_pid() -> nix::Result<()> {
+    let pgid = unistd::getpid();
+    unistd::setpgid(pgid, pgid)?;
+    unsafe { signal::signal(Signal::SIGTTOU, SigHandler::SigIgn) }?;
+    unistd::tcsetpgrp(nix::libc::STDIN_FILENO, pgid)
 }
 
 fn main() {
