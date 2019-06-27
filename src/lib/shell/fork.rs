@@ -69,7 +69,7 @@ impl<'a, 'b> Fork<'a, 'b> {
     pub fn exec<F: FnMut(&mut Shell<'b>) -> Result<(), IonError> + 'a>(
         self,
         mut child_func: F,
-    ) -> Result<IonResult, IonError> {
+    ) -> nix::Result<IonResult> {
         sys::signals::block();
 
         // If we are to capture stdout, create a pipe for capturing outputs.

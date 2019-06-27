@@ -1,4 +1,4 @@
-use super::{fork::Capture, sys::variables, variables::Value, IonError, Shell};
+use super::{fork::Capture, sys::variables, variables::Value, IonError, PipelineError, Shell};
 use crate::{
     expansion::{Error, Expander, Result, Select},
     types,
@@ -11,19 +11,18 @@ impl<'a, 'b> Expander for Shell<'b> {
 
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Result<types::Str, Self::Error> {
-        let output = self
+        let result = self
             .fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command))
-            .and_then(|result| {
-                let mut string = String::with_capacity(1024);
-                match result.stdout.unwrap().read_to_string(&mut string) {
-                    Ok(_) => Ok(string),
-                    Err(why) => Err(IonError::CaptureFailed(why)),
-                }
-            });
+            .map_err(|err| Error::Subprocess(Box::new(PipelineError::Fork(err).into())))?;
+        let mut string = String::with_capacity(1024);
+        let output = match result.stdout.unwrap().read_to_string(&mut string) {
+            Ok(_) => Ok(string.into()),
+            Err(why) => Err(Error::Subprocess(Box::new(PipelineError::CaptureFailed(why).into()))),
+        };
 
         // Ensure that the parent retains ownership of the terminal before exiting.
         let _ = tcsetpgrp(nix::libc::STDIN_FILENO, Pid::this());
-        output.map(Into::into).map_err(|err| Error::Subprocess(Box::new(err)))
+        output
     }
 
     /// Expand a string variable given if its quoted / unquoted

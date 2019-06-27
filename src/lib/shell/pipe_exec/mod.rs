@@ -68,6 +68,13 @@ pub enum RedirectError {
 /// This is created when Ion fails to create a pipeline
 #[derive(Debug, Error)]
 pub enum PipelineError {
+    /// The fork failed
+    #[error(display = "failed to fork: {}", _0)]
+    Fork(#[error(cause)] nix::Error),
+    /// Failed to setup capturing for function
+    #[error(display = "error reading stdout of child: {}", _0)]
+    CaptureFailed(#[error(cause)] io::Error),
+
     /// Could not set the pipe as a redirection
     #[error(display = "{}", _0)]
     RedirectPipeError(#[error(cause)] RedirectError),

@@ -7,6 +7,7 @@ use nix::{
     unistd,
 };
 use std::{
+    fs,
     io::{stdin, BufReader},
     process,
 };
@@ -175,7 +176,13 @@ fn main() {
     let err = if let Some(command) = command_line_args.command {
         shell.execute_command(command.as_bytes())
     } else if let Some(path) = script_path {
-        shell.execute_file(path)
+        match fs::File::open(&path) {
+            Ok(script) => shell.execute_command(std::io::BufReader::new(script)),
+            Err(cause) => {
+                println!("ion: could not execute '{}': {}", path, cause);
+                process::exit(1);
+            }
+        }
     } else if stdin_is_a_tty || command_line_args.interactive {
         let mut interactive = InteractiveShell::new(shell);
         if let Some(key_bindings) = command_line_args.key_bindings {

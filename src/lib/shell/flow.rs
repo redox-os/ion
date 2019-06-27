@@ -58,6 +58,10 @@ pub enum BlockError {
     /// Found a continue outside a loop
     #[error(display = "found Continue without loop body")]
     UnmatchedContinue,
+
+    /// Unclosed block
+    #[error(display = "expected end block for `{}`", _0)]
+    UnclosedBlock(String),
 }
 
 impl<'a> Shell<'a> {

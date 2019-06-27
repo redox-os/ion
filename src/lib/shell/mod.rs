@@ -41,10 +41,8 @@ use err_derive::Error;
 use itertools::Itertools;
 use nix::sys::signal::{self, SigHandler};
 use std::{
-    fs,
     io::{self, Write},
     ops::{Deref, DerefMut},
-    path::Path,
     sync::{atomic::Ordering, Arc, Mutex},
     time::SystemTime,
 };
@@ -52,25 +50,9 @@ use std::{
 /// Errors from execution
 #[derive(Debug, Error)]
 pub enum IonError {
-    /// The fork failed
-    #[error(display = "failed to fork: {}", _0)]
-    Fork(#[error(cause)] nix::Error),
-    /// Failed to setup capturing for function
-    #[error(display = "error reading stdout of child: {}", _0)]
-    CaptureFailed(#[error(cause)] io::Error),
-    /// The variable/function does not exist
-    #[error(display = "element does not exist")]
-    DoesNotExist,
-    /// The input is not properly terminated
-    #[error(display = "input was not terminated")]
-    Unterminated,
     /// Function execution error
     #[error(display = "function error: {}", _0)]
     Function(#[error(cause)] FunctionError),
-
-    /// Unclosed block
-    #[error(display = "unexpected end of script: expected end block for `{}`", _0)]
-    UnclosedBlock(String),
 
     /// Parsing failed
     #[error(display = "syntax error: {}", _0)]
@@ -84,12 +66,6 @@ pub enum IonError {
     #[error(display = "statement error: {}", _0)]
     UnterminatedStatementError(#[error(cause)] StatementError),
 
-    /// Found end without associated block
-    #[error(display = "could not exit the current block since it does not exist!")]
-    EmptyBlock,
-    /// Could not execute file
-    #[error(display = "could not execute file '{}': {}", _0, _1)]
-    FileExecutionError(String, #[error(cause)] io::Error),
     /// Failed to run a pipeline
     #[error(display = "pipeline execution error: {}", _0)]
     PipelineExecutionError(#[error(cause)] PipelineError),
@@ -116,10 +92,6 @@ impl From<BlockError> for IonError {
 
 impl From<PipelineError> for IonError {
     fn from(cause: PipelineError) -> Self { IonError::PipelineExecutionError(cause) }
-}
-
-impl From<nix::Error> for IonError {
-    fn from(cause: nix::Error) -> Self { IonError::Fork(cause) }
 }
 
 impl From<expansion::Error<IonError>> for IonError {
@@ -249,8 +221,8 @@ impl<'a> Shell<'a> {
     pub fn reset_flow(&mut self) { self.flow_control.clear(); }
 
     /// Exit the current block
-    pub fn exit_block(&mut self) -> Result<(), IonError> {
-        self.flow_control.pop().map(|_| ()).ok_or(IonError::EmptyBlock)
+    pub fn exit_block(&mut self) -> Result<(), BlockError> {
+        self.flow_control.pop().map(|_| ()).ok_or(BlockError::UnmatchedEnd)
     }
 
     /// Get the depth of the current block
@@ -263,39 +235,22 @@ impl<'a> Shell<'a> {
     /// The method is non-blocking, and therefore will immediately return file handles to the
     /// stdout and stderr of the child. The PID of the child is returned, which may be used to
     /// wait for and obtain the exit status.
-    pub fn fork<F: FnMut(&mut Self) -> Result<(), IonError>>(
+    fn fork<F: FnMut(&mut Self) -> Result<(), IonError>>(
         &self,
         capture: Capture,
         child_func: F,
-    ) -> Result<IonResult, IonError> {
+    ) -> nix::Result<IonResult> {
         Fork::new(self, capture).exec(child_func)
     }
 
-    /// A method for executing a function with the given `name`, using `args` as the input.
-    /// If the function does not exist, an `IonError::DoesNotExist` is returned.
+    /// A method for executing a function, using `args` as the input.
     pub fn execute_function<S: AsRef<str>>(
         &mut self,
-        name: &str,
+        function: &Function<'a>,
         args: &[S],
     ) -> Result<Status, IonError> {
-        if let Some(Value::Function(function)) = self.variables.get(name).cloned() {
-            function.execute(self, args)?;
-            Ok(self.previous_status)
-        } else {
-            Err(IonError::DoesNotExist)
-        }
-    }
-
-    /// A method for executing scripts in the Ion shell without capturing. Given a `Path`, this
-    /// method will attempt to execute that file as a script, and then returns the final exit
-    /// status of the evaluated script.
-    pub fn execute_file<P: AsRef<Path>>(&mut self, script: P) -> Result<Status, IonError> {
-        match fs::File::open(script.as_ref()) {
-            Ok(script) => self.execute_command(std::io::BufReader::new(script)),
-            Err(cause) => {
-                Err(IonError::FileExecutionError(script.as_ref().to_string_lossy().into(), cause))
-            }
-        }
+        function.clone().execute(self, args)?;
+        Ok(self.previous_status)
     }
 
     /// A method for executing commands in the Ion shell without capturing. It takes command(s)
@@ -316,7 +271,7 @@ impl<'a> Shell<'a> {
 
         if let Some(block) = self.flow_control.last().map(Statement::to_string) {
             self.previous_status = Status::from_exit_code(1);
-            Err(IonError::UnclosedBlock(block))
+            Err(IonError::StatementFlowError(BlockError::UnclosedBlock(block)))
         } else {
             Ok(self.previous_status)
         }
