@@ -19,6 +19,7 @@ use std::{
     cell::RefCell,
     fs::{self, OpenOptions},
     io,
+    io::Write,
     path::Path,
     rc::Rc,
 };
@@ -186,9 +187,9 @@ impl<'a> InteractiveShell<'a> {
                 }
                 None => {
                     print!("{}", context_bis.borrow().history.buffers.iter().format("\n"));
-                    /*io::stdout().flush().unwrap_or_else(|err| {
+                    io::stdout().flush().unwrap_or_else(|err| {
                         eprintln!("ion: history print: {}", err);
-                    });*/
+                    });
                 }
             }
             Status::SUCCESS
