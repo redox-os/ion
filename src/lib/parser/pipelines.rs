@@ -57,7 +57,7 @@ trait AddItem<'a> {
     );
 }
 
-impl<'a> AddItem<'a> for Pipeline<'a> {
+impl<'a> AddItem<'a> for Pipeline<Job<'a>> {
     fn add_item(
         &mut self,
         redirection: RedirectFrom,
@@ -119,7 +119,7 @@ impl<'a> Collector<'a> {
     fn parse<'builtins>(
         &self,
         builtins: &BuiltinMap<'builtins>,
-    ) -> Result<Pipeline<'builtins>, PipelineParsingError> {
+    ) -> Result<Pipeline<Job<'builtins>>, PipelineParsingError> {
         let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Args::with_capacity(ARG_DEFAULT_SIZE);
         let mut pipeline = Pipeline::new();
@@ -417,7 +417,7 @@ impl<'a> Collector<'a> {
     pub fn run<'builtins>(
         data: &'a str,
         builtins: &BuiltinMap<'builtins>,
-    ) -> Result<Pipeline<'builtins>, PipelineParsingError> {
+    ) -> Result<Pipeline<Job<'builtins>>, PipelineParsingError> {
         Collector::new(data).parse(builtins)
     }
 
@@ -432,7 +432,7 @@ mod tests {
             pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
             statement::parse,
         },
-        shell::{flow_control::Statement, Job},
+        shell::{flow_control::Statement, Job, Shell},
     };
 
     #[test]
@@ -453,7 +453,7 @@ mod tests {
 
             assert_eq!(expected, pipeline.items[0].outputs);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -466,7 +466,7 @@ mod tests {
             assert_eq!("{a b}", &items[0].job.args[1]);
             assert_eq!("{a {b c}}", &items[0].job.args[2]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -480,7 +480,7 @@ mod tests {
             assert_eq!("@split(var, ', ')", &items[0].job.args[1]);
             assert_eq!("$join(array, ',')", &items[0].job.args[2]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -493,7 +493,7 @@ mod tests {
             assert_eq!("echo", &items[0].job.args[0]);
             assert_eq!("$(echo one $(echo two) three)", &items[0].job.args[1]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -506,7 +506,7 @@ mod tests {
             assert_eq!("echo", &items[0].job.args[0]);
             assert_eq!("@(echo one @(echo two) three)", &items[0].job.args[1]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -520,7 +520,7 @@ mod tests {
             assert_eq!("\"$(seq 1 10)\"", &items[0].job.args[1]);
             assert_eq!(2, items[0].job.args.len());
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -534,7 +534,7 @@ mod tests {
             assert_eq!("$(seq 1 10 | head -1)", &items[0].job.args[1]);
             assert_eq!(2, items[0].job.args.len());
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -548,7 +548,7 @@ mod tests {
             assert_eq!("@(seq 1 10 | head -1)", &items[0].job.args[1]);
             assert_eq!(2, items[0].job.args.len());
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -557,10 +557,10 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("cat", &BuiltinMap::new()).unwrap() {
             let items = pipeline.items;
             assert_eq!(1, items.len());
-            assert_eq!("cat", items[0].command());
+            assert_eq!("cat", &items[0].job.args[0]);
             assert_eq!(1, items[0].job.args.len());
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -575,7 +575,7 @@ mod tests {
             assert_eq!("c", &items[0].job.args[3]);
             assert_eq!(4, items[0].job.args.len());
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -588,7 +588,7 @@ mod tests {
             assert_eq!("-al", &items[0].job.args[1]);
             assert_eq!("dir", &items[0].job.args[2]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -597,7 +597,7 @@ mod tests {
         if let Statement::Default = parse("", &BuiltinMap::new()).unwrap() {
             return;
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -612,7 +612,7 @@ mod tests {
             assert_eq!("-al", &items[0].job.args[1]);
             assert_eq!("dir", &items[0].job.args[2]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -623,7 +623,7 @@ mod tests {
             assert_eq!("ls", &pipeline.items[0].job.args[0]);
             assert_eq!("-al", &pipeline.items[0].job.args[1]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -637,7 +637,7 @@ mod tests {
             assert_eq!("\"a < 10\"", &items[0].job.args[2]);
             assert_eq!(3, items[0].job.args.len());
         } else {
-            assert!(false)
+            panic!()
         }
     }
 
@@ -650,7 +650,7 @@ mod tests {
             assert_eq!(2, items[0].job.args.len());
             assert_eq!("\"Hello \'Rusty\' World\"", &items[0].job.args[1]);
         } else {
-            assert!(false)
+            panic!()
         }
     }
 
@@ -663,7 +663,7 @@ mod tests {
             assert_eq!(2, items[0].job.args.len());
             assert_eq!("\"Hello \"Rusty\" World\"", &items[0].job.args[1]);
         } else {
-            assert!(false)
+            panic!()
         }
 
         if let Statement::Pipeline(pipeline) =
@@ -673,7 +673,7 @@ mod tests {
             assert_eq!(2, items[0].job.args.len());
             assert_eq!("\'Hello \'Rusty\' World\'", &items[0].job.args[1]);
         } else {
-            assert!(false)
+            panic!()
         }
     }
 
@@ -682,7 +682,7 @@ mod tests {
         if let Statement::Default = parse("  \t ", &BuiltinMap::new()).unwrap() {
             return;
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -694,7 +694,7 @@ mod tests {
             let items = pipeline.items;
             assert_eq!(RedirectFrom::None, items[0].job.redirection);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -705,7 +705,7 @@ mod tests {
         {
             assert_eq!(PipeType::Background, pipeline.pipe);
         } else {
-            assert!(false);
+            panic!();
         }
 
         if let Statement::Pipeline(pipeline) =
@@ -713,7 +713,7 @@ mod tests {
         {
             assert_eq!(PipeType::Background, pipeline.pipe);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -724,7 +724,7 @@ mod tests {
         {
             assert_eq!(PipeType::Disown, pipeline.pipe);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -733,7 +733,7 @@ mod tests {
         if let Statement::Default = parse("# ; \t as!!+dfa", &BuiltinMap::new()).unwrap() {
             return;
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -742,9 +742,9 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("    \techo", &BuiltinMap::new()).unwrap() {
             let items = pipeline.items;
             assert_eq!(1, items.len());
-            assert_eq!("echo", items[0].command());
+            assert_eq!("echo", &items[0].job.args[0]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -755,7 +755,7 @@ mod tests {
             let items = pipeline.items;
             assert_eq!("'#!!;\"\\'", &items[0].job.args[1]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -771,7 +771,7 @@ mod tests {
             assert_eq!("789", &items[0].job.args[4]);
             assert_eq!("one'  'two", &items[0].job.args[5]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -780,7 +780,7 @@ mod tests {
         if let Statement::Default = parse("\n\n\n", &BuiltinMap::new()).unwrap() {
             return;
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -798,9 +798,9 @@ mod tests {
             assert_eq!(vec![Input::File("stuff".into())], pipeline.items[2].inputs);
             assert_eq!("other", &pipeline.items[2].outputs[0].file);
             assert!(!pipeline.items[2].outputs[0].append);
-            assert_eq!(input.to_owned(), pipeline.to_string());
+            assert_eq!(input.to_owned(), pipeline.expand(&Shell::new()).unwrap().to_string());
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -816,7 +816,7 @@ mod tests {
             assert_eq!("other", &pipeline.items[2].outputs[0].file);
             assert!(pipeline.items[2].outputs[0].append);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -828,7 +828,7 @@ mod tests {
             assert_eq!("$(^)", &pipeline.items[0].job.args[0]);
             assert_eq!("\'$(^)\'", &pipeline.items[0].job.args[1]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -955,7 +955,7 @@ mod tests {
             assert_eq!(vec![Input::File("other".into())], pipeline.items[2].inputs);
             assert_eq!("stuff", &pipeline.items[2].outputs[0].file);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -970,7 +970,7 @@ mod tests {
             assert_eq!("'{()}'", &pipeline.items[0].job.args[2]);
             assert_eq!("test", &pipeline.items[0].job.args[3]);
         } else {
-            assert!(false);
+            panic!();
         }
 
         if let Statement::Pipeline(pipeline) =
@@ -981,7 +981,7 @@ mod tests {
             assert_eq!("$x'{()}'", &pipeline.items[0].job.args[1]);
             assert_eq!("test", &pipeline.items[0].job.args[2]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -1041,7 +1041,7 @@ mod tests {
             assert_eq!("'{ if (1) print $1 }'", &pipeline.items[0].job.args[3]);
             assert_eq!("myfile", &pipeline.items[0].job.args[4]);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 

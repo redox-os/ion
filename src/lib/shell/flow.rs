@@ -10,7 +10,7 @@ use crate::{
         Expander, ForValueExpression,
     },
     parser::{parse_and_validate, StatementSplitter, Terminator},
-    shell::{IonError, Value},
+    shell::{IonError, Job, Value},
     types,
 };
 use err_derive::Error;
@@ -562,14 +562,14 @@ impl<'a> Shell<'a> {
 // TODO: If the aliases are made standard functions, the error type must be changed
 fn expand_pipeline<'a>(
     shell: &Shell<'a>,
-    pipeline: &Pipeline<'a>,
-) -> std::result::Result<(Pipeline<'a>, Vec<Statement<'a>>), IonError> {
+    pipeline: &Pipeline<Job<'a>>,
+) -> std::result::Result<(Pipeline<Job<'a>>, Vec<Statement<'a>>), IonError> {
     let mut item_iter = pipeline.items.iter();
-    let mut items: Vec<PipeItem<'a>> = Vec::with_capacity(item_iter.size_hint().0);
+    let mut items: Vec<PipeItem<Job<'a>>> = Vec::with_capacity(item_iter.size_hint().0);
     let mut statements = Vec::new();
 
     while let Some(item) = item_iter.next() {
-        if let Some(Value::Alias(alias)) = shell.variables.get(item.command()) {
+        if let Some(Value::Alias(alias)) = shell.variables.get(&item.job.args[0]) {
             statements = StatementSplitter::new(alias.0.as_str())
                 .map(|stmt| parse_and_validate(stmt?, &shell.builtins).map_err(Into::into))
                 .collect::<std::result::Result<_, IonError>>()?;
@@ -614,7 +614,7 @@ fn expand_pipeline<'a>(
                         } else {
                             // Error in expansion
                             Err(PipelineError::InvalidAlias(
-                                item.command().to_string(),
+                                item.job.args[0].to_string(),
                                 alias.0.to_string(),
                             ))?;
                         }

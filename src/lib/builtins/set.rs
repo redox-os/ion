@@ -62,7 +62,6 @@ pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             for flag in arg.bytes().skip(1) {
                 match flag {
                     b'e' => shell.opts_mut().err_exit = false,
-                    b'x' => shell.opts_mut().print_comms = false,
                     b'o' => match args_iter.next().map(|s| s as &str) {
                         Some("huponexit") => shell.opts_mut().huponexit = false,
                         Some(_) => {

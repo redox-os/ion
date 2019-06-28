@@ -161,9 +161,14 @@ fn main() {
         }
     }
 
-    shell.opts_mut().print_comms = command_line_args.print_commands;
     shell.opts_mut().no_exec = command_line_args.no_execute;
     shell.opts_mut().is_background_shell = !stdin_is_a_tty;
+    if command_line_args.print_commands {
+        shell.set_pre_command(Some(Box::new(|_shell, pipeline| {
+            // A string representing the command is stored here.
+            eprintln!("> {}", pipeline);
+        })));
+    }
 
     let script_path = command_line_args.args.get(0).cloned();
     shell.variables_mut().set(

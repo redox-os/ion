@@ -2,7 +2,7 @@ use crate::{
     assignments::*,
     expansion::pipelines::Pipeline,
     parser::lexers::assignments::{KeyBuf, Operator, Primitive},
-    shell::{IonError, Shell},
+    shell::{IonError, Job, Shell},
     types,
 };
 use err_derive::Error;
@@ -158,7 +158,7 @@ pub enum Statement<'a> {
     /// Next loop
     Continue,
     /// Execute a pipeline
-    Pipeline(Pipeline<'a>),
+    Pipeline(Pipeline<Job<'a>>),
     /// Time the statement
     Time(Box<Statement<'a>>),
     /// Execute the statement if the previous command succeeded

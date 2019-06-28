@@ -1,8 +1,9 @@
-use super::{
-    super::Shell,
-    job_control::{BackgroundProcess, ProcessState},
+use super::job_control::{BackgroundProcess, ProcessState};
+use crate::{
+    builtins::Status,
+    expansion::pipelines::Pipeline,
+    shell::{RefinedJob, Shell},
 };
-use crate::{builtins::Status, expansion::pipelines::Pipeline};
 use nix::{
     sys::signal::{self, SigHandler, Signal},
     unistd::{self, ForkResult, Pid},
@@ -14,7 +15,11 @@ impl<'a> Shell<'a> {
 
     /// Forks the shell, adding the child to the parent's background list, and executing
     /// the given commands in the child fork.
-    pub(super) fn fork_pipe(&mut self, pipeline: Pipeline<'a>, state: ProcessState) -> Status {
+    pub(super) fn fork_pipe(
+        &mut self,
+        pipeline: Pipeline<RefinedJob<'a>>,
+        state: ProcessState,
+    ) -> Status {
         match unistd::fork() {
             Ok(ForkResult::Child) => {
                 self.opts_mut().is_background_shell = true;

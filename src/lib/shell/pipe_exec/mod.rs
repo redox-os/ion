@@ -13,12 +13,12 @@ pub mod streams;
 
 use self::{job_control::ProcessState, pipes::TeePipe};
 use super::{
-    job::{Job, RefinedJob, TeeItem, Variant},
+    job::{RefinedJob, TeeItem, Variant},
     signals::{self, SignalHandler},
     Shell, Value,
 };
 use crate::{
-    builtins::{self, Status},
+    builtins::Status,
     expansion::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
     types,
 };
@@ -33,9 +33,7 @@ use std::{
     fmt,
     fs::{File, OpenOptions},
     io::{self, Write},
-    iter,
     os::unix::{io::FromRawFd, process::CommandExt},
-    path::Path,
     process::{exit, Command, Stdio},
 };
 
@@ -167,6 +165,9 @@ pub unsafe fn stdin_of<T: AsRef<str>>(input: &T) -> Result<File, InputError> {
     infile
         .write_all(string.as_bytes())
         .map_err(|err| InputError::WriteError(string.into(), err))?;
+    if !string.ends_with('\n') {
+        infile.write(b"\n").map_err(|err| InputError::WriteError(string.into(), err))?;
+    }
     infile.flush().map_err(|err| InputError::WriteError(string.into(), err))?;
     // `infile` currently owns the writer end RawFd. If we just return the reader
     // end and let `infile` go out of scope, it will be closed, sending EOF to
@@ -175,32 +176,15 @@ pub unsafe fn stdin_of<T: AsRef<str>>(input: &T) -> Result<File, InputError> {
 }
 
 impl Input {
-    pub(self) fn get_infile(&mut self) -> Result<File, InputError> {
+    pub(self) fn get_infile(&self) -> Result<File, InputError> {
         match self {
             Input::File(ref filename) => match File::open(filename.as_str()) {
                 Ok(file) => Ok(file),
                 Err(why) => Err(InputError::File(filename.to_string(), why)),
             },
-            Input::HereString(ref mut string) => {
-                if !string.ends_with('\n') {
-                    string.push('\n');
-                }
-
-                unsafe { stdin_of(&string) }
-            }
+            Input::HereString(ref string) => unsafe { stdin_of(&string) },
         }
     }
-}
-
-/// Determines if the supplied command implicitly defines to change the directory.
-///
-/// This is detected by first checking if the argument starts with a '.' or an '/', or ends
-/// with a '/'. If that validates, then it will check if the supplied argument is a valid
-/// directory path.
-#[inline(always)]
-fn is_implicit_cd(argument: &str) -> bool {
-    (argument.starts_with('.') || argument.starts_with('/') || argument.ends_with('/'))
-        && Path::new(argument).is_dir()
 }
 
 fn need_tee(outs: &[Redirection], redirection: RedirectFrom) -> (bool, bool) {
@@ -276,50 +260,51 @@ fn do_tee<'a>(
 /// Insert the multiple redirects as pipelines if necessary. Handle both input and output
 /// redirection if necessary.
 fn prepare<'a, 'b>(
-    shell: &'a Shell<'b>,
-    pipeline: Pipeline<'b>,
-) -> Result<impl IntoIterator<Item = (RefinedJob<'b>, RedirectFrom)>, RedirectError> {
+    pipeline: Pipeline<RefinedJob<'b>>,
+) -> Result<impl IntoIterator<Item = RefinedJob<'b>>, RedirectError> {
     // Real logic begins here
-    let mut new_commands = SmallVec::<[_; 16]>::with_capacity(2 * pipeline.items.len());
+    let mut new_commands =
+        SmallVec::<[RefinedJob<'b>; 16]>::with_capacity(2 * pipeline.items.len());
     let mut prev_kind = RedirectFrom::None;
-    for PipeItem { job, outputs, mut inputs } in pipeline.items {
+    for PipeItem { mut job, outputs, inputs } in pipeline.items {
         let kind = job.redirection;
-        let mut job = shell.generate_command(job);
         match (inputs.len(), prev_kind) {
             (0, _) => {}
             (1, RedirectFrom::None) => job.stdin(inputs[0].get_infile()?),
             _ => {
-                new_commands.push((
-                    RefinedJob::cat(
-                        inputs.iter_mut().map(Input::get_infile).collect::<Result<_, _>>()?,
-                    ),
+                new_commands.push(RefinedJob::cat(
+                    inputs.iter().map(Input::get_infile).collect::<Result<_, _>>()?,
                     RedirectFrom::Stdout,
                 ));
             }
         }
         prev_kind = kind;
         if outputs.is_empty() {
-            new_commands.push((job, kind));
+            new_commands.push(job);
         } else {
             match need_tee(&outputs, kind) {
                 // No tees
                 (false, false) => {
                     do_tee(&outputs, &mut job, &mut RefinedJob::stdout, &mut RefinedJob::stderr)?;
-                    new_commands.push((job, kind));
+                    new_commands.push(job);
                 }
                 // tee stderr
                 (false, true) => {
                     let mut tee = TeeItem::new();
                     do_tee(&outputs, &mut job, &mut RefinedJob::stdout, &mut |_, f| tee.add(f))?;
-                    new_commands.push((job, RedirectFrom::Stderr));
-                    new_commands.push((RefinedJob::tee(None, Some(tee)), kind));
+                    let tee = RefinedJob::tee(None, Some(tee), job.redirection);
+                    job.redirection = RedirectFrom::Stderr;
+                    new_commands.push(job);
+                    new_commands.push(tee);
                 }
                 // tee stdout
                 (true, false) => {
                     let mut tee = TeeItem::new();
                     do_tee(&outputs, &mut job, &mut |_, f| tee.add(f), &mut RefinedJob::stderr)?;
-                    new_commands.push((job, RedirectFrom::Stdout));
-                    new_commands.push((RefinedJob::tee(Some(tee), None), kind));
+                    let tee = RefinedJob::tee(Some(tee), None, job.redirection);
+                    job.redirection = RedirectFrom::Stdout;
+                    new_commands.push(job);
+                    new_commands.push(tee);
                 }
                 // tee both
                 (true, true) => {
@@ -328,8 +313,10 @@ fn prepare<'a, 'b>(
                     do_tee(&outputs, &mut job, &mut |_, f| tee_out.add(f), &mut |_, f| {
                         tee_err.sinks.push(f)
                     })?;
-                    new_commands.push((job, RedirectFrom::Stdout));
-                    new_commands.push((RefinedJob::tee(Some(tee_out), Some(tee_err)), kind));
+                    let tee = RefinedJob::tee(Some(tee_out), Some(tee_err), job.redirection);
+                    job.redirection = RedirectFrom::Stdout;
+                    new_commands.push(job);
+                    new_commands.push(tee);
                 }
             }
         }
@@ -410,25 +397,6 @@ impl<'b> Shell<'b> {
         Ok(code)
     }
 
-    /// Generates a vector of commands from a given `Pipeline`.
-    ///
-    /// Each generated command will either be a builtin or external command, and will be
-    /// associated will be marked as an `&&`, `||`, `|`, or final job.
-    fn generate_command(&self, job: Job<'b>) -> RefinedJob<'b> {
-        if is_implicit_cd(&job.args[0]) {
-            RefinedJob::builtin(
-                &builtins::builtin_cd,
-                iter::once("cd".into()).chain(job.args).collect(),
-            )
-        } else if let Some(Value::Function(_)) = self.variables.get(&job.args[0]) {
-            RefinedJob::function(job.args)
-        } else if let Some(builtin) = job.builtin {
-            RefinedJob::builtin(builtin, job.args)
-        } else {
-            RefinedJob::external(job.args)
-        }
-    }
-
     /// Given a pipeline, generates commands and executes them.
     ///
     /// The `Pipeline` structure contains a vector of `Job`s, and redirections to perform on the
@@ -445,7 +413,10 @@ impl<'b> Shell<'b> {
     /// If a job is stopped, the shell will add that job to a list of background jobs and
     /// continue to watch the job in the background, printing notifications on status changes
     /// of that job over time.
-    pub fn execute_pipeline(&mut self, pipeline: Pipeline<'b>) -> Result<Status, PipelineError> {
+    pub fn execute_pipeline(
+        &mut self,
+        pipeline: Pipeline<RefinedJob<'b>>,
+    ) -> Result<Status, PipelineError> {
         // While active, the SIGTTOU signal will be ignored.
         let _sig_ignore = SignalHandler::new();
 
@@ -468,11 +439,11 @@ impl<'b> Shell<'b> {
     /// Executes a piped job `job1 | job2 | job3`
     ///
     /// This function will panic if called with an empty slice
-    fn pipe(&mut self, pipeline: Pipeline<'b>) -> Result<Status, PipelineError> {
-        let mut commands = prepare(self, pipeline)?.into_iter().peekable();
+    fn pipe(&mut self, pipeline: Pipeline<RefinedJob<'b>>) -> Result<Status, PipelineError> {
+        let mut commands = prepare(pipeline)?.into_iter().peekable();
 
-        if let Some((mut parent, mut kind)) = commands.next() {
-            if kind == RedirectFrom::None && !parent.needs_forking() {
+        if let Some(mut parent) = commands.next() {
+            if parent.redirection == RedirectFrom::None && !parent.needs_forking() {
                 let status = self.exec_job(&parent);
 
                 let _ = io::stdout().flush();
@@ -483,7 +454,7 @@ impl<'b> Shell<'b> {
                 let (mut pgid, mut last_pid, mut current_pid) = (None, None, Pid::this());
 
                 // Append jobs until all piped jobs are running
-                for (mut child, ckind) in commands {
+                for mut child in commands {
                     // Keep a reference to the FD to keep them open
                     let mut ext_stdio_pipes: Option<Vec<File>> = None;
 
@@ -514,14 +485,14 @@ impl<'b> Shell<'b> {
                         }
                         child.stdin(unsafe { File::from_raw_fd(reader) });
                         let writer = unsafe { File::from_raw_fd(writer) };
-                        match kind {
+                        match parent.redirection {
                             RedirectFrom::None => (),
                             RedirectFrom::Stderr => parent.stderr(writer),
                             RedirectFrom::Stdout => parent.stdout(writer),
                             RedirectFrom::Both => {
                                 let duped = writer.try_clone().map_err(|why| {
                                     RedirectError::from(OutputError {
-                                        redirect: kind,
+                                        redirect: parent.redirection,
                                         file: "pipe".to_string(),
                                         why,
                                     })
@@ -532,17 +503,16 @@ impl<'b> Shell<'b> {
                         }
                     }
 
-                    spawn_proc(self, parent, kind, &mut last_pid, &mut current_pid, &mut pgid)?;
+                    spawn_proc(self, parent, &mut last_pid, &mut current_pid, &mut pgid)?;
 
                     last_pid = Some(current_pid);
                     parent = child;
-                    kind = ckind;
-                    if ckind == RedirectFrom::None {
+                    if parent.redirection == RedirectFrom::None {
                         break;
                     }
                 }
 
-                spawn_proc(self, parent, kind, &mut last_pid, &mut current_pid, &mut pgid)?;
+                spawn_proc(self, parent, &mut last_pid, &mut current_pid, &mut pgid)?;
                 if !self.opts.is_background_shell {
                     unistd::tcsetpgrp(nix::libc::STDIN_FILENO, pgid.unwrap())
                         .map_err(PipelineError::TerminalGrabFailed)?;
@@ -572,12 +542,11 @@ impl<'b> Shell<'b> {
 fn spawn_proc(
     shell: &mut Shell<'_>,
     cmd: RefinedJob<'_>,
-    redirection: RedirectFrom,
     last_pid: &mut Option<Pid>,
     current_pid: &mut Pid,
     group: &mut Option<Pid>,
 ) -> Result<(), PipelineError> {
-    let RefinedJob { mut var, args, stdin, stdout, stderr } = cmd;
+    let RefinedJob { mut var, args, stdin, stdout, stderr, redirection } = cmd;
     let pid = match var {
         Variant::External => {
             let mut command = Command::new(&args[0].as_str());

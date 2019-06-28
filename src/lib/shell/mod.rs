@@ -14,7 +14,7 @@ pub(crate) mod sys;
 /// Variables for the shell
 pub mod variables;
 
-pub(crate) use self::job::Job;
+pub(crate) use self::job::{Job, RefinedJob};
 use self::{
     directory_stack::DirectoryStack,
     flow_control::{Block, Function, FunctionError, Statement},
@@ -95,8 +95,6 @@ impl From<ExpansionError<IonError>> for IonError {
 pub struct Options {
     /// Exit from the shell on the first error.
     pub err_exit: bool,
-    /// Print commands that are to be executed.
-    pub print_comms: bool,
     /// Do not execute any commands given to the shell.
     pub no_exec: bool,
     /// Hangup on exiting the shell.
@@ -135,8 +133,15 @@ pub struct Shell<'a> {
     /// background process.
     foreground_signals: Arc<foreground::Signals>,
     /// Custom callback for each command call
-    on_command: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
+    on_command: Option<OnCommandCallback<'a>>,
+    /// Custom callback before each command call
+    pre_command: Option<PreCommandCallback<'a>>,
 }
+
+/// A callback that is executed after each pipeline is run
+pub type OnCommandCallback<'a> = Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>;
+/// A callback that is executed before each pipeline is run
+pub type PreCommandCallback<'a> = Box<dyn Fn(&Shell<'_>, &Pipeline<RefinedJob<'_>>) + 'a>;
 
 impl<'a> Default for Shell<'a> {
     fn default() -> Self { Self::new() }
@@ -191,7 +196,6 @@ impl<'a> Shell<'a> {
             previous_status: Status::SUCCESS,
             opts: Options {
                 err_exit:            false,
-                print_comms:         false,
                 no_exec:             false,
                 huponexit:           false,
                 is_background_shell: true,
@@ -199,6 +203,7 @@ impl<'a> Shell<'a> {
             background: Arc::new(Mutex::new(Vec::new())),
             foreground_signals: Arc::new(foreground::Signals::new()),
             on_command: None,
+            pre_command: None,
             unterminated: false,
         }
     }
@@ -270,13 +275,12 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub fn run_pipeline(&mut self, pipeline: &Pipeline<'a>) -> Result<Status, IonError> {
+    pub fn run_pipeline(&mut self, pipeline: &Pipeline<Job<'a>>) -> Result<Status, IonError> {
         let command_start_time = SystemTime::now();
 
         let pipeline = pipeline.expand(self)?;
-        // A string representing the command is stored here.
-        if self.opts.print_comms {
-            eprintln!("> {}", pipeline);
+        if let Some(ref callback) = self.pre_command {
+            callback(self, &pipeline);
         }
 
         // Don't execute commands when the `-n` flag is passed.
@@ -325,20 +329,23 @@ impl<'a> Shell<'a> {
         }
     }
 
+    /// Set the callback to call before each command
+    pub fn set_pre_command(&mut self, callback: Option<PreCommandCallback<'a>>) {
+        self.pre_command = callback;
+    }
+
+    /// Set the callback to call before each command
+    pub fn pre_command_mut(&mut self) -> &mut Option<PreCommandCallback<'a>> {
+        &mut self.pre_command
+    }
+
     /// Set the callback to call on each command
-    pub fn set_on_command(
-        &mut self,
-        callback: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
-    ) {
+    pub fn set_on_command(&mut self, callback: Option<OnCommandCallback<'a>>) {
         self.on_command = callback;
     }
 
     /// Set the callback to call on each command
-    pub fn on_command_mut(
-        &mut self,
-    ) -> &mut Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>> {
-        &mut self.on_command
-    }
+    pub fn on_command_mut(&mut self) -> &mut Option<OnCommandCallback<'a>> { &mut self.on_command }
 
     /// Get access to the builtins
     pub const fn builtins(&self) -> &BuiltinMap<'a> { &self.builtins }
