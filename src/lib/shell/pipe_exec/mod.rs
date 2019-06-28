@@ -110,7 +110,7 @@ pub enum PipelineError {
 
     /// Failed to send signal to a process group. This typically happens when trying to start the
     /// pipeline after it's creation
-    #[error(display = "could not start the processes: {}", _0)]
+    #[error(display = "could not kill the processes: {}", _0)]
     KillFailed(#[error(cause)] nix::Error),
 }
 
