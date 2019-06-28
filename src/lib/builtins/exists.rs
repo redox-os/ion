@@ -198,6 +198,7 @@ mod tests {
         shell::flow_control::Statement,
         types,
     };
+    use std::rc::Rc;
 
     #[test]
     fn test_evaluate_arguments() {
@@ -318,7 +319,12 @@ mod tests {
 
         shell.variables_mut().set(
             &name,
-            Value::Function(Function::new(Some(description), name.clone(), args, statements)),
+            Value::Function(Rc::new(Function::new(
+                Some(description),
+                name.clone(),
+                args,
+                statements,
+            ))),
         );
 
         assert!(builtin_exists(&["ion".into(), "--fn".into(), name_str.into()], &mut shell)
@@ -462,7 +468,12 @@ mod tests {
 
         shell.variables_mut().set(
             &name,
-            Value::Function(Function::new(Some(description), name.clone(), args, statements)),
+            Value::Function(Rc::new(Function::new(
+                Some(description),
+                name.clone(),
+                args,
+                statements,
+            ))),
         );
 
         assert_eq!(function_is_defined(name_str, &shell), true);

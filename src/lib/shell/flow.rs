@@ -16,6 +16,7 @@ use crate::{
 use err_derive::Error;
 use itertools::Itertools;
 use nix::unistd::Pid;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Condition {
@@ -364,12 +365,12 @@ impl<'a> Shell<'a> {
             Statement::Function { name, args, statements, description } => {
                 self.variables.set(
                     name,
-                    Value::Function(Function::new(
+                    Value::Function(Rc::new(Function::new(
                         description.clone(),
                         name.clone(),
                         args.to_vec(),
                         statements.to_vec(),
-                    )),
+                    ))),
                 );
             }
             Statement::Pipeline(pipeline) => {
@@ -489,16 +490,13 @@ impl<'a> Shell<'a> {
                 // let pattern_is_array = is_array(&value);
                 let previous_bind = case.binding.as_ref().and_then(|bind| {
                     if is_array {
-                        let out =
-                            if let Some(Value::Array(array)) = self.variables.get(bind).cloned() {
-                                Some(Value::Array(array))
-                            } else {
-                                None
-                            };
-                        self.variables_mut().set(
-                            bind,
-                            value.iter().cloned().map(Value::Str).collect::<Value<Function<'a>>>(),
-                        );
+                        let out = if let Some(Value::Array(array)) = self.variables.get(bind) {
+                            Some(Value::Array(array.clone()))
+                        } else {
+                            None
+                        };
+                        self.variables_mut()
+                            .set(bind, value.iter().cloned().map(Value::Str).collect::<Value<_>>());
                         out
                     } else {
                         let out = self.variables.get_str(bind);

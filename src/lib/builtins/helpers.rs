@@ -1,4 +1,5 @@
 use super::{super::types, Value};
+use std::rc::Rc;
 
 /// The exit status of a command
 ///
@@ -57,7 +58,7 @@ impl Status {
     pub fn toggle(&mut self) { self.0 = if self.is_success() { 1 } else { 0 }; }
 }
 
-impl<'a> From<Status> for Value<types::Function<'a>> {
+impl<'a> From<Status> for Value<Rc<types::Function<'a>>> {
     fn from(status: Status) -> Self { Value::Str(status.into()) }
 }
 

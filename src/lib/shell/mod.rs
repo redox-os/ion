@@ -43,6 +43,7 @@ use nix::sys::signal::{self, SigHandler};
 use std::{
     io::{self, Write},
     ops::{Deref, DerefMut},
+    rc::Rc,
     sync::{atomic::Ordering, Arc, Mutex},
     time::SystemTime,
 };
@@ -386,7 +387,7 @@ impl<'a> Shell<'a> {
     /// Get the last command's return code and/or the code for the error
     pub const fn previous_status(&self) -> Status { self.previous_status }
 
-    fn assign(&mut self, key: &Key<'_>, value: Value<Function<'a>>) -> Result<(), String> {
+    fn assign(&mut self, key: &Key<'_>, value: Value<Rc<Function<'a>>>) -> Result<(), String> {
         match (&key.kind, &value) {
             (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
                 let index = value_check(self, index_name, index_kind)

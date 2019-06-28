@@ -4,7 +4,7 @@ use crate::{
     shell::variables::Value,
     types,
 };
-use std::iter::Iterator;
+use std::{iter::Iterator, rc::Rc};
 
 /// Determines if the supplied value is either an array or a string.
 ///
@@ -46,7 +46,7 @@ fn get_map_of<E: Expander>(
     primitive_type: &Primitive,
     shell: &E,
     expression: &str,
-) -> expansion::Result<Value<types::Function<'static>>, E::Error> {
+) -> expansion::Result<Value<Rc<types::Function<'static>>>, E::Error> {
     let array = shell.expand_string(expression)?;
 
     let inner_kind = match primitive_type {
@@ -95,7 +95,7 @@ pub fn value_check<E: Expander>(
     shell: &E,
     value: &str,
     expected: &Primitive,
-) -> expansion::Result<Value<types::Function<'static>>, E::Error> {
+) -> expansion::Result<Value<Rc<types::Function<'static>>>, E::Error> {
     if is_array(value) {
         let extracted = shell.get_array(value)?;
         match expected {
