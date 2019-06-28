@@ -240,6 +240,7 @@ fn do_tee<'a>(
             .create(true)
             .write(true)
             .append(output.append)
+            .truncate(!output.append)
             .open(output.file.as_str())
         {
             Ok(file) => match output.from {
