@@ -237,7 +237,7 @@ impl<'a> Shell<'a> {
         &self,
         capture: Capture,
         child_func: F,
-    ) -> nix::Result<IonResult> {
+    ) -> Result<IonResult, PipelineError> {
         Fork::new(self, capture).exec(child_func)
     }
 

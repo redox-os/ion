@@ -1,13 +1,12 @@
-use super::{sys, IonError, Shell};
+use super::{
+    pipe_exec::{create_pipe, PipelineError},
+    sys, IonError, Shell,
+};
 use nix::{
-    fcntl::OFlag,
     sys::wait::{self, WaitPidFlag, WaitStatus},
     unistd::{self, ForkResult, Pid},
 };
-use std::{
-    fs::File,
-    os::unix::io::{AsRawFd, FromRawFd},
-};
+use std::{fs::File, os::unix::io::AsRawFd};
 
 pub fn wait_for_child(pid: unistd::Pid) -> nix::Result<i32> {
     loop {
@@ -69,21 +68,19 @@ impl<'a, 'b> Fork<'a, 'b> {
     pub fn exec<F: FnMut(&mut Shell<'b>) -> Result<(), IonError> + 'a>(
         self,
         mut child_func: F,
-    ) -> nix::Result<IonResult> {
+    ) -> Result<IonResult, PipelineError> {
         sys::signals::block();
 
         // If we are to capture stdout, create a pipe for capturing outputs.
         let outs = if self.capture as u8 & Capture::Stdout as u8 != 0 {
-            let fds = unistd::pipe2(OFlag::O_CLOEXEC)?;
-            Some(unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
+            Some(create_pipe()?)
         } else {
             None
         };
 
         // And if we are to capture stderr, create a pipe for that as well.
         let errs = if self.capture as u8 & Capture::Stderr as u8 != 0 {
-            let fds = unistd::pipe2(OFlag::O_CLOEXEC)?;
-            Some(unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
+            Some(create_pipe()?)
         } else {
             None
         };
@@ -93,7 +90,7 @@ impl<'a, 'b> Fork<'a, 'b> {
         // be repeated.
         let null_file = File::open(sys::NULL_PATH);
 
-        match unistd::fork()? {
+        match unistd::fork().map_err(PipelineError::Fork)? {
             ForkResult::Child => {
                 // Allow the child to handle it's own signal handling.
                 sys::signals::unblock();
@@ -143,7 +140,7 @@ impl<'a, 'b> Fork<'a, 'b> {
                         read
                     }),
                     // `waitpid()` is required to reap the child.
-                    status: wait_for_child(child)?,
+                    status: wait_for_child(child).map_err(PipelineError::WaitPid)?,
                 })
             }
         }

@@ -41,6 +41,21 @@ pub enum Input {
     HereString(types::Str),
 }
 
+impl<'a> fmt::Display for RedirectFrom {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                RedirectFrom::Stdout => "stdout",
+                RedirectFrom::Stderr => "stderr",
+                RedirectFrom::Both => "both stdout and stderr",
+                RedirectFrom::None => "nothing",
+            },
+        )
+    }
+}
+
 impl<'a> fmt::Display for Input {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

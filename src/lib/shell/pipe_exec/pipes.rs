@@ -6,6 +6,12 @@ use super::{
 use nix::{fcntl::OFlag, unistd};
 use std::{fs::File, os::unix::io::FromRawFd};
 
+pub fn create_pipe() -> Result<(File, File), PipelineError> {
+    let (reader, writer) =
+        unistd::pipe2(OFlag::O_CLOEXEC).map_err(PipelineError::CreatePipeError)?;
+    Ok(unsafe { (File::from_raw_fd(reader), File::from_raw_fd(writer)) })
+}
+
 pub struct TeePipe<'a, 'b> {
     parent:          &'a mut RefinedJob<'b>,
     ext_stdio_pipes: &'a mut Option<Vec<File>>,
@@ -25,15 +31,14 @@ impl<'a, 'b> TeePipe<'a, 'b> {
     where
         F: FnMut(&mut RefinedJob<'b>, File),
     {
-        let (reader, writer) =
-            unistd::pipe2(OFlag::O_CLOEXEC).map_err(PipelineError::CreatePipeError)?;
-        (*tee).source = Some(unsafe { File::from_raw_fd(reader) });
-        action(self.parent, unsafe { File::from_raw_fd(writer) });
+        let (reader, writer) = create_pipe()?;
+        (*tee).source = Some(reader);
         if self.is_external {
             self.ext_stdio_pipes
                 .get_or_insert_with(|| Vec::with_capacity(4))
-                .push(unsafe { File::from_raw_fd(writer) });
+                .push(writer.try_clone().map_err(PipelineError::ClonePipeFailed)?);
         }
+        action(self.parent, writer);
         Ok(())
     }
 
