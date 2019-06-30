@@ -1,8 +1,9 @@
-use crate::parser::lexers::ArgumentSplitter;
+use crate::{parser::lexers::ArgumentSplitter, shell::flow_control::Case};
 use err_derive::Error;
+use std::str::FromStr;
 
-#[derive(Debug, PartialEq, Error)]
-pub enum CaseError {
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Error)]
+pub enum Error {
     #[error(display = "no bind variable was supplied")]
     NoBindVariable,
     #[error(display = "no conditional statement was given")]
@@ -13,70 +14,106 @@ pub enum CaseError {
     ExtraVar(String),
 }
 
-pub fn parse_case(data: &str) -> Result<(Option<&str>, Option<&str>, Option<String>), CaseError> {
-    let mut splitter = ArgumentSplitter::new(data);
-    // let argument = splitter.next().ok_or(CaseError::Empty)?;
-    let mut argument = None;
-    let mut binding = None;
-    let mut conditional = None;
-    loop {
-        match splitter.next() {
-            Some("@") => {
-                binding = Some(splitter.next().ok_or(CaseError::NoBindVariable)?);
-                match splitter.next() {
-                    Some("if") => {
-                        // Joining by folding is more efficient than collecting into Vec and then
-                        // joining
-                        let mut string =
-                            splitter.fold(String::with_capacity(5), |mut state, element| {
-                                state.push_str(element);
-                                state.push(' ');
-                                state
-                            });
-                        string.pop(); // Pop out the unneeded ' ' character
-                        if string.is_empty() {
-                            return Err(CaseError::NoConditional);
-                        }
-                        conditional = Some(string);
-                    }
-                    Some(value) => return Err(CaseError::ExtraBind(value.into())),
-                    None => (),
-                }
-            }
-            Some("if") => {
-                // Joining by folding is more efficient than collecting into Vec and then joining
-                let mut string = splitter.fold(String::with_capacity(5), |mut state, element| {
-                    state.push_str(element);
-                    state.push(' ');
-                    state
-                });
-                string.pop(); // Pop out the unneeded ' ' character
-                if string.is_empty() {
-                    return Err(CaseError::NoConditional);
-                }
-                conditional = Some(string);
-            }
-            Some(inner) if argument.is_none() => {
-                argument = Some(inner);
-                continue;
-            }
-            Some(inner) => return Err(CaseError::ExtraVar(inner.into())),
-            None => (),
+impl<'a> FromStr for Case<'a> {
+    type Err = Error;
+
+    fn from_str(data: &str) -> Result<Self, Self::Err> {
+        if data == "_" {
+            return Ok(Case::default());
         }
-        return Ok((argument, binding, conditional));
+        let mut splitter = ArgumentSplitter::new(data);
+        // let argument = splitter.next().ok_or(CaseError::Empty)?;
+        let mut argument = None;
+        let mut binding = None;
+        let mut conditional = None;
+        loop {
+            match splitter.next() {
+                Some("@") => {
+                    binding = Some(splitter.next().ok_or(Error::NoBindVariable)?);
+                    match splitter.next() {
+                        Some("if") => {
+                            // Joining by folding is more efficient than collecting into Vec and
+                            // then joining
+                            let mut string =
+                                splitter.fold(String::with_capacity(5), |mut state, element| {
+                                    state.push_str(element);
+                                    state.push(' ');
+                                    state
+                                });
+                            string.pop(); // Pop out the unneeded ' ' character
+                            if string.is_empty() {
+                                return Err(Error::NoConditional);
+                            }
+                            conditional = Some(string);
+                        }
+                        Some(value) => return Err(Error::ExtraBind(value.into())),
+                        None => (),
+                    }
+                }
+                Some("if") => {
+                    // Joining by folding is more efficient than collecting into Vec and then
+                    // joining
+                    let mut string =
+                        splitter.fold(String::with_capacity(5), |mut state, element| {
+                            state.push_str(element);
+                            state.push(' ');
+                            state
+                        });
+                    string.pop(); // Pop out the unneeded ' ' character
+                    if string.is_empty() {
+                        return Err(Error::NoConditional);
+                    }
+                    conditional = Some(string);
+                }
+                Some(inner) if argument.is_none() => {
+                    argument = Some(inner);
+                    continue;
+                }
+                Some(inner) => return Err(Error::ExtraVar(inner.into())),
+                None => (),
+            }
+            return Ok(Case {
+                value: argument.filter(|&val| val != "_").map(Into::into),
+                binding: binding.map(Into::into),
+                conditional,
+                statements: Vec::new(),
+            });
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::parse_case;
+    use super::*;
+
     #[test]
     fn case_parsing() {
         assert_eq!(
-            Ok((Some("test"), Some("test"), Some("exists".into()))),
-            parse_case("test @ test if exists")
+            Ok(Case {
+                value:       Some("test".into()),
+                binding:     Some("test".into()),
+                conditional: Some("exists".into()),
+                statements:  Vec::new(),
+            }),
+            "test @ test if exists".parse::<Case>()
         );
-        assert_eq!(Ok((Some("test"), Some("test"), None)), parse_case("test @ test"));
-        assert_eq!(Ok((Some("test"), None, None)), parse_case("test"));
+        assert_eq!(
+            Ok(Case {
+                value:       Some("test".into()),
+                binding:     Some("test".into()),
+                conditional: None,
+                statements:  Vec::new(),
+            }),
+            "test @ test".parse::<Case>()
+        );
+        assert_eq!(
+            Ok(Case {
+                value:       Some("test".into()),
+                binding:     None,
+                conditional: None,
+                statements:  Vec::new(),
+            }),
+            "test".parse::<Case>()
+        );
     }
 }

@@ -31,14 +31,4 @@ impl<'a> Shell<'a> {
             Err(())
         }
     }
-
-    /// Execute the function on command not found
-    pub fn command_not_found<S: AsRef<str>>(&self, cmd: S) {
-        if self
-            .fork_function(Capture::None, |_| Ok(()), "COMMAND_NOT_FOUND", &["ion", cmd.as_ref()])
-            .is_err()
-        {
-            eprintln!("ion: command not found: {}", cmd.as_ref());
-        }
-    }
 }

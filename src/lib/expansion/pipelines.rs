@@ -1,6 +1,6 @@
 use super::Expander;
 use crate::{
-    shell::{Job, Shell},
+    shell::{Job, RefinedJob, Shell},
     types,
 };
 use itertools::Itertools;
@@ -86,9 +86,9 @@ impl Default for PipeType {
 /// A pipeline
 ///
 /// Ex: `cat <<< input > output | cat &| cat &`
-pub struct Pipeline<'a> {
+pub struct Pipeline<T> {
     /// The individual commands
-    pub items: Vec<PipeItem<'a>>,
+    pub items: Vec<PipeItem<T>>,
     /// Should the pipeline be runned in background
     pub pipe: PipeType,
 }
@@ -98,20 +98,27 @@ pub struct Pipeline<'a> {
 /// For example `cat <<< input > output` is a pipeitem, with its own redirections, but representing
 /// a single executable to run
 #[derive(Debug, PartialEq, Clone)]
-pub struct PipeItem<'a> {
+pub struct PipeItem<T> {
     /// The command to spawn
-    pub job: Job<'a>,
+    pub job: T,
     /// Where to send output
     pub outputs: Vec<Redirection>,
     /// A list of inputs
     pub inputs: Vec<Input>,
 }
 
-impl<'a> PipeItem<'a> {
+impl<'a> PipeItem<RefinedJob<'a>> {
+    /// Get the command to lookup for execution
+    pub fn command(&self) -> &types::Str { self.job.command() }
+}
+
+impl<'a> PipeItem<Job<'a>> {
     /// Expand a single job to argument literals for execution
-    pub fn expand(&self, shell: &Shell<'a>) -> super::Result<Self, <Shell as Expander>::Error> {
-        let mut job = self.job.clone();
-        job.expand(shell)?;
+    pub fn expand(
+        &self,
+        shell: &Shell<'a>,
+    ) -> super::Result<PipeItem<RefinedJob<'a>>, <Shell as Expander>::Error> {
+        let job = self.job.expand(shell)?;
 
         let inputs = self
             .inputs
@@ -137,16 +144,13 @@ impl<'a> PipeItem<'a> {
         Ok(PipeItem { job, outputs, inputs })
     }
 
-    /// Get the command to lookup for execution
-    pub fn command(&self) -> &types::Str { self.job.command() }
-
     /// Create a new pipeitem with the given job and redirections
     pub const fn new(job: Job<'a>, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
         Self { job, outputs, inputs }
     }
 }
 
-impl<'a> fmt::Display for PipeItem<'a> {
+impl<'a> fmt::Display for PipeItem<RefinedJob<'a>> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.job.args.iter().format(" "))?;
         for input in &self.inputs {
@@ -168,7 +172,7 @@ impl<'a> fmt::Display for PipeItem<'a> {
     }
 }
 
-impl<'a> Pipeline<'a> {
+impl<'a> Pipeline<RefinedJob<'a>> {
     /// Check if the function can be executed without any forking
     pub fn requires_piping(&self) -> bool {
         self.items.len() > 1
@@ -176,18 +180,23 @@ impl<'a> Pipeline<'a> {
             || self.items.iter().any(|it| !it.inputs.is_empty())
             || self.pipe != PipeType::Normal
     }
+}
+
+impl<'a> Pipeline<Job<'a>> {
+    /// A useless, empty pipeline
+    pub fn new() -> Self { Pipeline { pipe: PipeType::Normal, items: Vec::new() } }
 
     /// Expand the pipeline to a set of arguments for execution
-    pub fn expand(&self, shell: &Shell<'a>) -> super::Result<Self, <Shell as Expander>::Error> {
+    pub fn expand(
+        &self,
+        shell: &Shell<'a>,
+    ) -> super::Result<Pipeline<RefinedJob<'a>>, <Shell as Expander>::Error> {
         let items = self.items.iter().map(|i| i.expand(shell)).collect::<Result<_, _>>()?;
         Ok(Pipeline { items, pipe: self.pipe })
     }
-
-    /// A useless, empty pipeline
-    pub fn new() -> Self { Self::default() }
 }
 
-impl<'a> fmt::Display for Pipeline<'a> {
+impl<'a> fmt::Display for Pipeline<RefinedJob<'a>> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

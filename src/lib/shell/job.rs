@@ -1,10 +1,10 @@
 use super::{IonError, Shell};
 use crate::{
-    builtins::BuiltinFunction,
+    builtins::{self, BuiltinFunction},
     expansion::{self, pipelines::RedirectFrom, Expander},
     types, Value,
 };
-use std::{fmt, fs::File, str};
+use std::{fmt, fs::File, iter, path::Path, str};
 
 #[derive(Clone)]
 pub struct Job<'a> {
@@ -13,22 +13,42 @@ pub struct Job<'a> {
     pub builtin:     Option<BuiltinFunction<'a>>,
 }
 
+/// Determines if the supplied command implicitly defines to change the directory.
+///
+/// This is detected by first checking if the argument starts with a '.' or an '/', or ends
+/// with a '/'. If that validates, then it will check if the supplied argument is a valid
+/// directory path.
+#[inline(always)]
+fn is_implicit_cd(argument: &str) -> bool {
+    (argument.starts_with('.') || argument.starts_with('/') || argument.ends_with('/'))
+        && Path::new(argument).is_dir()
+}
+
 impl<'a> Job<'a> {
     /// Get the job command (its first arg)
     pub fn command(&self) -> &types::Str { &self.args[0] }
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
-    pub fn expand(&mut self, shell: &Shell<'_>) -> expansion::Result<(), IonError> {
+    pub fn expand(&self, shell: &Shell<'a>) -> expansion::Result<RefinedJob<'a>, IonError> {
         let mut args = types::Args::new();
         for arg in &self.args {
             args.extend(expand_arg(arg, shell)?);
         }
-        match shell.variables.get(&self.args[0]) {
-            Some(Value::Function(_)) => {}
-            _ => self.args = args,
-        }
-        Ok(())
+
+        Ok(if is_implicit_cd(&args[0]) {
+            RefinedJob::builtin(
+                &builtins::builtin_cd,
+                iter::once("cd".into()).chain(args).collect(),
+                self.redirection,
+            )
+        } else if let Some(Value::Function(_)) = shell.variables.get(&self.args[0]) {
+            RefinedJob::function(self.args.clone(), self.redirection)
+        } else if let Some(builtin) = self.builtin {
+            RefinedJob::builtin(builtin, args, self.redirection)
+        } else {
+            RefinedJob::external(args, self.redirection)
+        })
     }
 
     pub fn new(
@@ -69,11 +89,12 @@ fn expand_arg(arg: &str, shell: &Shell<'_>) -> expansion::Result<types::Args, Io
 /// This represents a job that has been processed and expanded to be run
 /// as part of some pipeline
 pub struct RefinedJob<'a> {
-    pub stdin:  Option<File>,
-    pub stdout: Option<File>,
-    pub stderr: Option<File>,
-    pub args:   types::Args,
-    pub var:    Variant<'a>,
+    pub stdin:       Option<File>,
+    pub stdout:      Option<File>,
+    pub stderr:      Option<File>,
+    pub args:        types::Args,
+    pub var:         Variant<'a>,
+    pub redirection: RedirectFrom,
 }
 
 pub enum Variant<'a> {
@@ -179,35 +200,52 @@ impl<'a> RefinedJob<'a> {
 
     pub fn stdin(&mut self, file: File) { self.stdin = Some(file); }
 
-    pub fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
+    pub fn tee(
+        tee_out: Option<TeeItem>,
+        tee_err: Option<TeeItem>,
+        redirection: RedirectFrom,
+    ) -> Self {
         Self {
-            stdin:  None,
+            stdin: None,
             stdout: None,
             stderr: None,
-            args:   types::Args::new(),
-            var:    Variant::Tee { items: (tee_out, tee_err) },
+            args: types::Args::new(),
+            var: Variant::Tee { items: (tee_out, tee_err) },
+            redirection,
         }
     }
 
-    pub fn cat(sources: Vec<File>) -> Self {
+    pub fn cat(sources: Vec<File>, redirection: RedirectFrom) -> Self {
         Self {
-            stdin:  None,
+            stdin: None,
             stdout: None,
             stderr: None,
-            args:   types::Args::new(),
-            var:    Variant::Cat { sources },
+            args: types::Args::new(),
+            var: Variant::Cat { sources },
+            redirection,
         }
     }
 
-    pub const fn function(args: types::Args) -> Self {
-        Self { stdin: None, stdout: None, stderr: None, args, var: Variant::Function }
+    pub const fn function(args: types::Args, redirection: RedirectFrom) -> Self {
+        Self { stdin: None, stdout: None, stderr: None, args, var: Variant::Function, redirection }
     }
 
-    pub fn builtin(main: BuiltinFunction<'a>, args: types::Args) -> Self {
-        Self { stdin: None, stdout: None, stderr: None, args, var: Variant::Builtin { main } }
+    pub fn builtin(
+        main: BuiltinFunction<'a>,
+        args: types::Args,
+        redirection: RedirectFrom,
+    ) -> Self {
+        Self {
+            stdin: None,
+            stdout: None,
+            stderr: None,
+            args,
+            var: Variant::Builtin { main },
+            redirection,
+        }
     }
 
-    pub const fn external(args: types::Args) -> Self {
-        Self { stdin: None, stdout: None, stderr: None, args, var: Variant::External }
+    pub const fn external(args: types::Args, redirection: RedirectFrom) -> Self {
+        Self { stdin: None, stdout: None, stderr: None, args, var: Variant::External, redirection }
     }
 }

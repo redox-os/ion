@@ -62,7 +62,6 @@ pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             for flag in arg.bytes().skip(1) {
                 match flag {
                     b'e' => shell.opts_mut().err_exit = false,
-                    b'x' => shell.opts_mut().print_comms = false,
                     b'o' => match args_iter.next().map(|s| s as &str) {
                         Some("huponexit") => shell.opts_mut().huponexit = false,
                         Some(_) => {
@@ -86,7 +85,7 @@ pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                 // This used to take a `&[String]` but cloned them all, so although
                 // this is non-ideal and could probably be better done with `Rc`, it
                 // hasn't got any slower.
-                let arguments: types::Array<types::Function<'_>> =
+                let arguments: types::Array<_> =
                     iter::once(command).chain(args_iter.cloned().map(Value::Str)).collect();
                 if !(kind == PositionalArgs::RetainIfNone && arguments.len() == 1) {
                     shell.variables_mut().set("args", arguments);

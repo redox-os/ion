@@ -11,7 +11,7 @@ use ion_shell::{
     builtins::{man_pages, Status},
     expansion::Expander,
     parser::Terminator,
-    types, Shell, Signal,
+    types, Capture, IonError, PipelineError, Shell, Signal,
 };
 use itertools::Itertools;
 use liner::{Buffer, Context, KeyBindings};
@@ -263,9 +263,28 @@ impl<'a> InteractiveShell<'a> {
                     {
                         let mut shell = self.shell.borrow_mut();
                         shell.unterminated = false;
-                        if let Err(why) = shell.on_command(&cmd) {
-                            eprintln!("{}", why);
-                            shell.reset_flow();
+                        match shell.on_command(&cmd) {
+                            Ok(_) => (),
+                            Err(IonError::PipelineExecutionError(
+                                PipelineError::CommandNotFound(command),
+                            )) => {
+                                if shell
+                                    .fork_function(
+                                        Capture::None,
+                                        |_| Ok(()),
+                                        "COMMAND_NOT_FOUND",
+                                        &["ion", &command],
+                                    )
+                                    .is_err()
+                                {
+                                    eprintln!("ion: command not found: {}", command);
+                                }
+                                // Status::COULD_NOT_EXEC
+                            }
+                            Err(err) => {
+                                eprintln!("ion: {}", err);
+                                shell.reset_flow();
+                            }
                         }
                     }
                     self.save_command(&cmd);

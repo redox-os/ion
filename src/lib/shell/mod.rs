@@ -14,16 +14,16 @@ pub(crate) mod sys;
 /// Variables for the shell
 pub mod variables;
 
-pub(crate) use self::job::Job;
+pub(crate) use self::job::{Job, RefinedJob};
 use self::{
     directory_stack::DirectoryStack,
-    flow::BlockError,
     flow_control::{Block, Function, FunctionError, Statement},
     fork::{Fork, IonResult},
     pipe_exec::foreground,
     variables::Variables,
 };
 pub use self::{
+    flow::BlockError,
     fork::Capture,
     pipe_exec::{job_control::BackgroundProcess, PipelineError},
     variables::Value,
@@ -31,10 +31,10 @@ pub use self::{
 use crate::{
     assignments::value_check,
     builtins::{BuiltinMap, Status},
-    expansion::{self, pipelines::Pipeline},
+    expansion::{pipelines::Pipeline, Error as ExpansionError},
     parser::{
         lexers::{Key, Primitive},
-        ParseError, StatementError, Terminator,
+        Error as ParseError, Terminator,
     },
 };
 use err_derive::Error;
@@ -43,6 +43,7 @@ use nix::sys::signal::{self, SigHandler};
 use std::{
     io::{self, Write},
     ops::{Deref, DerefMut},
+    rc::Rc,
     sync::{atomic::Ordering, Arc, Mutex},
     time::SystemTime,
 };
@@ -50,36 +51,28 @@ use std::{
 /// Errors from execution
 #[derive(Debug, Error)]
 pub enum IonError {
-    /// Function execution error
-    #[error(display = "function error: {}", _0)]
-    Function(#[error(cause)] FunctionError),
-
+    // Parse-time error
     /// Parsing failed
     #[error(display = "syntax error: {}", _0)]
     InvalidSyntax(#[error(cause)] ParseError),
-
     /// Incorrect order of blocks
     #[error(display = "block error: {}", _0)]
     StatementFlowError(#[error(cause)] BlockError),
 
-    /// Unterminated statement
-    #[error(display = "statement error: {}", _0)]
-    UnterminatedStatementError(#[error(cause)] StatementError),
-
+    // Run time errors
+    /// Function execution error
+    #[error(display = "function error: {}", _0)]
+    Function(#[error(cause)] FunctionError),
     /// Failed to run a pipeline
     #[error(display = "pipeline execution error: {}", _0)]
     PipelineExecutionError(#[error(cause)] PipelineError),
     /// Could not properly expand to a pipeline
     #[error(display = "expansion error: {}", _0)]
-    ExpansionError(#[error(cause)] expansion::Error<IonError>),
+    ExpansionError(#[error(cause)] ExpansionError<IonError>),
 }
 
 impl From<ParseError> for IonError {
     fn from(cause: ParseError) -> Self { IonError::InvalidSyntax(cause) }
-}
-
-impl From<StatementError> for IonError {
-    fn from(cause: StatementError) -> Self { IonError::UnterminatedStatementError(cause) }
 }
 
 impl From<FunctionError> for IonError {
@@ -94,8 +87,8 @@ impl From<PipelineError> for IonError {
     fn from(cause: PipelineError) -> Self { IonError::PipelineExecutionError(cause) }
 }
 
-impl From<expansion::Error<IonError>> for IonError {
-    fn from(cause: expansion::Error<Self>) -> Self { IonError::ExpansionError(cause) }
+impl From<ExpansionError<IonError>> for IonError {
+    fn from(cause: ExpansionError<Self>) -> Self { IonError::ExpansionError(cause) }
 }
 
 /// Options for the shell
@@ -103,8 +96,6 @@ impl From<expansion::Error<IonError>> for IonError {
 pub struct Options {
     /// Exit from the shell on the first error.
     pub err_exit: bool,
-    /// Print commands that are to be executed.
-    pub print_comms: bool,
     /// Do not execute any commands given to the shell.
     pub no_exec: bool,
     /// Hangup on exiting the shell.
@@ -143,8 +134,15 @@ pub struct Shell<'a> {
     /// background process.
     foreground_signals: Arc<foreground::Signals>,
     /// Custom callback for each command call
-    on_command: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
+    on_command: Option<OnCommandCallback<'a>>,
+    /// Custom callback before each command call
+    pre_command: Option<PreCommandCallback<'a>>,
 }
+
+/// A callback that is executed after each pipeline is run
+pub type OnCommandCallback<'a> = Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>;
+/// A callback that is executed before each pipeline is run
+pub type PreCommandCallback<'a> = Box<dyn Fn(&Shell<'_>, &Pipeline<RefinedJob<'_>>) + 'a>;
 
 impl<'a> Default for Shell<'a> {
     fn default() -> Self { Self::new() }
@@ -199,7 +197,6 @@ impl<'a> Shell<'a> {
             previous_status: Status::SUCCESS,
             opts: Options {
                 err_exit:            false,
-                print_comms:         false,
                 no_exec:             false,
                 huponexit:           false,
                 is_background_shell: true,
@@ -207,6 +204,7 @@ impl<'a> Shell<'a> {
             background: Arc::new(Mutex::new(Vec::new())),
             foreground_signals: Arc::new(foreground::Signals::new()),
             on_command: None,
+            pre_command: None,
             unterminated: false,
         }
     }
@@ -278,13 +276,12 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub fn run_pipeline(&mut self, pipeline: &Pipeline<'a>) -> Result<Status, IonError> {
+    pub fn run_pipeline(&mut self, pipeline: &Pipeline<Job<'a>>) -> Result<Status, IonError> {
         let command_start_time = SystemTime::now();
 
         let pipeline = pipeline.expand(self)?;
-        // A string representing the command is stored here.
-        if self.opts.print_comms {
-            eprintln!("> {}", pipeline);
+        if let Some(ref callback) = self.pre_command {
+            callback(self, &pipeline);
         }
 
         // Don't execute commands when the `-n` flag is passed.
@@ -309,16 +306,7 @@ impl<'a> Shell<'a> {
             }
         } else {
             self.execute_pipeline(pipeline).map_err(Into::into)
-        };
-
-        let exit_status = match exit_status {
-            Ok(exit_status) => exit_status,
-            Err(IonError::PipelineExecutionError(PipelineError::CommandNotFound(command))) => {
-                self.command_not_found(&command);
-                Status::COULD_NOT_EXEC
-            }
-            Err(err) => return Err(err),
-        };
+        }?;
 
         if let Some(ref callback) = self.on_command {
             if let Ok(elapsed_time) = command_start_time.elapsed() {
@@ -342,20 +330,23 @@ impl<'a> Shell<'a> {
         }
     }
 
+    /// Set the callback to call before each command
+    pub fn set_pre_command(&mut self, callback: Option<PreCommandCallback<'a>>) {
+        self.pre_command = callback;
+    }
+
+    /// Set the callback to call before each command
+    pub fn pre_command_mut(&mut self) -> &mut Option<PreCommandCallback<'a>> {
+        &mut self.pre_command
+    }
+
     /// Set the callback to call on each command
-    pub fn set_on_command(
-        &mut self,
-        callback: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
-    ) {
+    pub fn set_on_command(&mut self, callback: Option<OnCommandCallback<'a>>) {
         self.on_command = callback;
     }
 
     /// Set the callback to call on each command
-    pub fn on_command_mut(
-        &mut self,
-    ) -> &mut Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>> {
-        &mut self.on_command
-    }
+    pub fn on_command_mut(&mut self) -> &mut Option<OnCommandCallback<'a>> { &mut self.on_command }
 
     /// Get access to the builtins
     pub const fn builtins(&self) -> &BuiltinMap<'a> { &self.builtins }
@@ -396,7 +387,7 @@ impl<'a> Shell<'a> {
     /// Get the last command's return code and/or the code for the error
     pub const fn previous_status(&self) -> Status { self.previous_status }
 
-    fn assign(&mut self, key: &Key<'_>, value: Value<Function<'a>>) -> Result<(), String> {
+    fn assign(&mut self, key: &Key<'_>, value: Value<Rc<Function<'a>>>) -> Result<(), String> {
         match (&key.kind, &value) {
             (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
                 let index = value_check(self, index_name, index_kind)

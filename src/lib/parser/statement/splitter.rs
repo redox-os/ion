@@ -2,42 +2,13 @@
 // - Rewrite this in the same style as shell_expand::words.
 // - Validate syntax in methods
 
-use err_derive::Error;
+use super::Error;
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 enum LogicalOp {
     And,
     Or,
     None,
-}
-
-/// Error during statement parsing
-#[derive(Debug, PartialEq, Error)]
-pub enum StatementError {
-    /// The command name is illegal
-    #[error(display = "illegal command name: {}", _0)]
-    IllegalCommandName(String),
-    /// Invalid character found
-    #[error(display = "syntax error: '{}' at position {} is out of place", _0, _1)]
-    InvalidCharacter(char, usize),
-    /// Unterminated subshell
-    #[error(display = "syntax error: unterminated subshell")]
-    UnterminatedSubshell,
-    /// Unterminated namespaced variable
-    #[error(display = "syntax error: unterminated brace")]
-    UnterminatedBracedVar,
-    /// Unterminated brace expansion
-    #[error(display = "syntax error: unterminated braced var")]
-    UnterminatedBrace,
-    /// Unterminated method
-    #[error(display = "syntax error: unterminated method")]
-    UnterminatedMethod,
-    /// Unterminated arithmetic expression
-    #[error(display = "syntax error: unterminated arithmetic subexpression")]
-    UnterminatedArithmetic,
-    /// Expected command but found ...
-    #[error(display = "expected command, but found {}", _0)]
-    ExpectedCommandButFound(&'static str),
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -101,7 +72,7 @@ impl<'a> StatementSplitter<'a> {
 }
 
 impl<'a> Iterator for StatementSplitter<'a> {
-    type Item = Result<StatementVariant<'a>, StatementError>;
+    type Item = Result<StatementVariant<'a>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.read;
@@ -129,7 +100,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 {
                     // If we are just ending the braced section continue as normal
                     if error.is_none() {
-                        error = Some(StatementError::InvalidCharacter(character as char, i + 1))
+                        error = Some(Error::InvalidCharacter(character as char, i + 1))
                     }
                 }
                 // Toggle quotes and stop matching variables.
@@ -148,7 +119,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 b'(' if self.variable => self.paren_level += 1,
                 b'(' if error.is_none() && !self.quotes => {
-                    error = Some(StatementError::InvalidCharacter(character as char, i + 1))
+                    error = Some(Error::InvalidCharacter(character as char, i + 1))
                 }
                 b')' if self.math_paren_level == 1 => match bytes.peek() {
                     Some(&(_, b')')) => {
@@ -156,9 +127,9 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         self.skip = true;
                     }
                     Some(&(_, next)) if error.is_none() => {
-                        error = Some(StatementError::InvalidCharacter(next as char, i + 1));
+                        error = Some(Error::InvalidCharacter(next as char, i + 1));
                     }
-                    None if error.is_none() => error = Some(StatementError::UnterminatedArithmetic),
+                    None if error.is_none() => error = Some(Error::UnterminatedArithmetic),
                     _ => {}
                 },
                 b'(' if self.math_paren_level != 0 => {
@@ -166,7 +137,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 b')' if self.paren_level == 0 => {
                     if !self.variable && error.is_none() && !self.quotes {
-                        error = Some(StatementError::InvalidCharacter(character as char, i + 1))
+                        error = Some(Error::InvalidCharacter(character as char, i + 1))
                     }
                     self.variable = false;
                 }
@@ -179,7 +150,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'}' => {
                     if self.brace_level == 0 {
                         if error.is_none() {
-                            error = Some(StatementError::InvalidCharacter(character as char, i + 1))
+                            error = Some(Error::InvalidCharacter(character as char, i + 1))
                         }
                     } else {
                         self.brace_level -= 1;
@@ -213,25 +184,23 @@ impl<'a> Iterator for StatementSplitter<'a> {
         self.read = self.data.len();
         error.map(Err).or_else(|| {
             if self.paren_level != 0 && self.variable {
-                Some(Err(StatementError::UnterminatedMethod))
+                Some(Err(Error::UnterminatedMethod))
             } else if self.paren_level != 0 {
-                Some(Err(StatementError::UnterminatedSubshell))
+                Some(Err(Error::UnterminatedSubshell))
             } else if self.vbrace {
-                Some(Err(StatementError::UnterminatedBracedVar))
+                Some(Err(Error::UnterminatedBracedVar))
             } else if self.brace_level != 0 {
-                Some(Err(StatementError::UnterminatedBrace))
+                Some(Err(Error::UnterminatedBrace))
             } else if self.math_paren_level != 0 {
-                Some(Err(StatementError::UnterminatedArithmetic))
+                Some(Err(Error::UnterminatedArithmetic))
             } else {
                 let output = self.data[start..].trim();
                 output.as_bytes().get(0).map(|c| match c {
-                    b'>' | b'<' | b'^' => {
-                        Err(StatementError::ExpectedCommandButFound("redirection"))
-                    }
-                    b'|' => Err(StatementError::ExpectedCommandButFound("pipe")),
-                    b'&' => Err(StatementError::ExpectedCommandButFound("&")),
+                    b'>' | b'<' | b'^' => Err(Error::ExpectedCommandButFound("redirection")),
+                    b'|' => Err(Error::ExpectedCommandButFound("pipe")),
+                    b'&' => Err(Error::ExpectedCommandButFound("&")),
                     b'*' | b'%' | b'?' | b'{' | b'}' => {
-                        Err(StatementError::IllegalCommandName(String::from(output)))
+                        Err(Error::IllegalCommandName(String::from(output)))
                     }
                     _ => {
                         let stmt = self.get_statement_from(output);
@@ -248,20 +217,20 @@ impl<'a> Iterator for StatementSplitter<'a> {
 fn syntax_errors() {
     let command = "echo (echo one); echo $( (echo one); echo ) two; echo $(echo one";
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
-    assert_eq!(results[0], Err(StatementError::InvalidCharacter('(', 6)));
-    assert_eq!(results[1], Err(StatementError::InvalidCharacter('(', 26)));
-    assert_eq!(results[2], Err(StatementError::InvalidCharacter(')', 43)));
-    assert_eq!(results[3], Err(StatementError::UnterminatedSubshell));
+    assert_eq!(results[0], Err(Error::InvalidCharacter('(', 6)));
+    assert_eq!(results[1], Err(Error::InvalidCharacter('(', 26)));
+    assert_eq!(results[2], Err(Error::InvalidCharacter(')', 43)));
+    assert_eq!(results[3], Err(Error::UnterminatedSubshell));
     assert_eq!(results.len(), 4);
 
     let command = ">echo";
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
-    assert_eq!(results[0], Err(StatementError::ExpectedCommandButFound("redirection")));
+    assert_eq!(results[0], Err(Error::ExpectedCommandButFound("redirection")));
     assert_eq!(results.len(), 1);
 
     let command = "echo $((foo bar baz)";
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
-    assert_eq!(results[0], Err(StatementError::UnterminatedArithmetic));
+    assert_eq!(results[0], Err(Error::UnterminatedArithmetic));
     assert_eq!(results.len(), 1);
 }
 
