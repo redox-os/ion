@@ -16,7 +16,7 @@ use self::{job_control::ProcessState, pipes::TeePipe};
 use super::{
     job::{RefinedJob, TeeItem, Variant},
     signals::{self, SignalHandler},
-    Shell, Value,
+    IonError, Shell, Value,
 };
 use crate::{
     builtins::Status,
@@ -336,12 +336,9 @@ impl<'b> Shell<'b> {
         Status::SUCCESS
     }
 
-    fn exec_function<S: AsRef<str>>(&mut self, name: &str, args: &[S]) -> Status {
+    fn exec_function<S: AsRef<str>>(&mut self, name: &str, args: &[S]) -> Result<Status, IonError> {
         if let Some(Value::Function(function)) = self.variables.get(name).cloned() {
-            match function.execute(self, args) {
-                Ok(()) => Status::SUCCESS,
-                Err(why) => Status::error(format!("{}", why)),
-            }
+            function.execute(self, args).map(|_| self.previous_status)
         } else {
             unreachable!()
         }
@@ -351,18 +348,18 @@ impl<'b> Shell<'b> {
     ///
     /// The aforementioned `RefinedJob` may be either a builtin or external command.
     /// The purpose of this function is therefore to execute both types accordingly.
-    fn exec_job(&mut self, job: &RefinedJob<'b>) -> Result<Status, PipelineError> {
+    fn exec_job(&mut self, job: &RefinedJob<'b>) -> Result<Status, IonError> {
         // Duplicate file descriptors, execute command, and redirect back.
         let (stdin_bk, stdout_bk, stderr_bk) =
             streams::duplicate().map_err(PipelineError::CreatePipeError)?;
         streams::redirect(&job.stdin, &job.stdout, &job.stderr)?;
         let code = match job.var {
-            Variant::Builtin { main } => main(job.args(), self),
+            Variant::Builtin { main } => Ok(main(job.args(), self)),
             Variant::Function => self.exec_function(job.command(), job.args()),
             _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
         };
         streams::redirect(&stdin_bk, &Some(stdout_bk), &Some(stderr_bk))?;
-        Ok(code)
+        code
     }
 
     /// Given a pipeline, generates commands and executes them.
@@ -384,7 +381,7 @@ impl<'b> Shell<'b> {
     pub fn execute_pipeline(
         &mut self,
         pipeline: Pipeline<RefinedJob<'b>>,
-    ) -> Result<Status, PipelineError> {
+    ) -> Result<Status, IonError> {
         // While active, the SIGTTOU signal will be ignored.
         let _sig_ignore = SignalHandler::new();
 
@@ -407,7 +404,7 @@ impl<'b> Shell<'b> {
     /// Executes a piped job `job1 | job2 | job3`
     ///
     /// This function will panic if called with an empty slice
-    fn pipe(&mut self, pipeline: Pipeline<RefinedJob<'b>>) -> Result<Status, PipelineError> {
+    fn pipe(&mut self, pipeline: Pipeline<RefinedJob<'b>>) -> Result<Status, IonError> {
         let mut commands = prepare(pipeline)?.into_iter().peekable();
 
         if let Some(mut parent) = commands.next() {
@@ -456,12 +453,13 @@ impl<'b> Shell<'b> {
                             RedirectFrom::Stderr => parent.stderr(writer),
                             RedirectFrom::Stdout => parent.stdout(writer),
                             RedirectFrom::Both => {
-                                let duped =
-                                    writer.try_clone().map_err(|why| RedirectError::Output {
+                                let duped = writer.try_clone().map_err(|why| {
+                                    PipelineError::RedirectPipeError(RedirectError::Output {
                                         redirect: parent.redirection,
                                         file: "pipe".to_string(),
                                         why,
-                                    })?;
+                                    })
+                                })?;
                                 parent.stderr(writer);
                                 parent.stdout(duped);
                             }
@@ -541,7 +539,9 @@ fn spawn_proc(
             fork_exec_internal(stdout, stderr, stdin, *group, |_, _, _| main(&args, shell))
         }
         Variant::Function => fork_exec_internal(stdout, stderr, stdin, *group, |_, _, _| {
-            shell.exec_function(&args[0], &args)
+            shell
+                .exec_function(&args[0], &args)
+                .unwrap_or_else(|why| Status::error(format!("{}", why)))
         }),
         Variant::Cat { ref mut sources } => {
             fork_exec_internal(stdout, None, stdin, *group, |_, _, mut stdin| {

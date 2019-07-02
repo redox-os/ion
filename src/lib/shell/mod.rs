@@ -47,6 +47,7 @@ use nix::{
     unistd::Pid,
 };
 use std::{
+    fs::File,
     io::{self, Write},
     ops::{Deref, DerefMut},
     rc::Rc,
@@ -139,12 +140,19 @@ pub struct Shell<'a> {
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<foreground::Signals>,
+
+    // Callbacks
     /// Custom callback for each command call
     on_command: Option<OnCommandCallback<'a>>,
     /// Custom callback before each command call
     pre_command: Option<PreCommandCallback<'a>>,
     /// Custom callback when a background event occurs
     background_event: Option<BackgroundEventCallback>,
+
+    // Default std pipes
+    stdin:  Option<File>,
+    stdout: Option<File>,
+    stderr: Option<File>,
 }
 
 /// A callback that is executed after each pipeline is run
@@ -212,8 +220,21 @@ impl<'a> Shell<'a> {
             pre_command: None,
             background_event: None,
             unterminated: false,
+
+            stdin: None,
+            stdout: None,
+            stderr: None,
         }
     }
+
+    /// Replace the default stdin
+    pub fn stdin<T: Into<Option<File>>>(&mut self, stdin: T) { self.stdin = stdin.into() }
+
+    /// Replace the default stdin
+    pub fn stdout<T: Into<Option<File>>>(&mut self, stdout: T) { self.stdout = stdout.into() }
+
+    /// Replace the default stdin
+    pub fn stderr<T: Into<Option<File>>>(&mut self, stderr: T) { self.stderr = stderr.into() }
 
     /// Access the directory stack
     pub const fn dir_stack(&self) -> &DirectoryStack { &self.directory_stack }
@@ -285,34 +306,32 @@ impl<'a> Shell<'a> {
     pub fn run_pipeline(&mut self, pipeline: &Pipeline<Job<'a>>) -> Result<Status, IonError> {
         let command_start_time = SystemTime::now();
 
-        let pipeline = pipeline.expand(self)?;
+        let mut pipeline = pipeline.expand(self)?;
+        for item in &mut pipeline.items {
+            // TODO: Once the rust version is shifted to 1.33, use the transpose method
+            item.job.stdin = if let Some(file) = &self.stdin {
+                Some(file.try_clone().map_err(PipelineError::ClonePipeFailed)?)
+            } else {
+                None
+            };
+            item.job.stdout = if let Some(file) = &self.stdout {
+                Some(file.try_clone().map_err(PipelineError::ClonePipeFailed)?)
+            } else {
+                None
+            };
+            item.job.stderr = if let Some(file) = &self.stderr {
+                Some(file.try_clone().map_err(PipelineError::ClonePipeFailed)?)
+            } else {
+                None
+            };
+        }
         if let Some(ref callback) = self.pre_command {
             callback(self, &pipeline);
         }
 
         // Don't execute commands when the `-n` flag is passed.
-        let exit_status = if self.opts.no_exec {
-            Ok(Status::SUCCESS)
-        // Branch else if -> input == shell command i.e. echo
-        } else if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
-            // Run the 'main' of the command and set exit_status
-            if pipeline.requires_piping() {
-                self.execute_pipeline(pipeline).map_err(Into::into)
-            } else {
-                Ok(main(&pipeline.items[0].job.args, self))
-            }
-        // Branch else if -> input == shell function and set the exit_status
-        } else if let Some(Value::Function(function)) =
-            self.variables.get(&pipeline.items[0].job.args[0]).cloned()
-        {
-            if pipeline.requires_piping() {
-                self.execute_pipeline(pipeline).map_err(Into::into)
-            } else {
-                function.execute(self, &pipeline.items[0].job.args).map(|_| self.previous_status)
-            }
-        } else {
-            self.execute_pipeline(pipeline).map_err(Into::into)
-        }?;
+        let exit_status =
+            if self.opts.no_exec { Ok(Status::SUCCESS) } else { self.execute_pipeline(pipeline) }?;
 
         if let Some(ref callback) = self.on_command {
             if let Ok(elapsed_time) = command_start_time.elapsed() {
