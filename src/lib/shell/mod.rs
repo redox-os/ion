@@ -92,7 +92,7 @@ impl From<ExpansionError<IonError>> for IonError {
 }
 
 /// Options for the shell
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Hash, Default)]
 pub struct Options {
     /// Exit from the shell on the first error.
     pub err_exit: bool,
@@ -101,7 +101,7 @@ pub struct Options {
     /// Hangup on exiting the shell.
     pub huponexit: bool,
     /// If set, denotes that this shell is running as a background job.
-    pub is_background_shell: bool,
+    pub grab_tty: bool,
 }
 
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
@@ -195,12 +195,7 @@ impl<'a> Shell<'a> {
             directory_stack: DirectoryStack::new(),
             previous_job: !0,
             previous_status: Status::SUCCESS,
-            opts: Options {
-                err_exit:            false,
-                no_exec:             false,
-                huponexit:           false,
-                is_background_shell: true,
-            },
+            opts: Options::default(),
             background: Arc::new(Mutex::new(Vec::new())),
             foreground_signals: Arc::new(foreground::Signals::new()),
             on_command: None,

@@ -50,11 +50,11 @@ pub fn status(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             }
 
             if login_shell && !is_login {
-                return Status::error("");
+                return Status::FALSE;
             }
 
-            if interactive && shell.opts().is_background_shell {
-                return Status::error("");
+            if interactive && !shell.opts().grab_tty {
+                return Status::FALSE;
             }
 
             if filename {
@@ -68,7 +68,7 @@ pub fn status(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                 }
             }
 
-            Status::SUCCESS
+            Status::TRUE
         }
         1 => {
             if is_login {

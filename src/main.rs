@@ -165,7 +165,7 @@ fn main() {
     }
 
     shell.opts_mut().no_exec = command_line_args.no_execute;
-    shell.opts_mut().is_background_shell = !stdin_is_a_tty;
+    shell.opts_mut().grab_tty = stdin_is_a_tty;
     if command_line_args.print_commands {
         shell.set_pre_command(Some(Box::new(|_shell, pipeline| {
             // A string representing the command is stored here.

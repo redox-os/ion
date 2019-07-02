@@ -22,7 +22,7 @@ impl<'a> Shell<'a> {
     ) -> Status {
         match unistd::fork() {
             Ok(ForkResult::Child) => {
-                self.opts_mut().is_background_shell = true;
+                self.opts_mut().grab_tty = false;
                 unsafe {
                     signal::signal(Signal::SIGINT, SigHandler::SigDfl).unwrap();
                     signal::signal(Signal::SIGHUP, SigHandler::SigDfl).unwrap();

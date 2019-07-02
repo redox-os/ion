@@ -392,7 +392,7 @@ impl<'b> Shell<'b> {
             PipeType::Normal => {
                 let exit_status = self.pipe(pipeline);
                 // Set the shell as the foreground process again to regain the TTY.
-                if !self.opts.is_background_shell {
+                if self.opts.grab_tty {
                     let _ = unistd::tcsetpgrp(0, Pid::this());
                 }
                 exit_status
@@ -474,7 +474,7 @@ impl<'b> Shell<'b> {
                 }
 
                 spawn_proc(self, parent, &mut last_pid, &mut current_pid, &mut pgid)?;
-                if !self.opts.is_background_shell {
+                if self.opts.grab_tty {
                     unistd::tcsetpgrp(nix::libc::STDIN_FILENO, pgid.unwrap())
                         .map_err(PipelineError::TerminalGrabFailed)?;
                 }
