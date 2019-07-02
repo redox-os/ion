@@ -35,7 +35,7 @@ pub use self::{
 };
 use crate as ion_shell;
 use crate::{
-    shell::{Capture, Shell, Value},
+    shell::{Shell, Value},
     types,
 };
 use builtins_proc::builtin;
@@ -308,7 +308,9 @@ pub fn cd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
 
     match err {
         Ok(()) => {
-            let _ = shell.fork_function(Capture::None, |_| Ok(()), "CD_CHANGE", &["ion"]);
+            if let Some(Value::Function(function)) = shell.variables().get("CD_CHANGE").cloned() {
+                let _ = shell.execute_function(&function, &["ion"]);
+            }
             Status::SUCCESS
         }
         Err(why) => Status::error(format!("{}", why)),

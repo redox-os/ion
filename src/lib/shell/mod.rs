@@ -5,7 +5,6 @@ mod flow;
 /// The various blocks
 pub mod flow_control;
 mod fork;
-mod fork_function;
 mod job;
 mod pipe_exec;
 mod shell_expand;
@@ -18,13 +17,12 @@ pub(crate) use self::job::{Job, RefinedJob};
 use self::{
     directory_stack::DirectoryStack,
     flow_control::{Block, Function, FunctionError, Statement},
-    fork::{Fork, IonResult},
+    fork::{Capture, Fork, IonResult},
     pipe_exec::foreground,
     variables::Variables,
 };
 pub use self::{
     flow::BlockError,
-    fork::Capture,
     pipe_exec::{
         job_control::{BackgroundEvent, BackgroundProcess},
         PipelineError,

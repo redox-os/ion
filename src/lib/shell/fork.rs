@@ -22,24 +22,16 @@ pub fn wait_for_child(pid: unistd::Pid) -> nix::Result<i32> {
 ///
 /// A type that is utilized by the `Fork` structure.
 pub enum Capture {
-    /// Don't capture any streams at all.
-    None = 0b0000,
     /// Capture just the standard output stream.
     Stdout = 0b0001,
     /// Capture just the standard error stream.
     Stderr = 0b0010,
-    /// Capture both the standard output and error streams.
-    Both = 0b0011,
     /// Redirect just the stdandard output stream to /dev/null.
     IgnoreStdout = 0b0100,
     /// Redirect just the standard error stream to /dev/null.
     IgnoreStderr = 0b1000,
-    /// Redirect both the standard output and error streams to /dev/null.
-    IgnoreBoth = 0b1100,
     /// Capture standard output and ignore standard error.
     StdoutThenIgnoreStderr = 0b1001,
-    /// Capture standard error and ignore standard output.
-    StderrThenIgnoreStdout = 0b0110,
 }
 
 /// Utilized by the shell for performing forks and capturing streams.
