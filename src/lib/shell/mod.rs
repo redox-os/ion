@@ -25,7 +25,10 @@ use self::{
 pub use self::{
     flow::BlockError,
     fork::Capture,
-    pipe_exec::{job_control::BackgroundProcess, PipelineError},
+    pipe_exec::{
+        job_control::{BackgroundEvent, BackgroundProcess},
+        PipelineError,
+    },
     variables::Value,
 };
 use crate::{
@@ -39,7 +42,10 @@ use crate::{
 };
 use err_derive::Error;
 use itertools::Itertools;
-use nix::sys::signal::{self, SigHandler};
+use nix::{
+    sys::signal::{self, SigHandler},
+    unistd::Pid,
+};
 use std::{
     io::{self, Write},
     ops::{Deref, DerefMut},
@@ -137,12 +143,16 @@ pub struct Shell<'a> {
     on_command: Option<OnCommandCallback<'a>>,
     /// Custom callback before each command call
     pre_command: Option<PreCommandCallback<'a>>,
+    /// Custom callback when a background event occurs
+    background_event: Option<BackgroundEventCallback>,
 }
 
 /// A callback that is executed after each pipeline is run
 pub type OnCommandCallback<'a> = Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>;
 /// A callback that is executed before each pipeline is run
 pub type PreCommandCallback<'a> = Box<dyn Fn(&Shell<'_>, &Pipeline<RefinedJob<'_>>) + 'a>;
+/// A callback that is executed when a background event occurs
+pub type BackgroundEventCallback = Arc<dyn Fn(usize, Pid, BackgroundEvent) + Send + Sync>;
 
 impl<'a> Default for Shell<'a> {
     fn default() -> Self { Self::new() }
@@ -200,6 +210,7 @@ impl<'a> Shell<'a> {
             foreground_signals: Arc::new(foreground::Signals::new()),
             on_command: None,
             pre_command: None,
+            background_event: None,
             unterminated: false,
         }
     }
@@ -323,6 +334,16 @@ impl<'a> Shell<'a> {
         } else {
             Some(self.previous_job)
         }
+    }
+
+    /// Set the callback to call before each command
+    pub fn set_background_event(&mut self, callback: Option<BackgroundEventCallback>) {
+        self.background_event = callback;
+    }
+
+    /// Set the callback to call before each command
+    pub fn background_event_mut(&mut self) -> &mut Option<BackgroundEventCallback> {
+        &mut self.background_event
     }
 
     /// Set the callback to call before each command

@@ -11,7 +11,7 @@ pub mod job_control;
 mod pipes;
 pub mod streams;
 
-pub use self::pipes::create_pipe;
+pub use self::{job_control::BackgroundEvent, pipes::create_pipe};
 use self::{job_control::ProcessState, pipes::TeePipe};
 use super::{
     job::{RefinedJob, TeeItem, Variant},
@@ -63,6 +63,10 @@ pub enum PipelineError {
     /// Failed to setup capturing for function
     #[error(display = "error reading stdout of child: {}", _0)]
     CaptureFailed(#[error(cause)] io::Error),
+
+    /// Failed to duplicate a file descriptor
+    #[error(display = "could not duplicate the pipe: {}", _0)]
+    CloneFdFailed(#[error(cause)] nix::Error),
 
     /// Could not clone the file
     #[error(display = "could not clone the pipe: {}", _0)]
@@ -351,13 +355,13 @@ impl<'b> Shell<'b> {
         // Duplicate file descriptors, execute command, and redirect back.
         let (stdin_bk, stdout_bk, stderr_bk) =
             streams::duplicate().map_err(PipelineError::CreatePipeError)?;
-        streams::redirect(&job.stdin, &job.stdout, &job.stderr);
+        streams::redirect(&job.stdin, &job.stdout, &job.stderr)?;
         let code = match job.var {
             Variant::Builtin { main } => main(job.args(), self),
             Variant::Function => self.exec_function(job.command(), job.args()),
             _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
         };
-        streams::redirect(&stdin_bk, &Some(stdout_bk), &Some(stderr_bk));
+        streams::redirect(&stdin_bk, &Some(stdout_bk), &Some(stderr_bk))?;
         Ok(code)
     }
 
@@ -579,7 +583,7 @@ where
             signals::unblock();
 
             unistd::setpgid(Pid::this(), pgid.unwrap_or_else(Pid::this)).unwrap();
-            streams::redirect(&stdin, &stdout, &stderr);
+            streams::redirect(&stdin, &stdout, &stderr).unwrap();
             let exit_status = exec_action(stdout, stderr, stdin);
             exit(exit_status.as_os_code())
         }

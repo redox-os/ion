@@ -1,3 +1,4 @@
+use crate::PipelineError;
 use nix::unistd;
 use std::{
     fs::File,
@@ -5,12 +6,11 @@ use std::{
 };
 
 /// Use dup2 to replace `old` with `new` using `old`s file descriptor ID
-fn redir(old: &Option<File>, new: RawFd) {
+fn redir(old: &Option<File>, new: RawFd) -> Result<(), PipelineError> {
     if let Some(old) = old.as_ref().map(AsRawFd::as_raw_fd) {
-        if let Err(e) = unistd::dup2(old, new) {
-            eprintln!("ion: could not duplicate {} to {}: {}", old, new, e);
-        }
+        unistd::dup2(old, new).map_err(PipelineError::CloneFdFailed)?;
     }
+    Ok(())
 }
 
 /// Duplicates STDIN, STDOUT, and STDERR; in that order; and returns them as `File`s.
@@ -28,8 +28,12 @@ pub fn duplicate() -> nix::Result<(Option<File>, File, File)> {
 }
 
 #[inline]
-pub fn redirect(inp: &Option<File>, out: &Option<File>, err: &Option<File>) {
-    redir(inp, nix::libc::STDIN_FILENO);
-    redir(out, nix::libc::STDOUT_FILENO);
-    redir(err, nix::libc::STDERR_FILENO);
+pub fn redirect(
+    inp: &Option<File>,
+    out: &Option<File>,
+    err: &Option<File>,
+) -> Result<(), PipelineError> {
+    redir(inp, nix::libc::STDIN_FILENO)?;
+    redir(out, nix::libc::STDOUT_FILENO)?;
+    redir(err, nix::libc::STDERR_FILENO)
 }
