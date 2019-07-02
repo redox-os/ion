@@ -3,5 +3,8 @@ name = "ion-ranges"
 version = "0.1.0"
 authors = ["Michael Murphy <mmstickman@gmail.com>"]
 edition = "2018"
+description = "extra traits to parse the stdlib's range"
+license = "MIT"
+repository = "https://gitlab.redox-os.org/redox-os/ion"
 
 [dependencies]
