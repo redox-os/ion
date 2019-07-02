@@ -1,8 +1,8 @@
-use super::Status;
+use super::{EmptyCompleter, Status};
 use crate as ion_shell;
 use builtins_proc::builtin;
 use calc::{eval, eval_polish, CalcError, Value};
-use std::io::{self, Write};
+use liner::Context;
 
 const REPL_GUIDE: &str = r#"ion-calc
 Type in expressions to have them evaluated.
@@ -52,8 +52,6 @@ AUTHOR
     Written by Hunter Goldstein."
 )]
 pub fn calc(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
-    let stdout = io::stdout();
-    let mut stdout = stdout.lock();
     if args.get(1).is_some() {
         let result = calc_or_polish_calc(&args[1..].join(" "));
         match result {
@@ -64,26 +62,26 @@ pub fn calc(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
             Err(e) => Status::error(format!("{}", e)),
         }
     } else {
-        let prompt = b"ion-calc: ";
         println!("{}", REPL_GUIDE);
+        let mut context = Context::new();
         loop {
-            let _ = stdout.write(prompt);
-            let _ = stdout.flush();
-            let mut input = String::new();
-            let _ = io::stdin().read_line(&mut input);
-            if input.is_empty() {
-                return Status::SUCCESS;
-            } else {
-                match input.trim() {
-                    "" => (),
-                    "exit" => return Status::SUCCESS,
-                    s => {
-                        let result = calc_or_polish_calc(s);
-                        match result {
-                            Ok(v) => println!("{}", v),
-                            Err(e) => eprintln!("{}", e),
-                        }
+            match context
+                .read_line("ion-calc: ", None, &mut EmptyCompleter)
+                .as_ref()
+                .map(AsRef::as_ref)
+            {
+                Ok("") => return Status::SUCCESS,
+                Ok(text) if text.trim() == "exit" => return Status::SUCCESS,
+                Ok(s) => {
+                    let result = calc_or_polish_calc(s);
+                    match result {
+                        Ok(v) => println!("{}", v),
+                        Err(e) => eprintln!("{}", e),
                     }
+                }
+                Err(err) => {
+                    eprintln!("{}", err);
+                    return Status::SUCCESS;
                 }
             }
         }
