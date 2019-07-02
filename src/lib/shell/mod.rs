@@ -103,8 +103,6 @@ pub struct Options {
     pub err_exit: bool,
     /// Do not execute any commands given to the shell.
     pub no_exec: bool,
-    /// Hangup on exiting the shell.
-    pub huponexit: bool,
     /// If set, denotes that this shell is running as a background job.
     pub grab_tty: bool,
 }
@@ -133,8 +131,6 @@ pub struct Shell<'a> {
     /// Contains information on all of the active background processes that are being managed
     /// by the shell.
     background: Arc<Mutex<Vec<BackgroundProcess>>>,
-    /// Used by an interactive session to know when the input is not terminated.
-    pub unterminated: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<foreground::Signals>,
@@ -217,7 +213,6 @@ impl<'a> Shell<'a> {
             on_command: None,
             pre_command: None,
             background_event: None,
-            unterminated: false,
 
             stdin: None,
             stdout: None,

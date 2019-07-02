@@ -8,7 +8,7 @@ mod prompt;
 mod readln;
 
 use ion_shell::{
-    builtins::{man_pages, Status},
+    builtins::{man_pages, BuiltinFunction, Status},
     expansion::Expander,
     parser::Terminator,
     types, IonError, PipelineError, Shell, Signal, Value,
@@ -16,7 +16,7 @@ use ion_shell::{
 use itertools::Itertools;
 use liner::{Buffer, Context, KeyBindings};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     fs::{self, OpenOptions},
     io,
     path::Path,
@@ -57,8 +57,10 @@ DESCRIPTION
     Prints the command history."#;
 
 pub struct InteractiveShell<'a> {
-    context: Rc<RefCell<Context>>,
-    shell:   RefCell<Shell<'a>>,
+    context:    Rc<RefCell<Context>>,
+    shell:      RefCell<Shell<'a>>,
+    terminated: Cell<bool>,
+    huponexit:  Rc<Cell<bool>>,
 }
 
 impl<'a> InteractiveShell<'a> {
@@ -74,7 +76,12 @@ impl<'a> InteractiveShell<'a> {
             }
             let _ = context.history.set_file_name_and_load_history(path.as_str());
         }
-        InteractiveShell { context: Rc::new(RefCell::new(context)), shell: RefCell::new(shell) }
+        InteractiveShell {
+            context:    Rc::new(RefCell::new(context)),
+            shell:      RefCell::new(shell),
+            terminated: Cell::new(true),
+            huponexit:  Rc::new(Cell::new(false)),
+        }
     }
 
     /// Handles commands given by the REPL, and saves them to history.
@@ -123,10 +130,11 @@ impl<'a> InteractiveShell<'a> {
     /// Liner.
     pub fn execute_interactive(self) -> ! {
         let context_bis = self.context.clone();
+        let huponexit = self.huponexit.clone();
         let prep_for_exit = &move |shell: &mut Shell<'_>| {
             // context will be sent a signal to commit all changes to the history file,
             // and waiting for the history thread in the background to finish.
-            if shell.opts().huponexit {
+            if huponexit.get() {
                 shell.resume_stopped();
                 shell.background_send(Signal::SIGHUP).expect("Failed to prepare for exit");
             }
@@ -155,6 +163,15 @@ impl<'a> InteractiveShell<'a> {
             Status::SUCCESS
         };
 
+        let huponexit = self.huponexit.clone();
+        let set_huponexit: BuiltinFunction = &move |args, _shell| {
+            huponexit.set(match args.get(1).map(AsRef::as_ref) {
+                Some("false") | Some("off") => false,
+                _ => true,
+            });
+            Status::SUCCESS
+        };
+
         let context_bis = self.context.clone();
         let keybindings = &move |args: &[types::Str], _shell: &mut Shell<'_>| -> Status {
             match args.get(1).map(|s| s.as_str()) {
@@ -172,18 +189,20 @@ impl<'a> InteractiveShell<'a> {
         };
 
         // change the lifetime to allow adding local builtins
-        let InteractiveShell { context, shell } = self;
+        let InteractiveShell { context, shell, terminated, huponexit } = self;
         let mut shell = shell.into_inner();
         shell
             .builtins_mut()
             .add("history", history, "Display a log of all commands previously executed")
             .add("keybindings", keybindings, "Change the keybindings")
             .add("exit", exit, "Exits the current session")
-            .add("exec", exec, "Replace the shell with the given command.");
+            .add("exec", exec, "Replace the shell with the given command.")
+            .add("huponexit", set_huponexit, "Hangup the shell's background jobs on exit");
 
         Self::exec_init_file(&mut shell);
 
-        InteractiveShell { context, shell: RefCell::new(shell) }.exec(prep_for_exit)
+        InteractiveShell { context, shell: RefCell::new(shell), terminated, huponexit }
+            .exec(prep_for_exit)
     }
 
     fn exec_init_file(shell: &mut Shell) {
@@ -220,9 +239,9 @@ impl<'a> InteractiveShell<'a> {
                         &self.context.borrow(),
                         command.trim_end(),
                     );
+                    self.terminated.set(true);
                     {
                         let mut shell = self.shell.borrow_mut();
-                        shell.unterminated = false;
                         match shell.on_command(&cmd) {
                             Ok(_) => (),
                             Err(IonError::PipelineExecutionError(
@@ -249,9 +268,7 @@ impl<'a> InteractiveShell<'a> {
                     }
                     self.save_command(&cmd);
                 }
-                None => {
-                    self.shell.borrow_mut().unterminated = true;
-                }
+                None => self.terminated.set(false),
             }
         }
     }

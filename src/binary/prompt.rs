@@ -5,7 +5,7 @@ impl<'a> InteractiveShell<'a> {
     /// Generates the prompt that will be used by Liner.
     pub fn prompt(&self) -> String {
         let shell = self.shell.borrow();
-        let blocks = shell.block_len() + if shell.unterminated { 1 } else { 0 };
+        let blocks = if self.terminated.get() { shell.block_len() } else { shell.block_len() + 1 };
 
         if blocks == 0 {
             shell.command("PROMPT").map(|res| res.to_string()).unwrap_or_else(|_| {
