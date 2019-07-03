@@ -31,26 +31,13 @@ function test {
     # Replace .ion with .out in file name
     EXPECTED_OUTPUT_FILE=$(echo $1 | sed 's/\..\+/\.out/')
 
-    # Run script and redirect stdout into tmp file
-    $PROJECT_DIR/target/debug/ion "${@:2}" > $EXAMPLES_DIR/tmp.out 2>&1
-
     # Compare real and expected output
-    diff "$EXAMPLES_DIR"/tmp.out "$EXPECTED_OUTPUT_FILE" > "$EXAMPLES_DIR"/diff_tmp
-    local RET=$?
-
-    # Clean up the mess
-    rm -f $EXAMPLES_DIR/tmp.out
-
-    # Write result
-    if [[ "$RET" -ne "0" ]]; then
-        cat "$EXAMPLES_DIR"/diff_tmp
-        rm "$EXAMPLES_DIR"/diff_tmp
-        echo -e "Test ${1} ${TAGFAIL}";
-        return 1;
-    else
-        rm "$EXAMPLES_DIR"/diff_tmp
+    if diff <($PROJECT_DIR/target/debug/ion "${@:2}" 2>&1) "$EXPECTED_OUTPUT_FILE"; then
         echo -e "Test ${1} ${TAGPASS}";
         return 0;
+    else
+        echo -e "Test ${1} ${TAGFAIL}";
+        return 1;
     fi
 }
 
@@ -76,32 +63,31 @@ function check_return_value {
     test $1 $1 1
 }
 
-function perform_testing {
-    set +e
-    # Iterate over every Ion script in examples directory
-    for i in $EXAMPLES_DIR/*.ion; do
-        check_return_value $i;
-        if [[ $? -ne 0 ]]; then
-            EXIT_VAL=1;
-        fi
-    done
-
-    # Iterate over every parameter set
-    for i in $EXAMPLES_DIR/*.params; do
-        test_cli $i;
-        if [[ $? -ne 0 ]]; then
-            EXIT_VAL=1;
-        fi
-    done
-}
-
 # Build debug binary
 cargo +$TOOLCHAIN build
-perform_testing
+set +e
+# Iterate over every Ion script in examples directory
+for i in $EXAMPLES_DIR/*.ion; do
+    if ! check_return_value $i; then
+        EXIT_VAL=1;
+    fi
+done
+
+# Iterate over every parameter set
+for i in $EXAMPLES_DIR/*.params; do
+    if ! test_cli $i; then
+        EXIT_VAL=1;
+    fi
+done
 
 # Build debug binary for testing structopt argument parsing
 cargo +$TOOLCHAIN build --features=advanced_arg_parsing
-perform_testing
+# Iterate over every parameter set
+for i in $EXAMPLES_DIR/*.params; do
+    if ! test_cli $i; then
+        EXIT_VAL=1;
+    fi
+done
 
 set -e
 exit $EXIT_VAL
