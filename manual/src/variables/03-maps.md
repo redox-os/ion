@@ -49,7 +49,7 @@ echo @values(hashmap)
 echo @hashmap
 ```
 
-## Iterate key/value paris in a loop
+## Iterate key/value pairs in a loop
 
 ```
 for key value in @hashmap
