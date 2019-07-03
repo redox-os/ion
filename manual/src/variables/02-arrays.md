@@ -72,7 +72,7 @@ echo @array
 ```
 
 ```
-0 1 2 3 4 5 6 7
+0 1 2 3 5 6 7
 ```
 
 ## Expand array as arguments to a command
