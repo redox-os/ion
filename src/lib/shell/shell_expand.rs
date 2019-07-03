@@ -13,7 +13,7 @@ impl<'a, 'b> Expander for Shell<'b> {
     fn command(&self, command: &str) -> Result<types::Str, Self::Error> {
         let result = self
             .fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command))
-            .map_err(|err| Error::Subprocess(Box::new(PipelineError::Fork(err).into())))?;
+            .map_err(|err| Error::Subprocess(Box::new(err.into())))?;
         let mut string = String::with_capacity(1024);
         let output = match result.stdout.unwrap().read_to_string(&mut string) {
             Ok(_) => Ok(string.into()),

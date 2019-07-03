@@ -1,0 +1,23 @@
+echo 'Hey you!'
+echo 'Press any key to pause/resume the animation'
+echo 'Move the mouse over the screen to change its color'
+
+# Stop the animation up-front
+toggle
+
+# When the application registers a key, it calls the on_key function with the key number in parameter
+fn on_key key
+    toggle # toggle the animation
+    echo "${c::yellow}key: ${c::reset}$key" # Print colored text
+end
+
+fn on_mouse x y
+    set_background $(( x / WINDOW_WIDTH )) $(( y / WINDOW_HEIGHT )) .5 # Change the background color
+    echo "${c::green}position: ${c::reset}($x, $y)"
+end
+
+# Extra handlers can be defined, like on_render. The application defines the callbacks and the user
+# can decide which one to implement
+
+# Try it yourself: copy this file to the root of the git folder and modify the content: you have
+# now a completely reactive config file

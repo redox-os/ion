@@ -37,6 +37,10 @@ members = [ "members/builtins-proc", "members/ranges", "members/scopes-rs", "mem
 criterion = "0.2"
 serial_test = "*"
 serial_test_derive = "*"
+# window example
+piston-ai_behavior = "0.31"
+piston_window = "0.99"
+piston2d-sprite = "0.55"
 
 [[bench]]
 name = "terminator"

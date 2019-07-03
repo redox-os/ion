@@ -7,3 +7,4 @@ manual/book
 .cargo/config
 vendor/
 vendor.tar.xz
+/window-config.ion

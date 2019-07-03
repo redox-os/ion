@@ -11,6 +11,7 @@ pub mod job_control;
 mod pipes;
 pub mod streams;
 
+pub use self::pipes::create_pipe;
 use self::{job_control::ProcessState, pipes::TeePipe};
 use super::{
     job::{RefinedJob, TeeItem, Variant},
@@ -24,42 +25,33 @@ use crate::{
 };
 use err_derive::Error;
 use nix::{
-    fcntl::OFlag,
     sys::signal::{self, Signal},
     unistd::{self, ForkResult, Pid},
 };
 use smallvec::SmallVec;
 use std::{
-    fmt,
     fs::{File, OpenOptions},
     io::{self, Write},
-    os::unix::{io::FromRawFd, process::CommandExt},
+    os::unix::process::CommandExt,
     process::{exit, Command, Stdio},
 };
 
 #[derive(Debug, Error)]
-pub enum InputError {
+pub enum RedirectError {
+    /// Input
     #[error(display = "failed to redirect '{}' to stdin: {}", _0, _1)]
     File(String, #[error(cause)] io::Error),
-    #[error(display = "failed to redirect herestring '{}' to stdin: {}", _0, _1)]
-    HereString(String, #[error(cause)] nix::Error),
-    #[error(display = "failed to redirect herestring '{}' to stdin: {}", _0, _1)]
+    #[error(display = "failed to write herestring '{}': {}", _0, _1)]
     WriteError(String, #[error(cause)] io::Error),
-}
 
-#[derive(Debug)]
-pub struct OutputError {
-    redirect: RedirectFrom,
-    file:     String,
-    why:      io::Error,
-}
-
-#[derive(Debug, Error)]
-pub enum RedirectError {
-    #[error(display = "{}", _0)]
-    Input(#[error(cause)] InputError),
-    #[error(display = "{}", _0)]
-    Output(#[error(cause)] OutputError),
+    /// Output
+    #[error(display = "failed to redirect {} to file '{}': {}", redirect, file, why)]
+    Output {
+        redirect: RedirectFrom,
+        file: String,
+        #[error(cause)]
+        why: io::Error,
+    },
 }
 
 /// This is created when Ion fails to create a pipeline
@@ -72,6 +64,9 @@ pub enum PipelineError {
     #[error(display = "error reading stdout of child: {}", _0)]
     CaptureFailed(#[error(cause)] io::Error),
 
+    /// Could not clone the file
+    #[error(display = "could not clone the pipe: {}", _0)]
+    ClonePipeFailed(#[error(cause)] io::Error),
     /// Could not set the pipe as a redirection
     #[error(display = "{}", _0)]
     RedirectPipeError(#[error(cause)] RedirectError),
@@ -115,37 +110,8 @@ pub enum PipelineError {
 
     /// Failed to send signal to a process group. This typically happens when trying to start the
     /// pipeline after it's creation
-    #[error(display = "could not start the processes: {}", _0)]
+    #[error(display = "could not kill the processes: {}", _0)]
     KillFailed(#[error(cause)] nix::Error),
-}
-
-impl fmt::Display for OutputError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "failed to redirect {} to file '{}': {}",
-            match self.redirect {
-                RedirectFrom::Both => "both stdout and stderr",
-                RedirectFrom::Stdout => "stdout",
-                RedirectFrom::Stderr => "stderr",
-                _ => unreachable!(),
-            },
-            self.file,
-            self.why,
-        )
-    }
-}
-
-impl std::error::Error for OutputError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { Some(&self.why) }
-}
-
-impl From<OutputError> for RedirectError {
-    fn from(cause: OutputError) -> Self { RedirectError::Output(cause) }
-}
-
-impl From<InputError> for RedirectError {
-    fn from(cause: InputError) -> Self { RedirectError::Input(cause) }
 }
 
 impl From<RedirectError> for PipelineError {
@@ -155,34 +121,32 @@ impl From<RedirectError> for PipelineError {
 /// Create an OS pipe and write the contents of a byte slice to one end
 /// such that reading from this pipe will produce the byte slice. Return
 /// A file descriptor representing the read end of the pipe.
-pub unsafe fn stdin_of<T: AsRef<str>>(input: &T) -> Result<File, InputError> {
+pub fn stdin_of<T: AsRef<str>>(input: &T) -> Result<File, PipelineError> {
     let string = input.as_ref();
-    let (reader, writer) = unistd::pipe2(OFlag::O_CLOEXEC)
-        .map_err(|err| InputError::HereString(string.into(), err))?;
-    let mut infile = File::from_raw_fd(writer);
+    let (reader, mut writer) = create_pipe()?;
     // Write the contents; make sure to use write_all so that we block until
     // the entire string is written
-    infile
+    writer
         .write_all(string.as_bytes())
-        .map_err(|err| InputError::WriteError(string.into(), err))?;
+        .map_err(|err| RedirectError::WriteError(string.into(), err))?;
     if !string.ends_with('\n') {
-        infile.write(b"\n").map_err(|err| InputError::WriteError(string.into(), err))?;
+        writer.write(b"\n").map_err(|err| RedirectError::WriteError(string.into(), err))?;
     }
-    infile.flush().map_err(|err| InputError::WriteError(string.into(), err))?;
+    writer.flush().map_err(|err| RedirectError::WriteError(string.into(), err))?;
     // `infile` currently owns the writer end RawFd. If we just return the reader
     // end and let `infile` go out of scope, it will be closed, sending EOF to
     // the reader!
-    Ok(File::from_raw_fd(reader))
+    Ok(reader)
 }
 
 impl Input {
-    pub(self) fn get_infile(&self) -> Result<File, InputError> {
+    pub(self) fn get_infile(&self) -> Result<File, PipelineError> {
         match self {
             Input::File(ref filename) => match File::open(filename.as_str()) {
                 Ok(file) => Ok(file),
-                Err(why) => Err(InputError::File(filename.to_string(), why)),
+                Err(why) => Err(RedirectError::File(filename.to_string(), why).into()),
             },
-            Input::HereString(ref string) => unsafe { stdin_of(&string) },
+            Input::HereString(ref string) => stdin_of(&string),
         }
     }
 }
@@ -217,7 +181,7 @@ fn do_tee<'a>(
     job: &mut RefinedJob<'a>,
     stdout: &mut dyn FnMut(&mut RefinedJob<'a>, File),
     stderr: &mut dyn FnMut(&mut RefinedJob<'a>, File),
-) -> Result<(), OutputError> {
+) -> Result<(), RedirectError> {
     // XXX: Possibly add an assertion here for correctness
     for output in outputs {
         match OpenOptions::new()
@@ -237,7 +201,7 @@ fn do_tee<'a>(
                         stderr(job, f_copy);
                     }
                     Err(why) => {
-                        return Err(OutputError {
+                        return Err(RedirectError::Output {
                             redirect: output.from,
                             file: output.file.to_string(),
                             why,
@@ -246,7 +210,7 @@ fn do_tee<'a>(
                 },
             },
             Err(why) => {
-                return Err(OutputError {
+                return Err(RedirectError::Output {
                     redirect: output.from,
                     file: output.file.to_string(),
                     why,
@@ -259,12 +223,12 @@ fn do_tee<'a>(
 
 /// Insert the multiple redirects as pipelines if necessary. Handle both input and output
 /// redirection if necessary.
-fn prepare<'a, 'b>(
-    pipeline: Pipeline<RefinedJob<'b>>,
-) -> Result<impl IntoIterator<Item = RefinedJob<'b>>, RedirectError> {
+fn prepare<'a>(
+    pipeline: Pipeline<RefinedJob<'a>>,
+) -> Result<impl IntoIterator<Item = RefinedJob<'a>>, PipelineError> {
     // Real logic begins here
     let mut new_commands =
-        SmallVec::<[RefinedJob<'b>; 16]>::with_capacity(2 * pipeline.items.len());
+        SmallVec::<[RefinedJob<'a>; 16]>::with_capacity(2 * pipeline.items.len());
     let mut prev_kind = RedirectFrom::None;
     for PipeItem { mut job, outputs, inputs } in pipeline.items {
         let kind = job.redirection;
@@ -428,7 +392,7 @@ impl<'b> Shell<'b> {
             PipeType::Normal => {
                 let exit_status = self.pipe(pipeline);
                 // Set the shell as the foreground process again to regain the TTY.
-                if !self.opts.is_background_shell {
+                if self.opts.grab_tty {
                     let _ = unistd::tcsetpgrp(0, Pid::this());
                 }
                 exit_status
@@ -476,27 +440,24 @@ impl<'b> Shell<'b> {
                             .connect(tee_out, tee_err)?;
                     } else {
                         // Pipe the previous command's stdin to this commands stdout/stderr.
-                        let (reader, writer) = unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC)
-                            .map_err(PipelineError::CreatePipeError)?;
+                        let (reader, writer) = create_pipe()?;
                         if is_external {
                             ext_stdio_pipes
                                 .get_or_insert_with(|| Vec::with_capacity(4))
-                                .push(unsafe { File::from_raw_fd(writer) });
+                                .push(writer.try_clone().map_err(PipelineError::ClonePipeFailed)?);
                         }
-                        child.stdin(unsafe { File::from_raw_fd(reader) });
-                        let writer = unsafe { File::from_raw_fd(writer) };
+                        child.stdin(reader);
                         match parent.redirection {
                             RedirectFrom::None => (),
                             RedirectFrom::Stderr => parent.stderr(writer),
                             RedirectFrom::Stdout => parent.stdout(writer),
                             RedirectFrom::Both => {
-                                let duped = writer.try_clone().map_err(|why| {
-                                    RedirectError::from(OutputError {
+                                let duped =
+                                    writer.try_clone().map_err(|why| RedirectError::Output {
                                         redirect: parent.redirection,
                                         file: "pipe".to_string(),
                                         why,
-                                    })
-                                })?;
+                                    })?;
                                 parent.stderr(writer);
                                 parent.stdout(duped);
                             }
@@ -513,7 +474,7 @@ impl<'b> Shell<'b> {
                 }
 
                 spawn_proc(self, parent, &mut last_pid, &mut current_pid, &mut pgid)?;
-                if !self.opts.is_background_shell {
+                if self.opts.grab_tty {
                     unistd::tcsetpgrp(nix::libc::STDIN_FILENO, pgid.unwrap())
                         .map_err(PipelineError::TerminalGrabFailed)?;
                 }

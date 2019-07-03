@@ -132,6 +132,9 @@ fn parse_args() -> CommandLineArgs {
 
 fn set_unique_pid() -> nix::Result<()> {
     let pgid = unistd::getpid();
+    if pgid == unistd::tcgetpgrp(nix::libc::STDIN_FILENO)? {
+        return Ok(());
+    }
     unistd::setpgid(pgid, pgid)?;
     unsafe { signal::signal(Signal::SIGTTOU, SigHandler::SigIgn) }?;
     unistd::tcsetpgrp(nix::libc::STDIN_FILENO, pgid)
@@ -162,7 +165,7 @@ fn main() {
     }
 
     shell.opts_mut().no_exec = command_line_args.no_execute;
-    shell.opts_mut().is_background_shell = !stdin_is_a_tty;
+    shell.opts_mut().grab_tty = stdin_is_a_tty;
     if command_line_args.print_commands {
         shell.set_pre_command(Some(Box::new(|_shell, pipeline| {
             // A string representing the command is stored here.
