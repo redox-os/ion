@@ -68,14 +68,17 @@ export TAGFAIL
 export TAGPASS
 export EXAMPLES_DIR
 
+# See https://prefetch.net/blog/2017/08/17/using-xargs-and-lscpu-to-spawn-one-process-per-cpu-core/
+CPU_CORES=$(lscpu -p=CORE,ONLINE | grep -c 'Y')
+
 # Build debug binary
 cargo +$TOOLCHAIN build
 # Iterate over every Ion script in examples directory
-ls -1 $EXAMPLES_DIR/*.ion | xargs -P 0 -n 1 -I {} bash -c "check_return_value {}"
+ls -1 $EXAMPLES_DIR/*.ion | xargs -P $CPU_CORES -n 1 -I {} bash -c "check_return_value {}"
 # Iterate over every parameter set
-ls -1 $EXAMPLES_DIR/*.params | xargs -P 0 -n 1 -I {} bash -c "test_cli {}"
+ls -1 $EXAMPLES_DIR/*.params | xargs -P $CPU_CORES -n 1 -I {} bash -c "test_cli {}"
 
 # Build debug binary for testing structopt argument parsing
 cargo +$TOOLCHAIN build --features=advanced_arg_parsing
 # Iterate over every parameter set
-ls -1 $EXAMPLES_DIR/*.params | xargs -P 0 -n 1 -I {} bash -c "test_cli {}"
+ls -1 $EXAMPLES_DIR/*.params | xargs -P $CPU_CORES -n 1 -I {} bash -c "test_cli {}"
