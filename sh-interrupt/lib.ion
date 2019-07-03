@@ -1,0 +1,13 @@
+fn docatcher
+    echo 'Trigger some async actions, shell should not exit'
+    echo 'Then exit catcher with C-d'
+    if not exists -f catcher
+	    make catcher
+    end
+    ./catcher
+end
+
+fn endless
+    while true
+    end
+end

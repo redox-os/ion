@@ -1,0 +1,3 @@
+all:
+	$(MAKE) -s -f Makefile2
+	../cpu

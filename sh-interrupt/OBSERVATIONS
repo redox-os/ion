@@ -1,0 +1,98 @@
+The latest diff (www.freebsd.org/~cracauer/) passes all tests for
+SIGINT. SIGQUIT is a different matter, though.
+
+
+
+OUTDATED INFORMATION FOLLOWS, don't use
+
+%%
+
+Neue bde-version:
+test09 (shell-wait is not interruptable by SIGINT)
+
+%%
+
+CRA = my diffs.
+BDE = Bruce diffs.
+
+BDE version 19980212:
+
+Test 2: It should send SIGQUIT to cat, it doesn't.
+
+Test 9: can't break wait()
+
+%% older notes:
+
+test2:
+  trap '' 2
+  while : ; do cat ; echo -n $? ; done
+test6:
+  trap '' 3
+  while : ; do cat ; echo -n $? ; done
+
+The trapped signal should be ignored. If SIGINT is ignored (test 2),
+SIGQUIT exits `cat`, but not the shell (means the loop will continue
+and `cat` will be called again). 
+
+If SIGQUIT is ignored, SIGINT both exit the whole script.
+
+I'm not sure this asymmetric behaviour is intended, but currently CRA
+and BDE versions has is.
+
+I think SIGTERM should exit the script in all cases immedeatly. CRA
+version does this, BDE version ignores SIGTERM.
+
+bash1 falls over completely on these tests.
+
+bash2 works like CRA version.
+
+Other tests:
+------------
+
+BDE version fails on 5, the shell terminated while the forground child
+is running (like the unpatched FreeBSD sh did). 
+
+BDE version handles SIGQUIT seperately from SIGINT in test 1, and 3,
+but not in test 4 and 5.
+
+bash2 fails on 5, it gets a SIGQUIT that was sent to a
+SIGQUIT-catching process after that process exits. Reliably, it
+doesn't matter how much time was passed between SIGQUIT to process and
+exit or process.
+
+As Bruce noted, bash version 1 fails on test 2 like my version of sh
+does. bash1 doesn't have the bash2 problem on test 5 (getting signals
+that were caught by the child after the child exits).
+
+zsh fails on test 1 and 5 in a similar way bash2 failed on 5: After a
+child exits that received SIGINT, it terminates immedeatly.
+
+I wonder how bash 2 manages to fail on test 5, but to pass test 1...
+
+csh fails on test 1 in two ways:
+- when the SIGINT/SIGQUIT-catching child receives both SIGQUIT and
+  SIGINT, csh exits immedeatly, while the child is still running.
+- when only one or more SIGQUIT are delivered to the child, csh gets
+  it after the child exits and terminates with coredump.
+
+csh also ignores SIGQUIT where SIGINT is caught.
+
+test2.csh is different from test1.sh in that all signals should be
+caught. csh fails in that it sometimes gets SIGQUIT and exits with
+coredump (the shell, not the child). 
+
+
+Other stuff not directly relevant to these fixes:
+=================================================
+
+csh oddness:
+------------
+
+When the "catcher" program resets the terminal, there's a time-window
+where C-g is mapped to SIGQUIT, but "catcher" already exited. In other
+word, if you type C-g while in "catcher", then immedeatly C-d, csh
+will get SIGQUIT. I thought that remapping the terminal keys should
+have been done before the shell is re-entered. The same happens to
+tcsh. 
+
+With sh variants I didn't manage to deliver SIGQUIT by C-g.
