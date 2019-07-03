@@ -1,6 +1,4 @@
-#!/usr/bin/env sh
-
-set -e -u
+#!/usr/bin/env bash
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -8,16 +6,16 @@ NC='\033[0m' # No Color
 TAGFAIL=$RED'[FAIL]'$NC
 TAGPASS=$GREEN'[PASS]'$NC
 
-EXAMPLES_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR=$(dirname $(cargo locate-project | awk -F\" '{print $4}'))
+# Some of the examples assume that the working directory is the project root
+# and it never hurts to force consistency regardless
+cd $PROJECT_DIR
+
+EXAMPLES_DIR=tests
 
 if [ -z "$TOOLCHAIN" ]; then
     TOOLCHAIN=$(rustc --version | sed 's/rustc [0-9\.\-]*\(.*\) (.*)/\1/')
 fi
-
-# Some of the examples assume that the working directory is the project root
-# and it never hurts to force consistency regardless
-cd $PROJECT_DIR
 
 # Create expected output for fn-root-vars
 echo $HOME > $EXAMPLES_DIR/fn-root-vars.out # Overwrite previous file
@@ -47,13 +45,14 @@ test_params() {
     ls -1 $EXAMPLES_DIR/*.params | xargs -P $CPU_CORES -n 1 -I {} bash -c "IFS=$'\\n'; test {} "'$(< {})'
 }
 
+set -e -u
+
 export -f test
 export TAGFAIL
 export TAGPASS
 export EXAMPLES_DIR
 
-# See https://prefetch.net/blog/2017/08/17/using-xargs-and-lscpu-to-spawn-one-process-per-cpu-core/
-CPU_CORES=$(lscpu -p=CORE,ONLINE | grep -c 'Y')
+CPU_CORES=$(nproc --all)
 
 # Build debug binary
 cargo +$TOOLCHAIN build
