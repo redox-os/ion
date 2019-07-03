@@ -15,8 +15,6 @@ if [ -z "$TOOLCHAIN" ]; then
     TOOLCHAIN=$(rustc --version | sed 's/rustc [0-9\.\-]*\(.*\) (.*)/\1/')
 fi
 
-EXIT_VAL=0
-
 # Some of the examples assume that the working directory is the project root
 # and it never hurts to force consistency regardless
 cd $PROJECT_DIR
@@ -32,7 +30,7 @@ function test {
     EXPECTED_OUTPUT_FILE=$(echo $1 | sed 's/\..\+/\.out/')
 
     # Compare real and expected output
-    if diff <($PROJECT_DIR/target/debug/ion "${@:2}" 2>&1) "$EXPECTED_OUTPUT_FILE"; then
+    if diff <(target/debug/ion "${@:2}" 2>&1) "$EXPECTED_OUTPUT_FILE"; then
         echo -e "Test ${1} ${TAGPASS}";
         return 0;
     else
@@ -63,31 +61,21 @@ function check_return_value {
     test $1 $1 1
 }
 
+export -f test
+export -f check_return_value
+export -f test_cli
+export TAGFAIL
+export TAGPASS
+export EXAMPLES_DIR
+
 # Build debug binary
 cargo +$TOOLCHAIN build
-set +e
 # Iterate over every Ion script in examples directory
-for i in $EXAMPLES_DIR/*.ion; do
-    if ! check_return_value $i; then
-        EXIT_VAL=1;
-    fi
-done
-
+ls -1 $EXAMPLES_DIR/*.ion | xargs -P 0 -n 1 -I {} bash -c "check_return_value {}"
 # Iterate over every parameter set
-for i in $EXAMPLES_DIR/*.params; do
-    if ! test_cli $i; then
-        EXIT_VAL=1;
-    fi
-done
+ls -1 $EXAMPLES_DIR/*.params | xargs -P 0 -n 1 -I {} bash -c "test_cli {}"
 
 # Build debug binary for testing structopt argument parsing
 cargo +$TOOLCHAIN build --features=advanced_arg_parsing
 # Iterate over every parameter set
-for i in $EXAMPLES_DIR/*.params; do
-    if ! test_cli $i; then
-        EXIT_VAL=1;
-    fi
-done
-
-set -e
-exit $EXIT_VAL
+ls -1 $EXAMPLES_DIR/*.params | xargs -P 0 -n 1 -I {} bash -c "test_cli {}"
