@@ -113,10 +113,11 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
         if let EventKind::BeforeComplete = event.kind {
             let (words, pos) = event.editor.get_words_and_cursor_position();
 
-            self.completion = match (words.len(), pos) {
-                (0, _) => CompletionType::Nothing,
-                (1, CursorPosition::InSpace(..)) => CompletionType::VariableAndFiles,
-                (1, _) => CompletionType::Command,
+            self.completion = match pos {
+                _ if words.is_empty() => CompletionType::Nothing,
+                CursorPosition::InWord(0) | CursorPosition::OnWordRightEdge(0) => {
+                    CompletionType::Command
+                }
                 _ => CompletionType::VariableAndFiles,
             };
         }
