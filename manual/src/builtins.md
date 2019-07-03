@@ -209,7 +209,7 @@ history
 
 Display a log of all commands previously executed
 
-## ion-docs
+## ion_docs
 
 ```
 ion_docs
