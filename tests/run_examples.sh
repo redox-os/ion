@@ -59,6 +59,8 @@ cargo +$TOOLCHAIN build
 test_generic
 test_params
 
+set +u
+
 if [ -n "$FULL" ]; then
     # Build debug binary for testing structopt argument parsing
     cargo +$TOOLCHAIN build --features=advanced_arg_parsing

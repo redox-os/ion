@@ -20,7 +20,7 @@ linux:
   image: 'rust:1.32.0'
   script:
     - cargo build
-    - make tests
+    - FULL=1 make tests
 
 linux:stable:
   script:
