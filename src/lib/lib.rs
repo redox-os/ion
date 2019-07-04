@@ -18,8 +18,8 @@
 //! ## Demo
 //!
 //! ```rust
-//! use ion_shell::{builtins::Status, Value, types, BuiltinFunction, BuiltinMap, Shell};
-//! use std::{cell::RefCell, rc::Rc, thread, time, fs::File};
+//! use ion_shell::{builtins::Status, types, BuiltinFunction, BuiltinMap, Shell, Value};
+//! use std::{cell::RefCell, fs::File, rc::Rc, thread, time};
 //!
 //! enum Layout {
 //!     Simple,
@@ -57,7 +57,9 @@
 //!         i += 1;
 //!         // call a user-defined callback function named on_update
 //!         if let Some(Value::Function(function)) = shell.variables().get("on_update") {
-//!             if let Err(why) = shell.execute_function(&function.clone(), &["ion", &i.to_string()]) {
+//!             if let Err(why) =
+//!                 shell.execute_function(&function.clone(), &["ion", &i.to_string()])
+//!             {
 //!                 println!("ERROR: my-application: error in on_update callback: {}", why);
 //!             }
 //!         }

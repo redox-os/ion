@@ -96,7 +96,14 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
                 // in the environment's **$PATH** variable.
                 let file_completers: Vec<_> = if let Some(paths) = env::var_os("PATH") {
                     env::split_paths(&paths)
-                        .map(|s| IonFileCompleter::new(Some(s), &self.shell, true))
+                        .map(|s| {
+                            let s = if !s.to_string_lossy().ends_with("/") {
+                                PathBuf::from(format!("{}/", s.to_string_lossy()))
+                            } else {
+                                s
+                            };
+                            IonFileCompleter::new(Some(s), &self.shell, true)
+                        })
                         .collect()
                 } else {
                     vec![IonFileCompleter::new(Some("/bin/".into()), &self.shell, true)]
@@ -106,35 +113,36 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
             }
             CompletionType::Nothing => (),
         }
-        
+
         completions
     }
 
     fn on_event<W: std::io::Write>(&mut self, event: Event<'_, '_, W>) {
         if let EventKind::BeforeComplete = event.kind {
             let (words, pos) = event.editor.get_words_and_cursor_position();
-
-/*            self.complete_commands = match pos {
-                CursorPosition::InWord(_) => false,
-                CursorPosition::InSpace(Some(_), _) => false,
-                CursorPosition::InSpace(None, _) => false,
-                CursorPosition::OnWordLeftEdge(_) => false,
-                CursorPosition::OnWordRightEdge(index) => if index == 0 {
-                    true
-                } else {
-                    words
-                    .into_iter()
-                    .nth(index - 1)
-                    .map(|(start, end)| event.editor.current_buffer().range(start, end))
-                    .filter(|filename| filename.ends_with("|"))
-                    .is_some()
-                },
-            };
-       }*/
             self.completion = match pos {
                 _ if words.is_empty() => CompletionType::Nothing,
-                CursorPosition::InWord(0) | CursorPosition::OnWordRightEdge(0) => {
-                    CompletionType::Command
+                CursorPosition::InWord(0) => CompletionType::Command,
+                CursorPosition::OnWordRightEdge(index) => {
+                    if index == 0 {
+                        CompletionType::Command
+                    } else {
+                        let is_pipe = words
+                            .into_iter()
+                            .nth(index - 1)
+                            .map(|(start, end)| event.editor.current_buffer().range(start, end))
+                            .filter(|filename| {
+                                filename.ends_with("|")
+                                    || filename.ends_with("&")
+                                    || filename.ends_with(";")
+                            })
+                            .is_some();
+                        if is_pipe {
+                            CompletionType::Command
+                        } else {
+                            CompletionType::VariableAndFiles
+                        }
+                    }
                 }
                 _ => CompletionType::VariableAndFiles,
             };
@@ -184,7 +192,6 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
         // Now we obtain completions for the `expanded` form of the `start` value.
         let completions = filename_completion(&expanded, &self.path);
         if expanded == start {
-            //return completions.map(|s| s.rsplit('/').nth(0).unwrap_or(&s).to_string()).collect();
             return if self.for_command {
                 completions.map(|s| s.rsplit('/').nth(0).unwrap_or(&s).to_string()).collect()
             } else {
@@ -253,7 +260,7 @@ fn filename_completion<'a>(start: &'a str, path: &'a PathBuf) -> impl Iterator<I
     let globs = glob_with(
         &string,
         MatchOptions {
-            case_sensitive:              false, //true,
+            case_sensitive:              true,
             require_literal_separator:   true,
             require_literal_leading_dot: false,
         },

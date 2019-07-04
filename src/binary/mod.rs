@@ -18,8 +18,7 @@ use liner::{Buffer, Context, KeyBindings};
 use std::{
     cell::{Cell, RefCell},
     fs::{self, OpenOptions},
-    io,
-    io::Write,
+    io::{self, Write},
     path::Path,
     rc::Rc,
 };
@@ -191,7 +190,10 @@ impl<'a> InteractiveShell<'a> {
                     context_bis.borrow_mut().history.load_duplicates = false;
                 }
                 Some(_) => {
-                    Status::error("Invalid history option. Choices are [+|-] inc_append and share (implies inc_append).");
+                    Status::error(
+                        "Invalid history option. Choices are [+|-] inc_append, duplicates and \
+                         share (implies inc_append).",
+                    );
                 }
                 None => {
                     print!("{}", context_bis.borrow().history.buffers.iter().format("\n"));
