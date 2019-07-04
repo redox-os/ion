@@ -28,6 +28,9 @@ The manual is located [here](https://doc.redox-os.org/ion-manual/) on Redox OS's
 also included in the source code for Ion, within the **manual** directory, which you may build
 with **mdbook**.
 
+# Ion library example
+See the [examples folder](https://gitlab.redox-os.org/redox-os/ion/tree/master/examples) and the [Parallelion project](https://gitlab.redox-os.org/AdminXVII/parallelion)
+
 # Packages
 
 ## Pop!\_OS / Ubuntu

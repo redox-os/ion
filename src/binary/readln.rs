@@ -18,7 +18,7 @@ impl<'a> InteractiveShell<'a> {
                 if line.bytes().next() != Some(b'#')
                     && line.bytes().any(|c| !c.is_ascii_whitespace())
                 {
-                    self.shell.borrow_mut().unterminated = true;
+                    self.terminated.set(false);
                 }
                 Some(line)
             }
@@ -27,7 +27,7 @@ impl<'a> InteractiveShell<'a> {
             // Handles Ctrl + D
             Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
                 let mut shell = self.shell.borrow_mut();
-                if !shell.unterminated && shell.exit_block().is_err() {
+                if self.terminated.get() && shell.exit_block().is_err() {
                     prep_for_exit(&mut shell);
                     std::process::exit(shell.previous_status().as_os_code())
                 }

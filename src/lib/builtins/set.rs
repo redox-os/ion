@@ -62,15 +62,6 @@ pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             for flag in arg.bytes().skip(1) {
                 match flag {
                     b'e' => shell.opts_mut().err_exit = false,
-                    b'o' => match args_iter.next().map(|s| s as &str) {
-                        Some("huponexit") => shell.opts_mut().huponexit = false,
-                        Some(_) => {
-                            return Status::error("ion: set: invalid option");
-                        }
-                        None => {
-                            return Status::error("ion: set: no option given");
-                        }
-                    },
                     _ => return Status::SUCCESS,
                 }
             }

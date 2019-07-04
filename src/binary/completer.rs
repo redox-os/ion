@@ -8,8 +8,8 @@ use liner::{Completer, CursorPosition, Event, EventKind};
 use std::{env, iter, path::PathBuf, str};
 
 pub struct IonCompleter<'a, 'b> {
-    shell:             &'b Shell<'a>,
-    complete_commands: bool,
+    shell:      &'b Shell<'a>,
+    completion: CompletionType,
 }
 
 /// Escapes filenames from the completer so that special characters will be properly escaped.
@@ -29,57 +29,82 @@ fn escape(input: &str) -> String {
     unsafe { String::from_utf8_unchecked(output) }
 }
 
+enum CompletionType {
+    Nothing,
+    Command,
+    VariableAndFiles,
+}
+
 impl<'a, 'b> IonCompleter<'a, 'b> {
-    pub fn new(shell: &'b Shell<'a>) -> Self { IonCompleter { shell, complete_commands: false } }
+    pub fn new(shell: &'b Shell<'a>) -> Self {
+        IonCompleter { shell, completion: CompletionType::Nothing }
+    }
 }
 
 impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
     fn completions(&mut self, start: &str) -> Vec<String> {
         let mut completions = IonFileCompleter::new(None, &self.shell, false).completions(start);
+        let vars = self.shell.variables();
 
-        if self.complete_commands {
-            let vars = self.shell.variables();
-            // Initialize a new completer from the definitions collected.
-            // Creates a list of definitions from the shell environment that
-            // will be used
-            // in the creation of a custom completer.
-            completions.extend(
-                self.shell
-                    .builtins()
-                    .keys()
-                    // Add built-in commands to the completer's definitions.
-                    .map(ToString::to_string)
-                    // Add the aliases to the completer's definitions.
-                    .chain(vars.aliases().map(|(key, _)| key.to_string()))
-                    // Add the list of available functions to the completer's
-                    // definitions.
-                    .chain(vars.functions().map(|(key, _)| key.to_string()))
-                    // Add the list of available variables to the completer's
-                    // definitions. TODO: We should make
-                    // it free to do String->SmallString
-                    //       and mostly free to go back (free if allocated)
-                    .chain(vars.string_vars().map(|(s, _)| ["$", &s].concat()))
-                    .filter(|s| s.starts_with(start)),
-            );
-            // Creates completers containing definitions from all directories
-            // listed
-            // in the environment's **$PATH** variable.
-            let file_completers: Vec<_> = if let Some(paths) = env::var_os("PATH") {
-                env::split_paths(&paths)
-                    .map(|s| {
-                        let s = if !s.to_string_lossy().ends_with("/") {
-                            PathBuf::from(format!("{}/", s.to_string_lossy()))
-                        } else {
-                            s
-                        };
-                        IonFileCompleter::new(Some(s), &self.shell, true)
-                    })
-                    .collect()
-            } else {
-                vec![IonFileCompleter::new(Some("/bin/".into()), &self.shell, true)]
-            };
-            // Merge the collected definitions with the file path definitions.
-            completions.extend(MultiCompleter::new(file_completers).completions(start));
+        match self.completion {
+            CompletionType::VariableAndFiles => {
+                // Initialize a new completer from the definitions collected.
+                // Creates a list of definitions from the shell environment that
+                // will be used
+                // in the creation of a custom completer.
+                if start.is_empty() {
+                    completions.extend(vars.string_vars().map(|(s, _)| format!("${}", s)));
+                    completions.extend(vars.arrays().map(|(s, _)| format!("@{}", s)));
+                } else if start.starts_with('$') {
+                    completions.extend(
+                        // Add the list of available variables to the completer's
+                        // definitions. TODO: We should make
+                        // it free to do String->SmallString
+                        //       and mostly free to go back (free if allocated)
+                        vars.string_vars()
+                            .filter(|(s, _)| s.starts_with(&start[1..]))
+                            .map(|(s, _)| format!("${}", &s)),
+                    );
+                } else if start.starts_with('@') {
+                    completions.extend(
+                        vars.arrays()
+                            .filter(|(s, _)| s.starts_with(&start[1..]))
+                            .map(|(s, _)| format!("@{}", &s)),
+                    );
+                }
+            }
+            CompletionType::Command => {
+                // Initialize a new completer from the definitions collected.
+                // Creates a list of definitions from the shell environment that
+                // will be used
+                // in the creation of a custom completer.
+                completions.extend(
+                    self.shell
+                        .builtins()
+                        .keys()
+                        // Add built-in commands to the completer's definitions.
+                        .map(ToString::to_string)
+                        // Add the aliases to the completer's definitions.
+                        .chain(vars.aliases().map(|(key, _)| key.to_string()))
+                        // Add the list of available functions to the completer's
+                        // definitions.
+                        .chain(vars.functions().map(|(key, _)| key.to_string()))
+                        .filter(|s| s.starts_with(start)),
+                );
+                // Creates completers containing definitions from all directories
+                // listed
+                // in the environment's **$PATH** variable.
+                let file_completers: Vec<_> = if let Some(paths) = env::var_os("PATH") {
+                    env::split_paths(&paths)
+                        .map(|s| IonFileCompleter::new(Some(s), &self.shell, true))
+                        .collect()
+                } else {
+                    vec![IonFileCompleter::new(Some("/bin/".into()), &self.shell, true)]
+                };
+                // Merge the collected definitions with the file path definitions.
+                completions.extend(MultiCompleter::new(file_completers).completions(start));
+            }
+            CompletionType::Nothing => (),
         }
         
         completions
@@ -89,7 +114,7 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
         if let EventKind::BeforeComplete = event.kind {
             let (words, pos) = event.editor.get_words_and_cursor_position();
 
-            self.complete_commands = match pos {
+/*            self.complete_commands = match pos {
                 CursorPosition::InWord(_) => false,
                 CursorPosition::InSpace(Some(_), _) => false,
                 CursorPosition::InSpace(None, _) => false,
@@ -105,7 +130,15 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
                     .is_some()
                 },
             };
-       }
+       }*/
+            self.completion = match pos {
+                _ if words.is_empty() => CompletionType::Nothing,
+                CursorPosition::InWord(0) | CursorPosition::OnWordRightEdge(0) => {
+                    CompletionType::Command
+                }
+                _ => CompletionType::VariableAndFiles,
+            };
+        }
     }
 }
 

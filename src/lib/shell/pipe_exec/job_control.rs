@@ -1,9 +1,11 @@
 use super::{
-    super::{signals, Shell},
     foreground::{BackgroundResult, Signals},
     PipelineError,
 };
-use crate::builtins::Status;
+use crate::{
+    builtins::Status,
+    shell::{signals, BackgroundEventCallback, Shell},
+};
 use nix::{
     sys::{
         signal::{self, Signal},
@@ -34,6 +36,21 @@ impl fmt::Display for ProcessState {
             ProcessState::Empty => write!(f, "Empty"),
         }
     }
+}
+
+/// An event sent by a job watcher for a background job
+#[derive(Clone, Debug, PartialEq)]
+pub enum BackgroundEvent {
+    /// A new job was sent to background
+    Added,
+    /// A background job was stopped
+    Stopped,
+    /// A background job was resumed
+    Resumed,
+    /// A background job exited
+    Exited(i32),
+    /// A job errored
+    Errored(nix::Error),
 }
 
 #[derive(Clone, Debug, Hash)]
@@ -108,6 +125,7 @@ impl<'a> Shell<'a> {
         processes: &Mutex<Vec<BackgroundProcess>>,
         pgid: Pid,
         njob: usize,
+        background_event: &Option<BackgroundEventCallback>,
     ) {
         let mut exit_status = 0;
 
@@ -127,7 +145,9 @@ impl<'a> Shell<'a> {
             match wait::waitpid(Pid::from_raw(-pgid.as_raw()), Some(opts)) {
                 Err(nix::Error::Sys(nix::errno::Errno::ECHILD)) => {
                     if !fg_was_grabbed {
-                        eprintln!("ion: ([{}] {}) exited with {}", njob, pgid, exit_status);
+                        if let Some(ref callback) = &background_event {
+                            callback(njob, pgid, BackgroundEvent::Exited(exit_status));
+                        }
                     }
 
                     get_process!(|process| {
@@ -140,7 +160,9 @@ impl<'a> Shell<'a> {
                     break;
                 }
                 Err(errno) => {
-                    eprintln!("ion: ([{}] {}) errored: {}", njob, pgid, errno);
+                    if let Some(ref callback) = &background_event {
+                        callback(njob, pgid, BackgroundEvent::Errored(errno));
+                    }
 
                     get_process!(|process| {
                         process.forget();
@@ -154,7 +176,9 @@ impl<'a> Shell<'a> {
                 Ok(WaitStatus::Exited(_, status)) => exit_status = status,
                 Ok(WaitStatus::Stopped(..)) => {
                     if !fg_was_grabbed {
-                        eprintln!("ion: ([{}] {}) Stopped", njob, pgid);
+                        if let Some(ref callback) = &background_event {
+                            callback(njob, pgid, BackgroundEvent::Stopped);
+                        }
                     }
 
                     get_process!(|process| {
@@ -166,7 +190,9 @@ impl<'a> Shell<'a> {
                 }
                 Ok(WaitStatus::Continued(_)) => {
                     if !fg_was_grabbed {
-                        eprintln!("ion: ([{}] {}) Running", njob, pgid);
+                        if let Some(ref callback) = &background_event {
+                            callback(njob, pgid, BackgroundEvent::Resumed);
+                        }
                     }
 
                     get_process!(|process| process.state = ProcessState::Running);
@@ -184,16 +210,21 @@ impl<'a> Shell<'a> {
         let pid = process.pid();
         let njob = self.add_to_background(process);
         self.previous_job = njob;
-        eprintln!("ion: bg [{}] {}", njob, pid);
+        if let Some(ref callback) = &self.background_event {
+            callback(njob, pid, BackgroundEvent::Added);
+        }
 
         // Increment the `Arc` counters so that these fields can be moved into
         // the upcoming background thread.
         let processes = self.background.clone();
         let fg_signals = self.foreground_signals.clone();
+        let background_event = self.background_event.clone();
         // Spawn a background thread that will monitor the progress of the
         // background process, updating it's state changes until it finally
         // exits.
-        let _ = spawn(move || Self::watch_background(&fg_signals, &processes, pid, njob as usize));
+        let _ = spawn(move || {
+            Self::watch_background(&fg_signals, &processes, pid, njob as usize, &background_event)
+        });
     }
 
     /// Send a kill signal to all running background tasks.

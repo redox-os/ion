@@ -1,0 +1,46 @@
+To run these tests, you will have to replace /bin/sh with the shell to
+test, the symlink trick doesn't work since we want the shell that make
+uses to be the testshell as well. 
+
+You may 
+TESTMAKE=gmake ./test01.sh 
+to test various makes.
+
+Currently, FreeBSD's make depends on the /bin/sh to exit on SIGINT even
+when a foreground job is run to behave right. GNU make works right
+with fixed FreeBSD shells.
+
+The following fix makes FreeBSD behave right (IMHO) for the non-compat
+case. Note that if you don't pass a `-j` parameter to make, it will be
+in compat mode even if you don't pass -B. test it like this
+export TESTMAKE=/foo/bar/make -j 1
+./test01.sh
+
+diff -c make.original/job.c make.work/job.c
+*** make.original/job.c	Tue Aug 26 12:06:38 1997
+--- make.work/job.c	Wed Mar 11 12:49:52 1998
+***************
+*** 2904,2910 ****
+  	}
+      }
+      (void) eunlink(tfile);
+!     exit(signo);
+  }
+  
+  /*
+--- 2904,2918 ----
+  	}
+      }
+      (void) eunlink(tfile);
+! 
+!     /*
+!      * For some signals, we don't want a direct exit, but to
+!      * let them resent to ourself, which is done by the calling
+!      * Routine.
+!      */
+! 
+!     if (signo != SIGINT && signo != SIGTERM && signo != SIGHUP)
+!       exit(signo);
+  }
+  
+  /*

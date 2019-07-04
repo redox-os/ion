@@ -3,7 +3,12 @@ name = "scopes"
 version = "0.1.0"
 authors = ["Michael Murphy <mmstickman@gmail.com>", "AdminXVII <dev.xlheureux@gmail.com"]
 edition = "2018"
-publish = false
+description = "A generic datastructure for variables organized in scopes"
+license = "MIT"
+repository = "https://gitlab.redox-os.org/redox-os/ion"
+readme = "README.md"
+keywords = ["scopes", "variables"]
+categories = ["data-structures", "memory-management"]
 
 [dependencies]
 hashbrown = "0.5"

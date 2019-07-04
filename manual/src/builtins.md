@@ -209,7 +209,7 @@ history
 
 Display a log of all commands previously executed
 
-## ion-docs
+## ion_docs
 
 ```
 ion_docs
@@ -280,7 +280,7 @@ RANDOM and no output will be produced. Two arguments indicate a range of [START;
 arguments indicate a range of [START; END] with a spacing of STEP between possible outputs.
 RANDOM choice will select one random item from the succeeding arguments.
 
-> Due to limitations int the rand crate, seeding is not yet implemented
+> Due to limitations in the rand crate, seeding is not yet implemented
 
 ## read
 

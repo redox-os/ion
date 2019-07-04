@@ -1,0 +1,29 @@
+1) Link or copy the shell to test to "./testshell", then run the tests
+like this: `./test01.sh`
+
+2) Please keep in mind that the sigint catcher program remaps SIGQUIT
+to C-g. When a script fails, it is possible that your terminal is left
+with these changes. Either you have to be careful and reset the
+terminal when it is needed or keep in mind that you might have to use
+C-g insted of C-\ for SIGQUIT.
+
+3) Some background jobs are started and are supposed to be killed by a
+working shell. You wouldn't read this if you weren't concerned about
+the quality of your shell, so you probably have some runaway jobs when
+done with the tests. Make sure you `ps` for all jobs attached to your
+terminal when you're done. I just discovered a `wc -c /dev/zero`
+running on my machine since almost a week ago :-)
+
+4) The program ./hardguy lasts 20 seconds it is not catched by the
+surrounding shell, no matter what happens. Patience, no need to kill
+it.
+
+5) Some examples need the -T switch I just committed to
+FreeBSD-current's /bin/sh (immediate execution of traps).
+
+mkdep.sh tests mkdep, which is an example of a program that is
+implemented as shell script and need to kill itself in a trap
+handler. It should just be interruptable by the first SIGINT.
+
+test??[ab].sh are subshell neede for other tests, but cann be called
+directly as well.

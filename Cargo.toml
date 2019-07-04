@@ -74,10 +74,10 @@ small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"]
 smallvec = "0.6"
 unicode-segmentation = "1.2"
 xdg = "2.2.0"
-ion-ranges = { path = "members/ranges" }
-scopes = { path = "members/scopes-rs" }
-types-rs = { path = "members/types-rs" }
-builtins-proc = { path = "members/builtins-proc" }
+ion-ranges = { version = "0.1", path = "members/ranges" }
+scopes = { version = "0.1", path = "members/scopes-rs" }
+types-rs = { version = "0.1", path = "members/types-rs" }
+builtins-proc = { version = "0.1", path = "members/builtins-proc" }
 hashbrown = "0.5"
 itertools = "0.8"
 lexical = "2.0"

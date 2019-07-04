@@ -5,7 +5,6 @@ mod flow;
 /// The various blocks
 pub mod flow_control;
 mod fork;
-mod fork_function;
 mod job;
 mod pipe_exec;
 mod shell_expand;
@@ -18,14 +17,16 @@ pub(crate) use self::job::{Job, RefinedJob};
 use self::{
     directory_stack::DirectoryStack,
     flow_control::{Block, Function, FunctionError, Statement},
-    fork::{Fork, IonResult},
+    fork::{Capture, Fork, IonResult},
     pipe_exec::foreground,
     variables::Variables,
 };
 pub use self::{
     flow::BlockError,
-    fork::Capture,
-    pipe_exec::{job_control::BackgroundProcess, PipelineError},
+    pipe_exec::{
+        job_control::{BackgroundEvent, BackgroundProcess},
+        PipelineError,
+    },
     variables::Value,
 };
 use crate::{
@@ -39,8 +40,12 @@ use crate::{
 };
 use err_derive::Error;
 use itertools::Itertools;
-use nix::sys::signal::{self, SigHandler};
+use nix::{
+    sys::signal::{self, SigHandler},
+    unistd::Pid,
+};
 use std::{
+    fs::File,
     io::{self, Write},
     ops::{Deref, DerefMut},
     rc::Rc,
@@ -98,8 +103,6 @@ pub struct Options {
     pub err_exit: bool,
     /// Do not execute any commands given to the shell.
     pub no_exec: bool,
-    /// Hangup on exiting the shell.
-    pub huponexit: bool,
     /// If set, denotes that this shell is running as a background job.
     pub grab_tty: bool,
 }
@@ -128,21 +131,30 @@ pub struct Shell<'a> {
     /// Contains information on all of the active background processes that are being managed
     /// by the shell.
     background: Arc<Mutex<Vec<BackgroundProcess>>>,
-    /// Used by an interactive session to know when the input is not terminated.
-    pub unterminated: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<foreground::Signals>,
+
+    // Callbacks
     /// Custom callback for each command call
     on_command: Option<OnCommandCallback<'a>>,
     /// Custom callback before each command call
     pre_command: Option<PreCommandCallback<'a>>,
+    /// Custom callback when a background event occurs
+    background_event: Option<BackgroundEventCallback>,
+
+    // Default std pipes
+    stdin:  Option<File>,
+    stdout: Option<File>,
+    stderr: Option<File>,
 }
 
 /// A callback that is executed after each pipeline is run
 pub type OnCommandCallback<'a> = Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>;
 /// A callback that is executed before each pipeline is run
 pub type PreCommandCallback<'a> = Box<dyn Fn(&Shell<'_>, &Pipeline<RefinedJob<'_>>) + 'a>;
+/// A callback that is executed when a background event occurs
+pub type BackgroundEventCallback = Arc<dyn Fn(usize, Pid, BackgroundEvent) + Send + Sync>;
 
 impl<'a> Default for Shell<'a> {
     fn default() -> Self { Self::new() }
@@ -200,9 +212,22 @@ impl<'a> Shell<'a> {
             foreground_signals: Arc::new(foreground::Signals::new()),
             on_command: None,
             pre_command: None,
-            unterminated: false,
+            background_event: None,
+
+            stdin: None,
+            stdout: None,
+            stderr: None,
         }
     }
+
+    /// Replace the default stdin
+    pub fn stdin<T: Into<Option<File>>>(&mut self, stdin: T) { self.stdin = stdin.into() }
+
+    /// Replace the default stdin
+    pub fn stdout<T: Into<Option<File>>>(&mut self, stdout: T) { self.stdout = stdout.into() }
+
+    /// Replace the default stdin
+    pub fn stderr<T: Into<Option<File>>>(&mut self, stderr: T) { self.stderr = stderr.into() }
 
     /// Access the directory stack
     pub const fn dir_stack(&self) -> &DirectoryStack { &self.directory_stack }
@@ -274,7 +299,25 @@ impl<'a> Shell<'a> {
     pub fn run_pipeline(&mut self, pipeline: &Pipeline<Job<'a>>) -> Result<Status, IonError> {
         let command_start_time = SystemTime::now();
 
-        let pipeline = pipeline.expand(self)?;
+        let mut pipeline = pipeline.expand(self)?;
+        for item in &mut pipeline.items {
+            // TODO: Once the rust version is shifted to 1.33, use the transpose method
+            item.job.stdin = if let Some(file) = &self.stdin {
+                Some(file.try_clone().map_err(PipelineError::ClonePipeFailed)?)
+            } else {
+                None
+            };
+            item.job.stdout = if let Some(file) = &self.stdout {
+                Some(file.try_clone().map_err(PipelineError::ClonePipeFailed)?)
+            } else {
+                None
+            };
+            item.job.stderr = if let Some(file) = &self.stderr {
+                Some(file.try_clone().map_err(PipelineError::ClonePipeFailed)?)
+            } else {
+                None
+            };
+        }
         if let Some(ref callback) = self.pre_command {
             callback(self, &pipeline);
         }
@@ -282,23 +325,14 @@ impl<'a> Shell<'a> {
         // Don't execute commands when the `-n` flag is passed.
         let exit_status = if self.opts.no_exec {
             Ok(Status::SUCCESS)
-        // Branch else if -> input == shell command i.e. echo
+        } else if pipeline.requires_piping() {
+            self.execute_pipeline(pipeline).map_err(Into::into)
         } else if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
-            // Run the 'main' of the command and set exit_status
-            if pipeline.requires_piping() {
-                self.execute_pipeline(pipeline).map_err(Into::into)
-            } else {
-                Ok(main(&pipeline.items[0].job.args, self))
-            }
-        // Branch else if -> input == shell function and set the exit_status
+            Ok(main(&pipeline.items[0].job.args, self))
         } else if let Some(Value::Function(function)) =
             self.variables.get(&pipeline.items[0].job.args[0]).cloned()
         {
-            if pipeline.requires_piping() {
-                self.execute_pipeline(pipeline).map_err(Into::into)
-            } else {
-                function.execute(self, &pipeline.items[0].job.args).map(|_| self.previous_status)
-            }
+            function.execute(self, &pipeline.items[0].job.args).map(|_| self.previous_status)
         } else {
             self.execute_pipeline(pipeline).map_err(Into::into)
         }?;
@@ -323,6 +357,16 @@ impl<'a> Shell<'a> {
         } else {
             Some(self.previous_job)
         }
+    }
+
+    /// Set the callback to call before each command
+    pub fn set_background_event(&mut self, callback: Option<BackgroundEventCallback>) {
+        self.background_event = callback;
+    }
+
+    /// Set the callback to call before each command
+    pub fn background_event_mut(&mut self) -> &mut Option<BackgroundEventCallback> {
+        &mut self.background_event
     }
 
     /// Set the callback to call before each command

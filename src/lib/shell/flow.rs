@@ -499,15 +499,13 @@ impl<'a> Shell<'a> {
                             .set(bind, value.iter().cloned().map(Value::Str).collect::<Value<_>>());
                         out
                     } else {
-                        let out = self.variables.get_str(bind);
+                        let out = if let Some(Value::Str(val)) = self.variables.get(bind) {
+                            Some(Value::Str(val.clone()))
+                        } else {
+                            None
+                        };
                         self.variables_mut().set(bind, value.join(" "));
-                        match out {
-                            Ok(out) => Some(Value::Str(out)),
-                            Err(why) => {
-                                eprintln!("ion: {}", why);
-                                None
-                            }
-                        }
+                        out
                     }
                 });
 

@@ -1,6 +1,6 @@
 use self::binary::{builtins, InteractiveShell};
 use atty::Stream;
-use ion_shell::{BuiltinMap, Shell, Value};
+use ion_shell::{BackgroundEvent, BuiltinMap, Shell, Value};
 use liner::KeyBindings;
 use nix::{
     sys::signal::{self, SigHandler, Signal},
@@ -10,6 +10,7 @@ use std::{
     fs,
     io::{stdin, BufReader},
     process,
+    sync::Arc,
 };
 
 #[cfg(not(feature = "advanced_arg_parsing"))]
@@ -132,12 +133,14 @@ fn parse_args() -> CommandLineArgs {
 
 fn set_unique_pid() -> nix::Result<()> {
     let pgid = unistd::getpid();
-    if pgid == unistd::tcgetpgrp(nix::libc::STDIN_FILENO)? {
-        return Ok(());
+    if pgid != unistd::getpgrp() {
+        unistd::setpgid(pgid, pgid)?;
     }
-    unistd::setpgid(pgid, pgid)?;
-    unsafe { signal::signal(Signal::SIGTTOU, SigHandler::SigIgn) }?;
-    unistd::tcsetpgrp(nix::libc::STDIN_FILENO, pgid)
+    if pgid != unistd::tcgetpgrp(nix::libc::STDIN_FILENO)? {
+        unsafe { signal::signal(Signal::SIGTTOU, SigHandler::SigIgn) }?;
+        unistd::tcsetpgrp(nix::libc::STDIN_FILENO, pgid)?;
+    }
+    Ok(())
 }
 
 fn main() {
@@ -163,6 +166,18 @@ fn main() {
             println!("ion: could not bring shell to foreground: {}", err);
         }
     }
+
+    shell.set_background_event(Some(Arc::new(|njob, pid, kind| match kind {
+        BackgroundEvent::Added => eprintln!("ion: bg [{}] {}", njob, pid),
+        BackgroundEvent::Stopped => eprintln!("ion: ([{}] {}) Stopped", njob, pid),
+        BackgroundEvent::Resumed => eprintln!("ion: ([{}] {}) Running", njob, pid),
+        BackgroundEvent::Exited(status) => {
+            eprintln!("ion: ([{}] {}) exited with {}", njob, pid, status)
+        }
+        BackgroundEvent::Errored(error) => {
+            eprintln!("ion: ([{}] {}) errored: {}", njob, pid, error)
+        }
+    })));
 
     shell.opts_mut().no_exec = command_line_args.no_execute;
     shell.opts_mut().grab_tty = stdin_is_a_tty;
