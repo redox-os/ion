@@ -4,12 +4,12 @@ use ion_shell::{
     expansion::{unescape, Expander},
     Shell,
 };
-use liner::{BasicCompleter, Completer, CursorPosition, Event, EventKind};
+use liner::{Completer, CursorPosition, Event, EventKind};
 use std::{env, iter, path::PathBuf, str};
 
 pub struct IonCompleter<'a, 'b> {
     shell:             &'b Shell<'a>,
-    history_completer: Option<BasicCompleter>,
+    complete_commands: bool,
 }
 
 /// Escapes filenames from the completer so that special characters will be properly escaped.
@@ -30,17 +30,15 @@ fn escape(input: &str) -> String {
 }
 
 impl<'a, 'b> IonCompleter<'a, 'b> {
-    pub fn new(shell: &'b Shell<'a>) -> Self { IonCompleter { shell, history_completer: None } }
+    pub fn new(shell: &'b Shell<'a>) -> Self { IonCompleter { shell, complete_commands: false } }
 }
 
 impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
     fn completions(&mut self, start: &str) -> Vec<String> {
-        let mut completions = IonFileCompleter::new(None, &self.shell).completions(start);
+        let mut completions = IonFileCompleter::new(None, &self.shell, false).completions(start);
 
-        if let Some(ref mut history) = &mut self.history_completer {
+        if self.complete_commands {
             let vars = self.shell.variables();
-
-            completions.extend(history.completions(start));
             // Initialize a new completer from the definitions collected.
             // Creates a list of definitions from the shell environment that
             // will be used
@@ -68,14 +66,22 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
             // in the environment's **$PATH** variable.
             let file_completers: Vec<_> = if let Some(paths) = env::var_os("PATH") {
                 env::split_paths(&paths)
-                    .map(|s| IonFileCompleter::new(Some(s), &self.shell))
+                    .map(|s| {
+                        let s = if !s.to_string_lossy().ends_with("/") {
+                            PathBuf::from(format!("{}/", s.to_string_lossy()))
+                        } else {
+                            s
+                        };
+                        IonFileCompleter::new(Some(s), &self.shell, true)
+                    })
                     .collect()
             } else {
-                vec![IonFileCompleter::new(Some("/bin/".into()), &self.shell)]
+                vec![IonFileCompleter::new(Some("/bin/".into()), &self.shell, true)]
             };
             // Merge the collected definitions with the file path definitions.
             completions.extend(MultiCompleter::new(file_completers).completions(start));
         }
+        
         completions
     }
 
@@ -83,39 +89,23 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
         if let EventKind::BeforeComplete = event.kind {
             let (words, pos) = event.editor.get_words_and_cursor_position();
 
-            let filename = match pos {
-                CursorPosition::InWord(index) => index > 0,
-                CursorPosition::InSpace(Some(_), _) => true,
+            self.complete_commands = match pos {
+                CursorPosition::InWord(_) => false,
+                CursorPosition::InSpace(Some(_), _) => false,
                 CursorPosition::InSpace(None, _) => false,
-                CursorPosition::OnWordLeftEdge(index) => index >= 1,
-                CursorPosition::OnWordRightEdge(index) => words
+                CursorPosition::OnWordLeftEdge(_) => false,
+                CursorPosition::OnWordRightEdge(index) => if index == 0 {
+                    true
+                } else {
+                    words
                     .into_iter()
-                    .nth(index)
+                    .nth(index - 1)
                     .map(|(start, end)| event.editor.current_buffer().range(start, end))
-                    .and_then(|filename| {
-                        Some(complete_as_file(&env::current_dir().ok()?, &filename, index))
-                    })
-                    .filter(|&x| x)
-                    .is_some(),
+                    .filter(|filename| filename.ends_with("|"))
+                    .is_some()
+                },
             };
-
-            // Add the history list to the completer's definitions.
-            // Map each underlying `liner::Buffer` into a `String`.
-            self.history_completer = if filename {
-                Some(BasicCompleter::new(
-                    event
-                        .editor
-                        .context()
-                        .history
-                        .buffers
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                ))
-            } else {
-                None
-            };
-        }
+       }
     }
 }
 
@@ -126,12 +116,13 @@ pub struct IonFileCompleter<'a, 'b> {
     shell: &'b Shell<'a>,
     /// The directory the expansion takes place in
     path: PathBuf,
+    for_command: bool,
 }
 
 impl<'a, 'b> IonFileCompleter<'a, 'b> {
-    pub fn new(path: Option<PathBuf>, shell: &'b Shell<'a>) -> Self {
+    pub fn new(path: Option<PathBuf>, shell: &'b Shell<'a>, for_command: bool) -> Self {
         let path = path.unwrap_or_default();
-        IonFileCompleter { shell, path }
+        IonFileCompleter { shell, path, for_command }
     }
 }
 
@@ -160,7 +151,12 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
         // Now we obtain completions for the `expanded` form of the `start` value.
         let completions = filename_completion(&expanded, &self.path);
         if expanded == start {
-            return completions.collect();
+            //return completions.map(|s| s.rsplit('/').nth(0).unwrap_or(&s).to_string()).collect();
+            return if self.for_command {
+                completions.map(|s| s.rsplit('/').nth(0).unwrap_or(&s).to_string()).collect()
+            } else {
+                completions.collect()
+            };
         }
         // We can do that by obtaining the index position where the tilde character
         // ends. We don't search with `~` because we also want to
@@ -221,11 +217,10 @@ fn filename_completion<'a>(start: &'a str, path: &'a PathBuf) -> impl Iterator<I
     if string.ends_with('.') {
         string.push('*')
     }
-
     let globs = glob_with(
         &string,
         MatchOptions {
-            case_sensitive:              true,
+            case_sensitive:              false, //true,
             require_literal_separator:   true,
             require_literal_leading_dot: false,
         },
@@ -283,25 +278,4 @@ mod tests {
         assert_eq!(completer.completions("~"), vec!["~/"]);
         assert_eq!(completer.completions("tes/fil"), vec!["testing/file_with_text"]);
     }
-}
-
-/// Infer if the given filename is actually a partial filename
-fn complete_as_file(current_dir: &PathBuf, filename: &str, index: usize) -> bool {
-    let filename = filename.trim();
-    let mut file = current_dir.clone();
-    file.push(&filename);
-    // If the user explicitly requests a file through this syntax then complete as
-    // a file
-    filename.starts_with('.') ||
-    // If the file starts with a dollar sign, it's a variable, not a file
-    (!filename.starts_with('$') &&
-    // Once we are beyond the first string, assume its a file
-    (index > 0 ||
-    // If we are referencing a file that exists then just complete to that file
-    file.exists() ||
-    // If we have a partial file inside an existing directory, e.g. /foo/b when
-    // /foo/bar exists, then treat it as file as long as `foo` isn't the
-    // current directory, otherwise this would apply to any string `foo`
-    file.parent().filter(|parent| parent.exists() && parent != current_dir).is_some()))
-    // By default assume its not a file
 }
