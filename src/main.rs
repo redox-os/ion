@@ -133,12 +133,14 @@ fn parse_args() -> CommandLineArgs {
 
 fn set_unique_pid() -> nix::Result<()> {
     let pgid = unistd::getpid();
-    if pgid == unistd::tcgetpgrp(nix::libc::STDIN_FILENO)? {
-        return Ok(());
+    if pgid != unistd::getpgrp() {
+        unistd::setpgid(pgid, pgid)?;
     }
-    unistd::setpgid(pgid, pgid)?;
-    unsafe { signal::signal(Signal::SIGTTOU, SigHandler::SigIgn) }?;
-    unistd::tcsetpgrp(nix::libc::STDIN_FILENO, pgid)
+    if pgid != unistd::tcgetpgrp(nix::libc::STDIN_FILENO)? {
+        unsafe { signal::signal(Signal::SIGTTOU, SigHandler::SigIgn) }?;
+        unistd::tcsetpgrp(nix::libc::STDIN_FILENO, pgid)?;
+    }
+    Ok(())
 }
 
 fn main() {
