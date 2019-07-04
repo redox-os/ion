@@ -198,7 +198,9 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
         let completions = filename_completion(&expanded, &self.path);
         if expanded == start {
             return if self.for_command {
-                completions.map(|s| s.rsplit('/').next().map(|s| s.to_string()).unwrap_or(s)).collect()
+                completions
+                    .map(|s| s.rsplit('/').next().map(|s| s.to_string()).unwrap_or(s))
+                    .collect()
             } else {
                 completions.collect()
             };
