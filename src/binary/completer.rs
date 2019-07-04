@@ -43,7 +43,7 @@ impl<'a, 'b> IonCompleter<'a, 'b> {
 
 impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
     fn completions(&mut self, start: &str) -> Vec<String> {
-        let mut completions = IonFileCompleter::new(None, &self.shell, false).completions(start);
+        let mut completions = IonFileCompleter::new(None, &self.shell).completions(start);
         let vars = self.shell.variables();
 
         match self.completion {
@@ -98,15 +98,17 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
                     env::split_paths(&paths)
                         .map(|s| {
                             let s = if !s.to_string_lossy().ends_with("/") {
-                                PathBuf::from(format!("{}/", s.to_string_lossy()))
+                                let mut oss = s.into_os_string();
+                                oss.push("/");
+                                oss.into()
                             } else {
                                 s
                             };
-                            IonFileCompleter::new(Some(s), &self.shell, true)
+                            IonFileCompleter::new(Some(s), &self.shell)
                         })
                         .collect()
                 } else {
-                    vec![IonFileCompleter::new(Some("/bin/".into()), &self.shell, true)]
+                    vec![IonFileCompleter::new(Some("/bin/".into()), &self.shell)]
                 };
                 // Merge the collected definitions with the file path definitions.
                 completions.extend(MultiCompleter::new(file_completers).completions(start));
@@ -161,7 +163,10 @@ pub struct IonFileCompleter<'a, 'b> {
 }
 
 impl<'a, 'b> IonFileCompleter<'a, 'b> {
-    pub fn new(path: Option<PathBuf>, shell: &'b Shell<'a>, for_command: bool) -> Self {
+    pub fn new(path: Option<PathBuf>, shell: &'b Shell<'a>) -> Self {
+        // The only time a path is Some is when looking for a command not a directory
+        // so save this fact to strip the paths when completing commands.
+        let for_command = path.is_some();
         let path = path.unwrap_or_default();
         IonFileCompleter { shell, path, for_command }
     }
@@ -193,7 +198,7 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
         let completions = filename_completion(&expanded, &self.path);
         if expanded == start {
             return if self.for_command {
-                completions.map(|s| s.rsplit('/').nth(0).unwrap_or(&s).to_string()).collect()
+                completions.map(|s| s.rsplit('/').next().map(|s| s.to_string()).unwrap_or(s)).collect()
             } else {
                 completions.collect()
             };
@@ -312,7 +317,7 @@ mod tests {
     #[test]
     fn filename_completion() {
         let shell = Shell::default();
-        let mut completer = IonFileCompleter::new(None, &shell, false);
+        let mut completer = IonFileCompleter::new(None, &shell);
         assert_eq!(completer.completions("testing"), vec!["testing/"]);
         assert_eq!(completer.completions("testing/file"), vec!["testing/file_with_text"]);
         assert_eq!(completer.completions("~"), vec!["~/"]);

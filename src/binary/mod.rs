@@ -269,12 +269,12 @@ impl<'a> InteractiveShell<'a> {
 
     fn exec<T: Fn(&mut Shell<'_>)>(self, prep_for_exit: &T) -> ! {
         loop {
-            io::stdout().flush().unwrap_or_else(|err| {
+            if let Err(err) = io::stdout().flush() {
                 eprintln!("ion: failed to flush stdio: {}", err);
-            });
-            io::stderr().flush().unwrap_or_else(|err| {
+            }
+            if let Err(err) = io::stderr().flush() {
                 println!("ion: failed to flush stderr: {}", err);
-            });
+            }
             let mut lines = std::iter::repeat_with(|| self.readln(prep_for_exit))
                 .filter_map(|cmd| cmd)
                 .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
