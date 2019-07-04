@@ -323,8 +323,19 @@ impl<'a> Shell<'a> {
         }
 
         // Don't execute commands when the `-n` flag is passed.
-        let exit_status =
-            if self.opts.no_exec { Ok(Status::SUCCESS) } else { self.execute_pipeline(pipeline) }?;
+        let exit_status = if self.opts.no_exec {
+            Ok(Status::SUCCESS)
+        } else if pipeline.requires_piping() {
+            self.execute_pipeline(pipeline).map_err(Into::into)
+        } else if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
+            Ok(main(&pipeline.items[0].job.args, self))
+        } else if let Some(Value::Function(function)) =
+            self.variables.get(&pipeline.items[0].job.args[0]).cloned()
+        {
+            function.execute(self, &pipeline.items[0].job.args).map(|_| self.previous_status)
+        } else {
+            self.execute_pipeline(pipeline).map_err(Into::into)
+        }?;
 
         if let Some(ref callback) = self.on_command {
             if let Ok(elapsed_time) = command_start_time.elapsed() {
