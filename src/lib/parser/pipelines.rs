@@ -798,7 +798,7 @@ mod tests {
             assert_eq!(vec![Input::File("stuff".into())], pipeline.items[2].inputs);
             assert_eq!("other", &pipeline.items[2].outputs[0].file);
             assert!(!pipeline.items[2].outputs[0].append);
-            assert_eq!(input.to_owned(), pipeline.expand(&Shell::new()).unwrap().to_string());
+            assert_eq!(input.to_owned(), pipeline.expand(&mut Shell::new()).unwrap().to_string());
         } else {
             panic!();
         }

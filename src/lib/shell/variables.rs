@@ -308,7 +308,7 @@ pub(crate) mod tests {
             Err(expansion::Error::VarNotFound)
         }
 
-        fn command(&self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
+        fn command(&mut self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
 
         fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 

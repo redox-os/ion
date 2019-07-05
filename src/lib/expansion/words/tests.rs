@@ -240,11 +240,11 @@ fn test_braces() {
 fn array_methods() {
     let method = ArrayMethod::new("graphemes", "pkmn1", Pattern::Whitespace, Some("3"));
     let expected = args!["é"];
-    assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), expected);
+    assert_eq!(method.handle_as_array(&mut DummyExpander).unwrap(), expected);
     let method = ArrayMethod::new("chars", "pkmn2", Pattern::Whitespace, Some("3"));
     let expected = args!["e"];
-    assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), expected);
+    assert_eq!(method.handle_as_array(&mut DummyExpander).unwrap(), expected);
     let method = ArrayMethod::new("bytes", "pkmn2", Pattern::Whitespace, Some("1"));
     let expected = args!["111"];
-    assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), expected);
+    assert_eq!(method.handle_as_array(&mut DummyExpander).unwrap(), expected);
 }

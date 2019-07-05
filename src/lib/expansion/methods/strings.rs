@@ -91,13 +91,16 @@ pub struct StringMethod<'a> {
 }
 
 impl<'a> StringMethod<'a> {
-    pub fn handle<E: Expander>(&self, output: &mut types::Str, expand: &E) -> Result<(), E::Error> {
+    pub fn handle<E: Expander>(
+        &self,
+        output: &mut types::Str,
+        expand: &mut E,
+    ) -> Result<(), E::Error> {
         let variable = self.variable;
-        let pattern = MethodArgs::new(self.pattern, expand);
 
         macro_rules! string_eval {
             ($variable:ident $method:tt) => {{
-                let pattern = pattern.join(" ")?;
+                let pattern = MethodArgs::new(self.pattern, expand).join(" ")?;
                 let is_true = match expand.string($variable) {
                     Ok(value) => value.$method(pattern.as_str()),
                     Err(Error::VarNotFound) if is_expression($variable) => {
@@ -147,7 +150,8 @@ impl<'a> StringMethod<'a> {
 
         macro_rules! get_var {
             () => {{
-                match expand.string(variable) {
+                let string = expand.string(variable);
+                match string {
                     Ok(value) => value,
                     Err(Error::VarNotFound) if is_expression(variable) => {
                         types::Str::from(expand.expand_string(variable)?.join(" "))
@@ -176,7 +180,7 @@ impl<'a> StringMethod<'a> {
             "trim_left" => {
                 output.push_str(get_var!().trim_start());
             }
-            "repeat" => match pattern.join(" ")?.parse::<usize>() {
+            "repeat" => match MethodArgs::new(self.pattern, expand).join(" ")?.parse::<usize>() {
                 Ok(repeat) => output.push_str(&get_var!().repeat(repeat)),
                 Err(_) => Err(MethodError::WrongArgument(
                     "repeat",
@@ -184,8 +188,12 @@ impl<'a> StringMethod<'a> {
                 ))?,
             },
             "replace" => {
-                let mut args = pattern.array();
-                match (args.next(), args.next()) {
+                let params = {
+                    let mut args = MethodArgs::new(self.pattern, expand);
+                    let mut args = args.array();
+                    (args.next(), args.next())
+                };
+                match params {
                     (Some(replace), Some(with)) => {
                         output.push_str(&get_var!().replace(replace.as_str(), &with));
                     }
@@ -193,8 +201,12 @@ impl<'a> StringMethod<'a> {
                 }
             }
             "replacen" => {
-                let mut args = pattern.array();
-                match (args.next(), args.next(), args.next()) {
+                let params = {
+                    let mut args = MethodArgs::new(self.pattern, expand);
+                    let mut args = args.array();
+                    (args.next(), args.next(), args.next())
+                };
+                match params {
                     (Some(replace), Some(with), Some(nth)) => {
                         if let Ok(nth) = nth.parse::<usize>() {
                             output.push_str(&get_var!().replacen(replace.as_str(), &with, nth));
@@ -209,8 +221,12 @@ impl<'a> StringMethod<'a> {
                 }
             }
             "regex_replace" => {
-                let mut args = pattern.array();
-                match (args.next(), args.next()) {
+                let params = {
+                    let mut args = MethodArgs::new(self.pattern, expand);
+                    let mut args = args.array();
+                    (args.next(), args.next())
+                };
+                match params {
                     (Some(replace), Some(with)) => match Regex::new(&replace) {
                         Ok(re) => output.push_str(&re.replace_all(&get_var!(), &with[..])),
                         Err(why) => Err(MethodError::InvalidRegex(replace.to_string(), why))?,
@@ -221,14 +237,13 @@ impl<'a> StringMethod<'a> {
                 }
             }
             "join" => {
-                let pattern = pattern.join(" ")?;
+                let pattern = MethodArgs::new(self.pattern, expand).join(" ")?;
                 match expand.array(variable, &Select::All) {
                     Ok(array) => expand.slice(output, array.join(&pattern), &self.selection)?,
-                    Err(Error::VarNotFound) if is_expression(variable) => expand.slice(
-                        output,
-                        expand.expand_string(variable)?.join(&pattern),
-                        &self.selection,
-                    )?,
+                    Err(Error::VarNotFound) if is_expression(variable) => {
+                        let expanded = expand.expand_string(variable)?.join(&pattern);
+                        expand.slice(output, expanded, &self.selection)?
+                    }
                     Err(why) => return Err(why),
                 }
             }
@@ -273,10 +288,11 @@ impl<'a> StringMethod<'a> {
                 Err(why) => return Err(why),
             },
             "find" => {
+                let pattern = MethodArgs::new(self.pattern, expand).join(" ")?;
                 let out = match expand.string(variable) {
-                    Ok(value) => value.find(pattern.join(" ")?.as_str()),
+                    Ok(value) => value.find(pattern.as_str()),
                     Err(Error::VarNotFound) if is_expression(variable) => {
-                        expand.expand_string(variable)?.join(" ").find(pattern.join(" ")?.as_str())
+                        expand.expand_string(variable)?.join(" ").find(pattern.as_str())
                     }
                     Err(why) => return Err(why),
                 };
@@ -315,7 +331,10 @@ impl<'a> StringMethod<'a> {
                 if first_str.is_empty() {
                     // Note that these commas should probably not be here and that this
                     // is the wrong place to handle this
-                    if let Some(elem) = pattern.array().find(|elem| elem != "" && elem != ",") {
+                    if let Some(elem) = MethodArgs::new(self.pattern, expand)
+                        .array()
+                        .find(|elem| elem != "" && elem != ",")
+                    {
                         // If the separation commas are properly removed from the
                         // pattern, then the cleaning on the next 7 lines is unnecessary
                         if elem.ends_with(',') {
@@ -364,7 +383,7 @@ mod test {
             pattern:   "\"BAR\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "1");
     }
 
@@ -377,7 +396,7 @@ mod test {
             pattern:   "\"BA\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "0");
     }
 
@@ -390,7 +409,7 @@ mod test {
             pattern:   "\"OBA\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "1");
     }
 
@@ -403,7 +422,7 @@ mod test {
             pattern:   "\"OBI\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "0");
     }
 
@@ -416,7 +435,7 @@ mod test {
             pattern:   "\"FOO\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "1");
     }
 
@@ -429,7 +448,7 @@ mod test {
             pattern:   "\"OO\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "0");
     }
 
@@ -442,7 +461,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "file.txt");
     }
 
@@ -455,7 +474,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "txt");
     }
 
@@ -468,7 +487,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "file");
     }
 
@@ -481,7 +500,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "/home/redox");
     }
 
@@ -494,7 +513,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "ford prefect");
     }
 
@@ -507,7 +526,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "FORD PREFECT");
     }
 
@@ -520,7 +539,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "Foo Bar");
     }
 
@@ -529,7 +548,7 @@ mod test {
         let mut output = types::Str::new();
         let method =
             StringMethod { method: "trim", variable: "$BAZ", pattern: "", selection: None };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "BARBAZ");
     }
 
@@ -542,7 +561,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "  Foo Bar");
     }
 
@@ -555,7 +574,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "  BARBAZ");
     }
 
@@ -568,7 +587,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "Foo Bar ");
     }
 
@@ -581,7 +600,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "BARBAZ   ");
     }
 
@@ -594,7 +613,7 @@ mod test {
             pattern:   "2",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBARFOOBAR");
     }
 
@@ -608,7 +627,7 @@ mod test {
             pattern:   "-2",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
     }
 
     #[test]
@@ -620,7 +639,7 @@ mod test {
             pattern:   "[\"FOO\" \"BAR\"]",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "BARBAR");
     }
 
@@ -634,7 +653,7 @@ mod test {
             pattern:   "[]",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
     }
 
     #[test]
@@ -646,7 +665,7 @@ mod test {
             pattern:   "[\"FOO\" \"BAR\" 1]",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "BARFOOBAR");
     }
 
@@ -660,7 +679,7 @@ mod test {
             pattern:   "[]",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
     }
 
     #[test]
@@ -672,7 +691,7 @@ mod test {
             pattern:   "[\"^F\" \"f\"]",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "fOOBAR");
     }
 
@@ -685,7 +704,7 @@ mod test {
             pattern:   "[\"^f\" \"F\"]",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBAR");
     }
 
@@ -698,7 +717,7 @@ mod test {
             pattern:   "\" \"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "FOO BAR");
     }
 
@@ -711,7 +730,7 @@ mod test {
             pattern:   "[\"-\" \"-\"]",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "FOO- -BAR");
     }
 
@@ -720,7 +739,7 @@ mod test {
         let mut output = types::Str::new();
         let method =
             StringMethod { method: "len", variable: "[\"1\"]", pattern: "", selection: None };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "1");
     }
 
@@ -729,7 +748,7 @@ mod test {
         let mut output = types::Str::new();
         let method =
             StringMethod { method: "len", variable: "\"FOO\"", pattern: "", selection: None };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "3");
     }
 
@@ -738,7 +757,7 @@ mod test {
         let mut output = types::Str::new();
         let method =
             StringMethod { method: "len", variable: "$FOO", pattern: "", selection: None };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "6");
     }
 
@@ -751,7 +770,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "6");
     }
 
@@ -764,7 +783,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "10");
     }
 
@@ -777,7 +796,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "RABOOF");
     }
 
@@ -790,7 +809,7 @@ mod test {
             pattern:   "",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "RABOOF");
     }
 
@@ -803,7 +822,7 @@ mod test {
             pattern:   "\"O\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "1");
     }
 
@@ -816,7 +835,7 @@ mod test {
             pattern:   "\"L\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "-1");
     }
 
@@ -829,7 +848,7 @@ mod test {
             pattern:   "\"baz\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "baz");
     }
 
@@ -842,7 +861,7 @@ mod test {
             pattern:   "\"baz\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "baz");
     }
 
@@ -855,7 +874,7 @@ mod test {
             pattern:   "\"baz\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBAR");
     }
 
@@ -868,7 +887,7 @@ mod test {
             pattern:   "\"bar\", \"baz\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "bar");
     }
 
@@ -881,7 +900,7 @@ mod test {
             pattern:   "\"\", \"baz\"",
             selection: None,
         };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "baz");
     }
 
@@ -890,7 +909,7 @@ mod test {
         let mut output = types::Str::new();
         let method =
             StringMethod { method: "or", variable: "$FOO", pattern: "\"\"", selection: None };
-        method.handle(&mut output, &DummyExpander).unwrap();
+        method.handle(&mut output, &mut DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBAR");
     }
 }
