@@ -325,7 +325,11 @@ impl<'a> Shell<'a> {
         // Don't execute commands when the `-n` flag is passed.
         let exit_status = if self.opts.no_exec {
             Ok(Status::SUCCESS)
-        } else if pipeline.requires_piping() {
+        } else if pipeline.requires_piping()
+            || self.stderr.is_some()
+            || self.stdin.is_some()
+            || self.stdout.is_some()
+        {
             self.execute_pipeline(pipeline).map_err(Into::into)
         } else if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
             Ok(main(&pipeline.items[0].job.args, self))
