@@ -4,7 +4,6 @@ mod directory_stack;
 mod flow;
 /// The various blocks
 pub mod flow_control;
-mod fork;
 mod job;
 mod pipe_exec;
 mod shell_expand;
@@ -17,7 +16,6 @@ pub(crate) use self::job::{Job, RefinedJob};
 use self::{
     directory_stack::DirectoryStack,
     flow_control::{Block, Function, FunctionError, Statement},
-    fork::{Capture, Fork, IonResult},
     pipe_exec::foreground,
     variables::Variables,
 };
@@ -47,6 +45,7 @@ use nix::{
 use std::{
     fs::File,
     io::{self, Write},
+    mem,
     ops::{Deref, DerefMut},
     rc::Rc,
     sync::{atomic::Ordering, Arc, Mutex},
@@ -221,13 +220,19 @@ impl<'a> Shell<'a> {
     }
 
     /// Replace the default stdin
-    pub fn stdin<T: Into<Option<File>>>(&mut self, stdin: T) { self.stdin = stdin.into() }
+    pub fn stdin<T: Into<Option<File>>>(&mut self, stdin: T) -> Option<File> {
+        mem::replace(&mut self.stdin, stdin.into())
+    }
 
     /// Replace the default stdin
-    pub fn stdout<T: Into<Option<File>>>(&mut self, stdout: T) { self.stdout = stdout.into() }
+    pub fn stdout<T: Into<Option<File>>>(&mut self, stdout: T) -> Option<File> {
+        mem::replace(&mut self.stdout, stdout.into())
+    }
 
     /// Replace the default stdin
-    pub fn stderr<T: Into<Option<File>>>(&mut self, stderr: T) { self.stderr = stderr.into() }
+    pub fn stderr<T: Into<Option<File>>>(&mut self, stderr: T) -> Option<File> {
+        mem::replace(&mut self.stderr, stderr.into())
+    }
 
     /// Access the directory stack
     pub const fn dir_stack(&self) -> &DirectoryStack { &self.directory_stack }
@@ -245,21 +250,6 @@ impl<'a> Shell<'a> {
 
     /// Get the depth of the current block
     pub fn block_len(&self) -> usize { self.flow_control.len() }
-
-    /// A method for capturing the output of the shell, and performing actions without modifying
-    /// the state of the original shell. This performs a fork, taking a closure that controls
-    /// the shell in the child of the fork.
-    ///
-    /// The method is non-blocking, and therefore will immediately return file handles to the
-    /// stdout and stderr of the child. The PID of the child is returned, which may be used to
-    /// wait for and obtain the exit status.
-    fn fork<F: FnMut(&mut Self) -> Result<(), IonError>>(
-        &self,
-        capture: Capture,
-        child_func: F,
-    ) -> Result<IonResult, PipelineError> {
-        Fork::new(self, capture).exec(child_func)
-    }
 
     /// A method for executing a function, using `args` as the input.
     pub fn execute_function<S: AsRef<str>>(
