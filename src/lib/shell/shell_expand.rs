@@ -1,21 +1,42 @@
-use super::{fork::Capture, sys::variables, variables::Value, IonError, PipelineError, Shell};
+use super::{
+    pipe_exec::create_pipe,
+    sys::{variables, NULL_PATH},
+    variables::Value,
+    IonError, PipelineError, Shell,
+};
 use crate::{
     expansion::{Error, Expander, Result, Select},
     types,
 };
 use nix::unistd::{tcsetpgrp, Pid};
-use std::{env, io::Read, iter::FromIterator};
+use std::{env, fs::File, io::Read, iter::FromIterator};
 
 impl<'a, 'b> Expander for Shell<'b> {
     type Error = IonError;
 
     /// Uses a subshell to expand a given command.
     fn command(&mut self, command: &str) -> Result<types::Str, Self::Error> {
-        let result = self
-            .fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command))
-            .map_err(|err| Error::Subprocess(Box::new(err.into())))?;
+        let (mut reader, writer) = create_pipe()
+            .map_err(|err| Error::Subprocess(Box::new(IonError::PipelineExecutionError(err))))?;
+        let null_file = File::open(NULL_PATH).map_err(|err| {
+            Error::Subprocess(Box::new(IonError::PipelineExecutionError(
+                PipelineError::CaptureFailed(err),
+            )))
+        })?;
+
+        // Store the previous default redirections
+        let prev_stdout = self.stdout(writer);
+        let prev_stderr = self.stderr(null_file);
+
+        // Execute the command
+        self.on_command(command).map_err(|err| Error::Subprocess(Box::new(err)))?;
+
+        // Reset the pipes, droping the stdout
+        self.stdout(prev_stdout);
+        self.stderr(prev_stderr);
+
         let mut string = String::with_capacity(1024);
-        let output = match result.stdout.unwrap().read_to_string(&mut string) {
+        let output = match reader.read_to_string(&mut string) {
             Ok(_) => Ok(string.into()),
             Err(why) => Err(Error::Subprocess(Box::new(PipelineError::CaptureFailed(why).into()))),
         };
