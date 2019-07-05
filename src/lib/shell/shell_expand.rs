@@ -10,7 +10,7 @@ impl<'a, 'b> Expander for Shell<'b> {
     type Error = IonError;
 
     /// Uses a subshell to expand a given command.
-    fn command(&self, command: &str) -> Result<types::Str, Self::Error> {
+    fn command(&mut self, command: &str) -> Result<types::Str, Self::Error> {
         let result = self
             .fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command))
             .map_err(|err| Error::Subprocess(Box::new(err.into())))?;

@@ -17,7 +17,7 @@ pub enum Pattern<'a> {
 #[derive(Debug)]
 pub struct MethodArgs<'a, 'b, E: Expander> {
     args:   &'a str,
-    expand: &'b E,
+    expand: &'b mut E,
 }
 
 /// Error during method expansion
@@ -41,9 +41,10 @@ pub enum MethodError {
 }
 
 impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
-    pub fn array<'c>(&'c self) -> impl Iterator<Item = types::Str> + 'c {
+    pub fn array<'c>(&'c mut self) -> impl Iterator<Item = types::Str> + 'c {
+        let expand = &mut (*self.expand);
         ArgumentSplitter::new(self.args)
-            .flat_map(move |x| self.expand.expand_string(x).unwrap_or_else(|_| types::Args::new()))
+            .flat_map(move |x| expand.expand_string(x).unwrap_or_else(|_| types::Args::new()))
             .map(|s| unescape(&s))
     }
 
@@ -51,7 +52,7 @@ impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
         Ok(unescape(&self.expand.expand_string(self.args)?.join(pattern)))
     }
 
-    pub fn new(args: &'a str, expand: &'b E) -> MethodArgs<'a, 'b, E> {
+    pub fn new(args: &'a str, expand: &'b mut E) -> MethodArgs<'a, 'b, E> {
         MethodArgs { args, expand }
     }
 }

@@ -127,23 +127,23 @@ pub trait Expander: Sized {
     /// Expand a string variable given if it's quoted / unquoted
     fn string(&self, _name: &str) -> Result<types::Str, Self::Error>;
     /// Expand a subshell expression.
-    fn command(&self, _command: &str) -> Result<types::Str, Self::Error>;
+    fn command(&mut self, _command: &str) -> Result<types::Str, Self::Error>;
     /// Iterating upon key-value maps.
     fn map_keys(&self, _name: &str) -> Result<Args, Self::Error>;
     /// Iterating upon key-value maps.
     fn map_values(&self, _name: &str) -> Result<Args, Self::Error>;
     /// Get a string that exists in the shell.
-    fn get_string(&self, value: &str) -> Result<types::Str, Self::Error> {
+    fn get_string(&mut self, value: &str) -> Result<types::Str, Self::Error> {
         Ok(self.expand_string(value)?.join(" ").into())
     }
 
     /// Get an array that exists in the shell.
-    fn get_array(&self, value: &str) -> Result<Args, Self::Error> { self.expand_string(value) }
+    fn get_array(&mut self, value: &str) -> Result<Args, Self::Error> { self.expand_string(value) }
 
     /// Performs shell expansions to an input string, efficiently returning the final
     /// expanded form. Shells must provide their own batteries for expanding tilde
     /// and variable words.
-    fn expand_string(&self, original: &str) -> Result<Args, Self::Error> {
+    fn expand_string(&mut self, original: &str) -> Result<Args, Self::Error> {
         if original.is_empty() {
             return Ok(args![""]);
         }
@@ -166,7 +166,7 @@ impl<T: Expander> ExpanderInternal for T {}
 
 trait ExpanderInternal: Expander {
     fn expand_process<'a>(
-        &self,
+        &mut self,
         current: &mut types::Str,
         command: &str,
         selection: &Option<&'a str>,
@@ -176,7 +176,7 @@ trait ExpanderInternal: Expander {
     }
 
     fn expand_brace(
-        &self,
+        &mut self,
         current: &mut types::Str,
         expanders: &mut Vec<Vec<types::Str>>,
         tokens: &mut Vec<BraceToken>,
@@ -206,7 +206,7 @@ trait ExpanderInternal: Expander {
     }
 
     fn array_expand(
-        &self,
+        &mut self,
         elements: &[&str],
         selection: &Option<&str>,
     ) -> Result<Args, Self::Error> {
@@ -230,7 +230,7 @@ trait ExpanderInternal: Expander {
         }
     }
 
-    fn array_nth(&self, elements: &[&str], index: Index) -> Result<types::Str, Self::Error> {
+    fn array_nth(&mut self, elements: &[&str], index: Index) -> Result<types::Str, Self::Error> {
         let mut i = match index {
             Index::Forward(n) | Index::Backward(n) => n,
         };
@@ -255,7 +255,7 @@ trait ExpanderInternal: Expander {
         Err(Error::OutOfBound)
     }
 
-    fn array_range(&self, elements: &[&str], range: Range) -> Result<Args, Self::Error> {
+    fn array_range(&mut self, elements: &[&str], range: Range) -> Result<Args, Self::Error> {
         let mut expanded = Args::new();
         for element in elements {
             expanded.extend(self.expand_string(element)?);
@@ -268,7 +268,7 @@ trait ExpanderInternal: Expander {
     }
 
     fn slice_array<'a, S: Into<types::Str>, T: Iterator<Item = S>>(
-        &self,
+        &mut self,
         expanded: T,
         selection: &Option<&'a str>,
     ) -> Result<Args, Self::Error> {
@@ -285,7 +285,7 @@ trait ExpanderInternal: Expander {
     }
 
     fn slice<'a, S: AsRef<str>>(
-        &self,
+        &mut self,
         output: &mut types::Str,
         expanded: S,
         selection: &Option<&'a str>,
@@ -326,7 +326,7 @@ trait ExpanderInternal: Expander {
         Ok(())
     }
 
-    fn expand_string_no_glob(&self, original: &str) -> Result<Args, Self::Error> {
+    fn expand_string_no_glob(&mut self, original: &str) -> Result<Args, Self::Error> {
         let mut token_buffer = Vec::new();
         let mut contains_brace = false;
 
@@ -343,12 +343,12 @@ trait ExpanderInternal: Expander {
     }
 
     #[auto_enum]
-    fn expand_single_array_token(&self, token: &WordToken<'_>) -> Result<Args, Self::Error> {
+    fn expand_single_array_token(&mut self, token: &WordToken<'_>) -> Result<Args, Self::Error> {
         match *token {
             WordToken::Array(ref elements, ref index) => {
                 self.array_expand(elements, index).map_err(Into::into)
             }
-            WordToken::ArrayVariable(array, quoted, Some(ref key)) if key.contains(' ') => {
+            WordToken::ArrayVariable(array, quoted, Some(key)) if key.contains(' ') => {
                 if quoted {
                     let mut output = types::Str::new();
                     for index in key.split(' ') {
@@ -421,7 +421,7 @@ trait ExpanderInternal: Expander {
         }
     }
 
-    fn expand_single_string_token(&self, token: &WordToken<'_>) -> Result<Args, Self::Error> {
+    fn expand_single_string_token(&mut self, token: &WordToken<'_>) -> Result<Args, Self::Error> {
         let mut output = types::Str::new();
         let mut expanded_words = Args::new();
 
@@ -500,7 +500,7 @@ trait ExpanderInternal: Expander {
     }
 
     fn expand_tokens(
-        &self,
+        &mut self,
         token_buffer: &[WordToken<'_>],
         contains_brace: bool,
     ) -> Result<Args, Self::Error> {
@@ -523,7 +523,7 @@ trait ExpanderInternal: Expander {
                         self.array_expand(elements, index)?.iter().format(" ")
                     );
                 }
-                WordToken::ArrayVariable(array, _, Some(ref key)) if key.contains(' ') => {
+                WordToken::ArrayVariable(array, _, Some(key)) if key.contains(' ') => {
                     for index in key.split(' ') {
                         let select = index
                             .parse::<Select<types::Str>>()
@@ -703,7 +703,7 @@ pub(crate) mod test {
             }
         }
 
-        fn command(&self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
+        fn command(&mut self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
 
         fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 

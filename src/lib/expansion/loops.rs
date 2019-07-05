@@ -13,7 +13,10 @@ pub enum ForValueExpression {
 
 impl ForValueExpression {
     /// Parse the arguments for the for loop
-    pub fn new<E: Expander>(expression: &[types::Str], expanders: &E) -> Result<Self, E::Error> {
+    pub fn new<E: Expander>(
+        expression: &[types::Str],
+        expanders: &mut E,
+    ) -> Result<Self, E::Error> {
         let mut output = Vec::new();
         for exp in expression {
             output.extend(expanders.expand_string(exp)?);

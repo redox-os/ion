@@ -44,7 +44,7 @@ pub fn is_boolean(value: &mut types::Str) -> bool {
 
 fn get_map_of<E: Expander>(
     primitive_type: &Primitive,
-    shell: &E,
+    shell: &mut E,
     expression: &str,
 ) -> expansion::Result<Value<Rc<types::Function<'static>>>, E::Error> {
     let array = shell.expand_string(expression)?;
@@ -92,7 +92,7 @@ fn get_map_of<E: Expander>(
 }
 
 pub fn value_check<E: Expander>(
-    shell: &E,
+    shell: &mut E,
     value: &str,
     expected: &Primitive,
 ) -> expansion::Result<Value<Rc<types::Function<'static>>>, E::Error> {
@@ -181,13 +181,13 @@ mod test {
     #[test]
     fn is_integer_array_() {
         assert_eq!(
-            value_check(&DummyExpander, "[1 2 3]", &Primitive::IntegerArray).unwrap(),
+            value_check(&mut DummyExpander, "[1 2 3]", &Primitive::IntegerArray).unwrap(),
             Value::Array(vec![
                 Value::Str("1".into()),
                 Value::Str("2".into()),
                 Value::Str("3".into())
             ])
         );
-        assert!(value_check(&DummyExpander, "[1 2 three]", &Primitive::IntegerArray).is_err());
+        assert!(value_check(&mut DummyExpander, "[1 2 three]", &Primitive::IntegerArray).is_err());
     }
 }
