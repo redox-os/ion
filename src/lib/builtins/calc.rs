@@ -3,6 +3,7 @@ use crate as ion_shell;
 use builtins_proc::builtin;
 use calc::{eval, eval_polish, CalcError, Value};
 use liner::Context;
+use std::io::{self, Read};
 
 const REPL_GUIDE: &str = r#"ion-calc
 Type in expressions to have them evaluated.
@@ -61,7 +62,7 @@ pub fn calc(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
             }
             Err(e) => Status::error(format!("{}", e)),
         }
-    } else {
+    } else if nix::unistd::isatty(nix::libc::STDIN_FILENO).unwrap() {
         println!("{}", REPL_GUIDE);
         let mut context = Context::new();
         loop {
@@ -84,6 +85,18 @@ pub fn calc(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
                     return Status::SUCCESS;
                 }
             }
+        }
+    } else {
+        let mut input = String::with_capacity(1024);
+        io::stdin().read_to_string(&mut input).unwrap();
+
+        let result = calc_or_polish_calc(&input);
+        match result {
+            Ok(v) => {
+                println!("{}", v);
+                Status::SUCCESS
+            }
+            Err(e) => Status::error(format!("{}", e)),
         }
     }
 }
