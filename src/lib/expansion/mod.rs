@@ -129,27 +129,12 @@ pub trait Expander: Sized {
     /// Expand a subshell expression.
     fn command(&self, _command: &str) -> Result<types::Str, Self::Error>;
     /// Iterating upon key-value maps.
-    fn map_keys(&self, _name: &str, _select: &Select<types::Str>) -> Result<Args, Self::Error>;
+    fn map_keys(&self, _name: &str) -> Result<Args, Self::Error>;
     /// Iterating upon key-value maps.
-    fn map_values(&self, _name: &str, _select: &Select<types::Str>) -> Result<Args, Self::Error>;
+    fn map_values(&self, _name: &str) -> Result<Args, Self::Error>;
     /// Get a string that exists in the shell.
     fn get_string(&self, value: &str) -> Result<types::Str, Self::Error> {
         Ok(self.expand_string(value)?.join(" ").into())
-    }
-    /// Select the proper values from an iterator
-    fn select<I: Iterator<Item = types::Str>>(
-        vals: I,
-        select: &Select<types::Str>,
-        n: usize,
-    ) -> Option<Args> {
-        match select {
-            Select::All => Some(vals.collect()),
-            Select::Range(range) => range
-                .bounds(n)
-                .filter(|&(start, _)| n > start)
-                .map(|(start, length)| vals.skip(start).take(length).collect()),
-            _ => None,
-        }
     }
 
     /// Get an array that exists in the shell.
@@ -166,8 +151,7 @@ pub trait Expander: Sized {
         let mut token_buffer = Vec::new();
         let mut contains_brace = false;
 
-        for word in WordIterator::new(original, self, true) {
-            let word = word?;
+        for word in WordIterator::new(original, true) {
             if let WordToken::Brace(_) = word {
                 contains_brace = true;
             }
@@ -181,14 +165,14 @@ pub trait Expander: Sized {
 impl<T: Expander> ExpanderInternal for T {}
 
 trait ExpanderInternal: Expander {
-    fn expand_process(
+    fn expand_process<'a>(
         &self,
         current: &mut types::Str,
         command: &str,
-        selection: &Select<types::Str>,
+        selection: &Option<&'a str>,
     ) -> Result<(), Self::Error> {
-        self.command(command)
-            .map(|result| Self::slice(current, result.trim_end_matches('\n'), selection))
+        let result = self.command(command)?;
+        self.slice(current, result.trim_end_matches('\n'), selection)
     }
 
     fn expand_brace(
@@ -224,8 +208,14 @@ trait ExpanderInternal: Expander {
     fn array_expand(
         &self,
         elements: &[&str],
-        selection: &Select<types::Str>,
+        selection: &Option<&str>,
     ) -> Result<Args, Self::Error> {
+        let selection = if let Some(selection) = selection {
+            let value = self.expand_string(selection)?.join(" ");
+            value.parse::<Select<types::Str>>().map_err(|_| Error::IndexParsingError(value))?
+        } else {
+            Select::All
+        };
         match selection {
             Select::All => {
                 let mut collected = Args::new();
@@ -234,8 +224,8 @@ trait ExpanderInternal: Expander {
                 }
                 Ok(collected)
             }
-            Select::Index(index) => self.array_nth(elements, *index).map(|el| args![el]),
-            Select::Range(range) => self.array_range(elements, *range),
+            Select::Index(index) => self.array_nth(elements, index).map(|el| args![el]),
+            Select::Range(range) => self.array_range(elements, range),
             Select::Key(_) => Err(Error::OutOfBound),
         }
     }
@@ -277,41 +267,70 @@ trait ExpanderInternal: Expander {
         }
     }
 
-    fn slice<S: AsRef<str>>(output: &mut types::Str, expanded: S, selection: &Select<types::Str>) {
-        match selection {
-            Select::All => output.push_str(expanded.as_ref()),
-            Select::Index(Index::Forward(id)) => {
-                if let Some(character) =
-                    UnicodeSegmentation::graphemes(expanded.as_ref(), true).nth(*id)
-                {
-                    output.push_str(character);
-                }
-            }
-            Select::Index(Index::Backward(id)) => {
-                if let Some(character) =
-                    UnicodeSegmentation::graphemes(expanded.as_ref(), true).rev().nth(*id)
-                {
-                    output.push_str(character);
-                }
-            }
-            Select::Range(range) => {
-                let graphemes = UnicodeSegmentation::graphemes(expanded.as_ref(), true);
-                if let Some((start, length)) = range.bounds(graphemes.clone().count()) {
-                    graphemes.skip(start).take(length).for_each(|str| {
-                        output.push_str(str.as_ref());
-                    });
-                }
-            }
-            Select::Key(_) => (),
+    fn slice_array<'a, S: Into<types::Str>, T: Iterator<Item = S>>(
+        &self,
+        expanded: T,
+        selection: &Option<&'a str>,
+    ) -> Result<Args, Self::Error> {
+        if let Some(selection) = selection {
+            let value = self.expand_string(selection)?.join(" ");
+            let selection =
+                value.parse::<Select<types::Str>>().map_err(|_| Error::IndexParsingError(value))?;
+            let expanded: Vec<_> = expanded.collect();
+            let len = expanded.len();
+            Ok(expanded.into_iter().map(Into::into).select(&selection, len))
+        } else {
+            Ok(expanded.map(Into::into).collect())
         }
+    }
+
+    fn slice<'a, S: AsRef<str>>(
+        &self,
+        output: &mut types::Str,
+        expanded: S,
+        selection: &Option<&'a str>,
+    ) -> Result<(), Self::Error> {
+        if let Some(selection) = selection {
+            let value = self.expand_string(selection)?.join(" ");
+            let selection =
+                value.parse::<Select<types::Str>>().map_err(|_| Error::IndexParsingError(value))?;
+            match selection {
+                Select::All => output.push_str(expanded.as_ref()),
+                Select::Index(Index::Forward(id)) => {
+                    if let Some(character) =
+                        UnicodeSegmentation::graphemes(expanded.as_ref(), true).nth(id)
+                    {
+                        output.push_str(character);
+                    }
+                }
+                Select::Index(Index::Backward(id)) => {
+                    if let Some(character) =
+                        UnicodeSegmentation::graphemes(expanded.as_ref(), true).rev().nth(id)
+                    {
+                        output.push_str(character);
+                    }
+                }
+                Select::Range(range) => {
+                    let graphemes = UnicodeSegmentation::graphemes(expanded.as_ref(), true);
+                    if let Some((start, length)) = range.bounds(graphemes.clone().count()) {
+                        graphemes.skip(start).take(length).for_each(|str| {
+                            output.push_str(str.as_ref());
+                        });
+                    }
+                }
+                Select::Key(_) => (),
+            }
+        } else {
+            output.push_str(expanded.as_ref())
+        };
+        Ok(())
     }
 
     fn expand_string_no_glob(&self, original: &str) -> Result<Args, Self::Error> {
         let mut token_buffer = Vec::new();
         let mut contains_brace = false;
 
-        for word in WordIterator::new(original, self, false) {
-            let word = word?;
+        for word in WordIterator::new(original, false) {
             if let WordToken::Brace(_) = word {
                 contains_brace = true;
             }
@@ -329,13 +348,14 @@ trait ExpanderInternal: Expander {
             WordToken::Array(ref elements, ref index) => {
                 self.array_expand(elements, index).map_err(Into::into)
             }
-            WordToken::ArrayVariable(array, quoted, Select::Key(ref key)) if key.contains(' ') => {
+            WordToken::ArrayVariable(array, quoted, Some(ref key)) if key.contains(' ') => {
                 if quoted {
                     let mut output = types::Str::new();
                     for index in key.split(' ') {
-                        let select = index
+                        let value = self.expand_string(index)?.join(" ");
+                        let select = value
                             .parse::<Select<types::Str>>()
-                            .map_err(|_| Error::IndexParsingError(index.into()))?;
+                            .map_err(|_| Error::IndexParsingError(value))?;
                         let _ = write!(
                             &mut output,
                             "{}",
@@ -348,16 +368,25 @@ trait ExpanderInternal: Expander {
                 } else {
                     let mut out = Args::with_capacity(10);
                     for index in key.split(' ') {
-                        let select = index
+                        let value = self.expand_string(index)?.join(" ");
+                        let select = value
                             .parse::<Select<types::Str>>()
-                            .map_err(|_| Error::IndexParsingError(index.into()))?;
+                            .map_err(|_| Error::IndexParsingError(value))?;
                         out.extend(self.array(array, &select)?);
                     }
                     Ok(out)
                 }
             }
             WordToken::ArrayVariable(array, quoted, ref index) => {
-                let array = self.array(array, index)?;
+                let index = if let Some(index) = index {
+                    let value = self.expand_string(index)?.join(" ");
+                    value
+                        .parse::<Select<types::Str>>()
+                        .map_err(|_| Error::IndexParsingError(value))?
+                } else {
+                    Select::All
+                };
+                let array = self.array(array, &index)?;
                 if quoted {
                     Ok(args![types::Str::from(array.join(" "))])
                 } else {
@@ -366,22 +395,17 @@ trait ExpanderInternal: Expander {
             }
             WordToken::ArrayProcess(command, quoted, ref index) => {
                 crate::IonPool::string(|output| {
-                    self.expand_process(output, command, &Select::All)?;
+                    self.expand_process(output, command, &None)?;
 
                     if quoted {
                         Ok(args!(format!(
                             "{}",
-                            output
-                                .split_whitespace()
-                                .select::<Vec<_>, _>(index, output.split_whitespace().count())
+                            self.slice_array(output.split_whitespace(), index)?
                                 .into_iter()
                                 .format(" ")
                         )))
                     } else {
-                        Ok(output
-                            .split_whitespace()
-                            .map(From::from)
-                            .select::<Args, _>(index, output.split_whitespace().count()))
+                        self.slice_array(output.split_whitespace(), index)
                     }
                 })
             }
@@ -411,7 +435,7 @@ trait ExpanderInternal: Expander {
                 self.expand_process(&mut output, command, index)?
             }
             WordToken::Variable(text, ref index) => {
-                Self::slice(&mut output, self.string(text)?, index);
+                self.slice(&mut output, self.string(text)?, index)?;
             }
             WordToken::Arithmetic(s) => self.expand_arithmetic(&mut output, s),
             _ => unreachable!(),
@@ -499,7 +523,7 @@ trait ExpanderInternal: Expander {
                         self.array_expand(elements, index)?.iter().format(" ")
                     );
                 }
-                WordToken::ArrayVariable(array, _, Select::Key(ref key)) if key.contains(' ') => {
+                WordToken::ArrayVariable(array, _, Some(ref key)) if key.contains(' ') => {
                     for index in key.split(' ') {
                         let select = index
                             .parse::<Select<types::Str>>()
@@ -514,7 +538,16 @@ trait ExpanderInternal: Expander {
                     output.pop(); // Pop out the last unneeded whitespace token
                 }
                 WordToken::ArrayVariable(array, _, ref index) => {
-                    let _ = write!(&mut output, "{}", self.array(array, index)?.iter().format(" "));
+                    let index = if let Some(index) = index {
+                        let value = self.expand_string(index)?.join(" ");
+                        value
+                            .parse::<Select<types::Str>>()
+                            .map_err(|_| Error::IndexParsingError(value))?
+                    } else {
+                        Select::All
+                    };
+                    let _ =
+                        write!(&mut output, "{}", self.array(array, &index)?.iter().format(" "));
                 }
                 WordToken::ArrayProcess(command, _, ref index)
                 | WordToken::Process(command, ref index) => {
@@ -542,7 +575,7 @@ trait ExpanderInternal: Expander {
                     output.push_str(text);
                 }
                 WordToken::Variable(text, ref index) => {
-                    Self::slice(&mut output, self.string(text)?, index);
+                    self.slice(&mut output, self.string(text)?, index)?;
                 }
                 WordToken::Arithmetic(s) => self.expand_arithmetic(&mut output, s),
             }
@@ -674,19 +707,11 @@ pub(crate) mod test {
 
         fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 
-        fn map_keys<'a>(
-            &'a self,
-            _name: &str,
-            _select: &Select<types::Str>,
-        ) -> Result<Args, Self::Error> {
+        fn map_keys<'a>(&'a self, _name: &str) -> Result<Args, Self::Error> {
             Err(Error::VarNotFound)
         }
 
-        fn map_values<'a>(
-            &'a self,
-            _name: &str,
-            _select: &Select<types::Str>,
-        ) -> Result<Args, Self::Error> {
+        fn map_values<'a>(&'a self, _name: &str) -> Result<Args, Self::Error> {
             Err(Error::VarNotFound)
         }
     }
@@ -696,12 +721,12 @@ pub(crate) mod test {
         let mut output = types::Str::new();
 
         let line = " Mary   had\ta little  \n\t lamb😉😉\t";
-        DummyExpander.expand_process(&mut output, line, &Select::All).unwrap();
+        DummyExpander.expand_process(&mut output, line, &None).unwrap();
         assert_eq!(output.as_str(), line);
 
         output.clear();
         let line = "foo not bar😉😉\n\n";
-        DummyExpander.expand_process(&mut output, line, &Select::All).unwrap();
+        DummyExpander.expand_process(&mut output, line, &None).unwrap();
         assert_eq!(output.as_str(), "foo not bar😉😉");
     }
 

@@ -87,7 +87,7 @@ pub struct StringMethod<'a> {
     /// Pattern to use for certain methods
     pub pattern: &'a str,
     /// Selection to use to control the output of this method
-    pub selection: Select<types::Str>,
+    pub selection: Option<&'a str>,
 }
 
 impl<'a> StringMethod<'a> {
@@ -223,18 +223,12 @@ impl<'a> StringMethod<'a> {
             "join" => {
                 let pattern = pattern.join(" ")?;
                 match expand.array(variable, &Select::All) {
-                    Ok(array) => <E as ExpanderInternal>::slice(
+                    Ok(array) => expand.slice(output, array.join(&pattern), &self.selection)?,
+                    Err(Error::VarNotFound) if is_expression(variable) => expand.slice(
                         output,
-                        array.join(&pattern),
+                        expand.expand_string(variable)?.join(&pattern),
                         &self.selection,
-                    ),
-                    Err(Error::VarNotFound) if is_expression(variable) => {
-                        <E as ExpanderInternal>::slice(
-                            output,
-                            expand.expand_string(variable)?.join(&pattern),
-                            &self.selection,
-                        )
-                    }
+                    )?,
                     Err(why) => return Err(why),
                 }
             }
@@ -368,7 +362,7 @@ mod test {
             method:    "ends_with",
             variable:  "$FOO",
             pattern:   "\"BAR\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "1");
@@ -381,7 +375,7 @@ mod test {
             method:    "ends_with",
             variable:  "$FOO",
             pattern:   "\"BA\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "0");
@@ -394,7 +388,7 @@ mod test {
             method:    "contains",
             variable:  "$FOO",
             pattern:   "\"OBA\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "1");
@@ -407,7 +401,7 @@ mod test {
             method:    "contains",
             variable:  "$FOO",
             pattern:   "\"OBI\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "0");
@@ -420,7 +414,7 @@ mod test {
             method:    "starts_with",
             variable:  "$FOO",
             pattern:   "\"FOO\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "1");
@@ -433,7 +427,7 @@ mod test {
             method:    "starts_with",
             variable:  "$FOO",
             pattern:   "\"OO\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "0");
@@ -446,7 +440,7 @@ mod test {
             method:    "basename",
             variable:  "\"/home/redox/file.txt\"",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "file.txt");
@@ -459,7 +453,7 @@ mod test {
             method:    "extension",
             variable:  "\"/home/redox/file.txt\"",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "txt");
@@ -472,7 +466,7 @@ mod test {
             method:    "filename",
             variable:  "\"/home/redox/file.txt\"",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "file");
@@ -485,7 +479,7 @@ mod test {
             method:    "parent",
             variable:  "\"/home/redox/file.txt\"",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "/home/redox");
@@ -498,7 +492,7 @@ mod test {
             method:    "to_lowercase",
             variable:  "\"Ford Prefect\"",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "ford prefect");
@@ -511,7 +505,7 @@ mod test {
             method:    "to_uppercase",
             variable:  "\"Ford Prefect\"",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FORD PREFECT");
@@ -524,7 +518,7 @@ mod test {
             method:    "trim",
             variable:  "\"  Foo Bar \"",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "Foo Bar");
@@ -533,12 +527,8 @@ mod test {
     #[test]
     fn test_trim_with_variable() {
         let mut output = types::Str::new();
-        let method = StringMethod {
-            method:    "trim",
-            variable:  "$BAZ",
-            pattern:   "",
-            selection: Select::All,
-        };
+        let method =
+            StringMethod { method: "trim", variable: "$BAZ", pattern: "", selection: None };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "BARBAZ");
     }
@@ -550,7 +540,7 @@ mod test {
             method:    "trim_right",
             variable:  "\"  Foo Bar \"",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "  Foo Bar");
@@ -563,7 +553,7 @@ mod test {
             method:    "trim_right",
             variable:  "$BAZ",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "  BARBAZ");
@@ -576,7 +566,7 @@ mod test {
             method:    "trim_left",
             variable:  "\"  Foo Bar \"",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "Foo Bar ");
@@ -589,7 +579,7 @@ mod test {
             method:    "trim_left",
             variable:  "$BAZ",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "BARBAZ   ");
@@ -602,7 +592,7 @@ mod test {
             method:    "repeat",
             variable:  "$FOO",
             pattern:   "2",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBARFOOBAR");
@@ -616,7 +606,7 @@ mod test {
             method:    "repeat",
             variable:  "$FOO",
             pattern:   "-2",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
     }
@@ -628,7 +618,7 @@ mod test {
             method:    "replace",
             variable:  "$FOO",
             pattern:   "[\"FOO\" \"BAR\"]",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "BARBAR");
@@ -642,7 +632,7 @@ mod test {
             method:    "replace",
             variable:  "$FOO",
             pattern:   "[]",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
     }
@@ -654,7 +644,7 @@ mod test {
             method:    "replacen",
             variable:  "\"FOO$FOO\"",
             pattern:   "[\"FOO\" \"BAR\" 1]",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "BARFOOBAR");
@@ -668,7 +658,7 @@ mod test {
             method:    "replacen",
             variable:  "$FOO",
             pattern:   "[]",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
     }
@@ -680,7 +670,7 @@ mod test {
             method:    "regex_replace",
             variable:  "$FOO",
             pattern:   "[\"^F\" \"f\"]",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "fOOBAR");
@@ -693,7 +683,7 @@ mod test {
             method:    "regex_replace",
             variable:  "$FOO",
             pattern:   "[\"^f\" \"F\"]",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBAR");
@@ -706,7 +696,7 @@ mod test {
             method:    "join",
             variable:  "[\"FOO\" \"BAR\"]",
             pattern:   "\" \"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOO BAR");
@@ -719,7 +709,7 @@ mod test {
             method:    "join",
             variable:  "[\"FOO\" \"BAR\"]",
             pattern:   "[\"-\" \"-\"]",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOO- -BAR");
@@ -728,12 +718,8 @@ mod test {
     #[test]
     fn test_len_with_array() {
         let mut output = types::Str::new();
-        let method = StringMethod {
-            method:    "len",
-            variable:  "[\"1\"]",
-            pattern:   "",
-            selection: Select::All,
-        };
+        let method =
+            StringMethod { method: "len", variable: "[\"1\"]", pattern: "", selection: None };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "1");
     }
@@ -741,12 +727,8 @@ mod test {
     #[test]
     fn test_len_with_string() {
         let mut output = types::Str::new();
-        let method = StringMethod {
-            method:    "len",
-            variable:  "\"FOO\"",
-            pattern:   "",
-            selection: Select::All,
-        };
+        let method =
+            StringMethod { method: "len", variable: "\"FOO\"", pattern: "", selection: None };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "3");
     }
@@ -754,12 +736,8 @@ mod test {
     #[test]
     fn test_len_with_variable() {
         let mut output = types::Str::new();
-        let method = StringMethod {
-            method:    "len",
-            variable:  "$FOO",
-            pattern:   "",
-            selection: Select::All,
-        };
+        let method =
+            StringMethod { method: "len", variable: "$FOO", pattern: "", selection: None };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "6");
     }
@@ -771,7 +749,7 @@ mod test {
             method:    "len_bytes",
             variable:  "$FOO",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "6");
@@ -784,7 +762,7 @@ mod test {
             method:    "len_bytes",
             variable:  "\"oh là là\"",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "10");
@@ -797,7 +775,7 @@ mod test {
             method:    "reverse",
             variable:  "$FOO",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "RABOOF");
@@ -810,7 +788,7 @@ mod test {
             method:    "reverse",
             variable:  "\"FOOBAR\"",
             pattern:   "",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "RABOOF");
@@ -823,7 +801,7 @@ mod test {
             method:    "find",
             variable:  "$FOO",
             pattern:   "\"O\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "1");
@@ -836,7 +814,7 @@ mod test {
             method:    "find",
             variable:  "$FOO",
             pattern:   "\"L\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "-1");
@@ -849,7 +827,7 @@ mod test {
             method:    "or",
             variable:  "$NDIUKFBINCF",
             pattern:   "\"baz\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "baz");
@@ -862,7 +840,7 @@ mod test {
             method:    "or",
             variable:  "$EMPTY",
             pattern:   "\"baz\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "baz");
@@ -875,7 +853,7 @@ mod test {
             method:    "or",
             variable:  "$FOO",
             pattern:   "\"baz\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBAR");
@@ -888,7 +866,7 @@ mod test {
             method:    "or",
             variable:  "$EMPTY",
             pattern:   "\"bar\", \"baz\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "bar");
@@ -901,7 +879,7 @@ mod test {
             method:    "or",
             variable:  "$EMPTY",
             pattern:   "\"\", \"baz\"",
-            selection: Select::All,
+            selection: None,
         };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "baz");
@@ -910,12 +888,8 @@ mod test {
     #[test]
     fn test_or_no_pattern() {
         let mut output = types::Str::new();
-        let method = StringMethod {
-            method:    "or",
-            variable:  "$FOO",
-            pattern:   "\"\"",
-            selection: Select::All,
-        };
+        let method =
+            StringMethod { method: "or", variable: "$FOO", pattern: "\"\"", selection: None };
         method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBAR");
     }

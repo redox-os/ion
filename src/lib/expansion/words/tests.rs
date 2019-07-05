@@ -1,13 +1,9 @@
 use super::*;
-use crate::{
-    expansion::test::DummyExpander,
-    ranges::{Index, Range},
-};
+use crate::expansion::test::DummyExpander;
 
-fn compare(input: &str, expected: Vec<WordToken<'_>>) {
+fn compare(input: &str, expected: &[WordToken<'_>]) {
     let mut correct = 0;
-    for (actual, expected) in WordIterator::new(input, &DummyExpander, true).zip(expected.iter()) {
-        let actual = actual.unwrap();
+    for (actual, expected) in WordIterator::new(input, true).zip(expected.iter()) {
         assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
         correct += 1;
     }
@@ -17,19 +13,19 @@ fn compare(input: &str, expected: Vec<WordToken<'_>>) {
 #[test]
 fn string_method() {
     let input = "$join(array 'pattern') $join(array 'pattern')";
-    let expected = vec![
+    let expected = &[
         WordToken::StringMethod(StringMethod {
             method:    "join",
             variable:  "array",
             pattern:   "'pattern'",
-            selection: Select::All,
+            selection: None,
         }),
         WordToken::Whitespace(" "),
         WordToken::StringMethod(StringMethod {
             method:    "join",
             variable:  "array",
             pattern:   "'pattern'",
-            selection: Select::All,
+            selection: None,
         }),
     ];
     compare(input, expected);
@@ -38,7 +34,7 @@ fn string_method() {
 #[test]
 fn escape_with_backslash() {
     let input = r#"\$FOO\$BAR \$FOO"#;
-    let expected = vec![
+    let expected = &[
         WordToken::Normal("$FOO$BAR".into(), false, false),
         WordToken::Whitespace(" "),
         WordToken::Normal("$FOO".into(), false, false),
@@ -51,10 +47,10 @@ fn array_expressions() {
     let input = "[ one two [three four]] [[one two] three four][0]";
     let first = vec!["one", "two", "[three four]"];
     let second = vec!["[one two]", "three", "four"];
-    let expected = vec![
-        WordToken::Array(first, Select::All),
+    let expected = &[
+        WordToken::Array(first, None),
         WordToken::Whitespace(" "),
-        WordToken::Array(second, Select::Index(Index::new(0))),
+        WordToken::Array(second, Some("0")),
     ];
     compare(input, expected);
 }
@@ -62,12 +58,12 @@ fn array_expressions() {
 #[test]
 fn array_variables() {
     let input = "@array @array[0] @{array[1..]}";
-    let expected = vec![
-        WordToken::ArrayVariable("array", false, Select::All),
+    let expected = &[
+        WordToken::ArrayVariable("array", false, None),
         WordToken::Whitespace(" "),
-        WordToken::ArrayVariable("array", false, Select::Index(Index::new(0))),
+        WordToken::ArrayVariable("array", false, Some("0")),
         WordToken::Whitespace(" "),
-        WordToken::ArrayVariable("array", false, Select::Range(Range::from(Index::new(1)))),
+        WordToken::ArrayVariable("array", false, Some("1..")),
     ];
     compare(input, expected);
 }
@@ -75,10 +71,10 @@ fn array_variables() {
 #[test]
 fn array_processes() {
     let input = "@(echo one two three) @(echo one two three)[0]";
-    let expected = vec![
-        WordToken::ArrayProcess("echo one two three", false, Select::All),
+    let expected = &[
+        WordToken::ArrayProcess("echo one two three", false, None),
         WordToken::Whitespace(" "),
-        WordToken::ArrayProcess("echo one two three", false, Select::Index(Index::new(0))),
+        WordToken::ArrayProcess("echo one two three", false, Some("0")),
     ];
     compare(input, expected);
 }
@@ -87,13 +83,10 @@ fn array_processes() {
 fn array_process_within_string_process() {
     compare(
         "echo $(let free=[@(free -h)]; echo @free[6]@free[8]/@free[7])",
-        vec![
+        &[
             WordToken::Normal("echo".into(), false, false),
             WordToken::Whitespace(" "),
-            WordToken::Process(
-                "let free=[@(free -h)]; echo @free[6]@free[8]/@free[7]",
-                Select::All,
-            ),
+            WordToken::Process("let free=[@(free -h)]; echo @free[6]@free[8]/@free[7]", None),
         ],
     )
 }
@@ -101,24 +94,16 @@ fn array_process_within_string_process() {
 #[test]
 fn indexes() {
     let input = "@array[0..3] @array[0...3] @array[abc] @array[..3] @array[3..]";
-    let expected = vec![
-        WordToken::ArrayVariable(
-            "array",
-            false,
-            Select::Range(Range::exclusive(Index::new(0), Index::new(3))),
-        ),
+    let expected = &[
+        WordToken::ArrayVariable("array", false, Some("0..3")),
         WordToken::Whitespace(" "),
-        WordToken::ArrayVariable(
-            "array",
-            false,
-            Select::Range(Range::inclusive(Index::new(0), Index::new(3))),
-        ),
+        WordToken::ArrayVariable("array", false, Some("0...3")),
         WordToken::Whitespace(" "),
-        WordToken::ArrayVariable("array", false, Select::Key("abc".into())),
+        WordToken::ArrayVariable("array", false, Some("abc")),
         WordToken::Whitespace(" "),
-        WordToken::ArrayVariable("array", false, Select::Range(Range::to(Index::new(3)))),
+        WordToken::ArrayVariable("array", false, Some("..3")),
         WordToken::Whitespace(" "),
-        WordToken::ArrayVariable("array", false, Select::Range(Range::from(Index::new(3)))),
+        WordToken::ArrayVariable("array", false, Some("3..")),
     ];
     compare(input, expected);
 }
@@ -126,12 +111,12 @@ fn indexes() {
 #[test]
 fn string_keys() {
     let input = "@array['key'] @array[key] @array[]";
-    let expected = vec![
-        WordToken::ArrayVariable("array", false, Select::Key("key".into())),
+    let expected = &[
+        WordToken::ArrayVariable("array", false, Some("'key'")),
         WordToken::Whitespace(" "),
-        WordToken::ArrayVariable("array", false, Select::Key("key".into())),
+        WordToken::ArrayVariable("array", false, Some("key")),
         WordToken::Whitespace(" "),
-        WordToken::ArrayVariable("array", false, Select::Key("".into())),
+        WordToken::ArrayVariable("array", false, Some("")),
     ];
     compare(input, expected);
 }
@@ -139,12 +124,12 @@ fn string_keys() {
 #[test]
 fn nested_processes() {
     let input = "echo $(echo $(echo one)) $(echo one $(echo two) three)";
-    let expected = vec![
+    let expected = &[
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Process("echo $(echo one)", Select::All),
+        WordToken::Process("echo $(echo one)", None),
         WordToken::Whitespace(" "),
-        WordToken::Process("echo one $(echo two) three", Select::All),
+        WordToken::Process("echo one $(echo two) three", None),
     ];
     compare(input, expected);
 }
@@ -152,18 +137,18 @@ fn nested_processes() {
 #[test]
 fn words_process_with_quotes() {
     let input = "echo $(git branch | rg '[*]' | awk '{print $2}')";
-    let expected = vec![
+    let expected = &[
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", Select::All),
+        WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", None),
     ];
     compare(input, expected);
 
     let input = "echo $(git branch | rg \"[*]\" | awk '{print $2}')";
-    let expected = vec![
+    let expected = &[
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", Select::All),
+        WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", None),
     ];
     compare(input, expected);
 }
@@ -171,21 +156,21 @@ fn words_process_with_quotes() {
 #[test]
 fn test_words() {
     let input = "echo $ABC \"${ABC}\" one{$ABC,$ABC} ~ $(echo foo) \"$(seq 1 100)\"";
-    let expected = vec![
+    let expected = &[
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Variable("ABC", Select::All),
+        WordToken::Variable("ABC", None),
         WordToken::Whitespace(" "),
-        WordToken::Variable("ABC", Select::All),
+        WordToken::Variable("ABC", None),
         WordToken::Whitespace(" "),
         WordToken::Normal("one".into(), false, false),
         WordToken::Brace(vec!["$ABC", "$ABC"]),
         WordToken::Whitespace(" "),
         WordToken::Normal("~".into(), false, true),
         WordToken::Whitespace(" "),
-        WordToken::Process("echo foo", Select::All),
+        WordToken::Process("echo foo", None),
         WordToken::Whitespace(" "),
-        WordToken::Process("seq 1 100", Select::All),
+        WordToken::Process("seq 1 100", None),
     ];
     compare(input, expected);
 }
@@ -193,7 +178,7 @@ fn test_words() {
 #[test]
 fn test_multiple_escapes() {
     let input = "foo\\(\\) bar\\(\\)";
-    let expected = vec![
+    let expected = &[
         WordToken::Normal("foo()".into(), false, false),
         WordToken::Whitespace(" "),
         WordToken::Normal("bar()".into(), false, false),
@@ -204,7 +189,7 @@ fn test_multiple_escapes() {
 #[test]
 fn test_arithmetic() {
     let input = "echo $((foo bar baz bing 3 * 2))";
-    let expected = vec![
+    let expected = &[
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
         WordToken::Arithmetic("foo bar baz bing 3 * 2"),
@@ -215,7 +200,7 @@ fn test_arithmetic() {
 #[test]
 fn test_globbing() {
     let input = "barbaz* bingcrosb*";
-    let expected = vec![
+    let expected = &[
         WordToken::Normal("barbaz*".into(), true, false),
         WordToken::Whitespace(" "),
         WordToken::Normal("bingcrosb*".into(), true, false),
@@ -226,7 +211,7 @@ fn test_globbing() {
 #[test]
 fn test_empty_strings() {
     let input = "rename '' 0 a \"\"";
-    let expected = vec![
+    let expected = &[
         WordToken::Normal("rename".into(), false, false),
         WordToken::Whitespace(" "),
         WordToken::Normal("".into(), false, false),
@@ -243,7 +228,7 @@ fn test_empty_strings() {
 #[test]
 fn test_braces() {
     let input = "echo {c[a,b],d}";
-    let expected = vec![
+    let expected = &[
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
         WordToken::Brace(vec!["c[a,b]", "d"]),
@@ -253,20 +238,13 @@ fn test_braces() {
 
 #[test]
 fn array_methods() {
-    let method = ArrayMethod::new(
-        "graphemes",
-        "pkmn1",
-        Pattern::Whitespace,
-        Select::Index(Index::Forward(3)),
-    );
+    let method = ArrayMethod::new("graphemes", "pkmn1", Pattern::Whitespace, Some("3"));
     let expected = args!["é"];
     assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), expected);
-    let method =
-        ArrayMethod::new("chars", "pkmn2", Pattern::Whitespace, Select::Index(Index::Forward(3)));
+    let method = ArrayMethod::new("chars", "pkmn2", Pattern::Whitespace, Some("3"));
     let expected = args!["e"];
     assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), expected);
-    let method =
-        ArrayMethod::new("bytes", "pkmn2", Pattern::Whitespace, Select::Index(Index::Forward(1)));
+    let method = ArrayMethod::new("bytes", "pkmn2", Pattern::Whitespace, Some("1"));
     let expected = args!["111"];
     assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), expected);
 }

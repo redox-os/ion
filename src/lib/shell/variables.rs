@@ -312,19 +312,11 @@ pub(crate) mod tests {
 
         fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 
-        fn map_keys(
-            &self,
-            _name: &str,
-            _select: &Select<types::Str>,
-        ) -> Result<types::Args, Self::Error> {
+        fn map_keys(&self, _name: &str) -> Result<types::Args, Self::Error> {
             Err(expansion::Error::VarNotFound)
         }
 
-        fn map_values(
-            &self,
-            _name: &str,
-            _select: &Select<types::Str>,
-        ) -> Result<types::Args, Self::Error> {
+        fn map_values(&self, _name: &str) -> Result<types::Args, Self::Error> {
             Err(expansion::Error::VarNotFound)
         }
     }

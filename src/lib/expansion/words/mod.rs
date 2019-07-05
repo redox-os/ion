@@ -1,12 +1,9 @@
 #[cfg(test)]
 mod tests;
 
-use super::{
-    methods::{ArrayMethod, Pattern, StringMethod},
-    Expander, Result,
-};
+use super::methods::{ArrayMethod, Pattern, StringMethod};
+use crate::parser::lexers::ArgumentSplitter;
 pub use crate::ranges::{Select, SelectWithSize};
-use crate::{parser::lexers::ArgumentSplitter, types};
 use std::borrow::Cow;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -40,15 +37,15 @@ pub enum WordToken<'a> {
     /// Braced alternatives
     Brace(Vec<&'a str>),
     /// An array literal
-    Array(Vec<&'a str>, Select<types::Str>),
+    Array(Vec<&'a str>, Option<&'a str>),
     /// A scalar variable
-    Variable(&'a str, Select<types::Str>),
+    Variable(&'a str, Option<&'a str>),
     /// An array or map-like variable
-    ArrayVariable(&'a str, bool, Select<types::Str>),
+    ArrayVariable(&'a str, bool, Option<&'a str>),
     /// A process that should expand to an array
-    ArrayProcess(&'a str, bool, Select<types::Str>),
+    ArrayProcess(&'a str, bool, Option<&'a str>),
     /// A process that expands to a scalar value
-    Process(&'a str, Select<types::Str>),
+    Process(&'a str, Option<&'a str>),
     /// A method on a scalar value
     StringMethod(StringMethod<'a>),
     /// A method on a array value
@@ -59,16 +56,15 @@ pub enum WordToken<'a> {
 
 /// Iterate over the terminal tokens of the parsed text
 #[derive(Debug, PartialEq, Clone)]
-pub struct WordIterator<'a, E: Expander> {
-    data:      &'a str,
-    read:      usize,
-    quotes:    Quotes,
-    backsl:    bool,
-    expanders: &'a E,
-    do_glob:   bool,
+pub struct WordIterator<'a> {
+    data:    &'a str,
+    read:    usize,
+    quotes:  Quotes,
+    backsl:  bool,
+    do_glob: bool,
 }
 
-impl<'a, E: Expander + 'a> WordIterator<'a, E> {
+impl<'a> WordIterator<'a> {
     fn arithmetic_expression<I: Iterator<Item = u8>>(&mut self, iter: &mut I) -> WordToken<'a> {
         let mut paren: i8 = 0;
         let start = self.read;
@@ -138,7 +134,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     /// Contains the grammar for parsing array expression syntax
-    fn array<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
+    fn array<I>(&mut self, iterator: &mut I) -> WordToken<'a>
     where
         I: Iterator<Item = u8>,
     {
@@ -161,9 +157,9 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
 
                         return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                             let _ = iterator.next();
-                            Ok(WordToken::Array(elements, self.read_selection(iterator)?))
+                            WordToken::Array(elements, Some(self.read_selection(iterator)))
                         } else {
-                            Ok(WordToken::Array(elements, Select::All))
+                            WordToken::Array(elements, None)
                         };
                     } else {
                         level -= 1;
@@ -218,7 +214,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     /// Contains the logic for parsing array subshell syntax.
-    fn array_process<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
+    fn array_process<I>(&mut self, iterator: &mut I) -> WordToken<'a>
     where
         I: Iterator<Item = u8>,
     {
@@ -243,17 +239,17 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                         self.read += 1;
                         return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                             let _ = iterator.next();
-                            Ok(WordToken::ArrayProcess(
+                            WordToken::ArrayProcess(
                                 array_process_contents,
                                 self.quotes == Quotes::Double,
-                                self.read_selection(iterator)?,
-                            ))
+                                Some(self.read_selection(iterator)),
+                            )
                         } else {
-                            Ok(WordToken::ArrayProcess(
+                            WordToken::ArrayProcess(
                                 array_process_contents,
                                 self.quotes == Quotes::Double,
-                                Select::All,
-                            ))
+                                None,
+                            )
                         };
                     } else {
                         level -= 1;
@@ -269,7 +265,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     /// Contains the logic for parsing subshell syntax.
-    fn process<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
+    fn process<I>(&mut self, iterator: &mut I) -> WordToken<'a>
     where
         I: Iterator<Item = u8>,
     {
@@ -305,9 +301,9 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                         self.read += 1;
                         return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                             let _ = iterator.next();
-                            Ok(WordToken::Process(output, self.read_selection(iterator)?))
+                            WordToken::Process(output, Some(self.read_selection(iterator)))
                         } else {
-                            Ok(WordToken::Process(output, Select::All))
+                            WordToken::Process(output, None)
                         };
                     } else {
                         level -= 1;
@@ -322,7 +318,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         panic!("ion: fatal error with syntax validation: unterminated process");
     }
 
-    fn braced_array_variable<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
+    fn braced_array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
     where
         I: Iterator<Item = u8>,
     {
@@ -331,11 +327,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         while let Some(character) = iterator.next() {
             match character {
                 b'[' => {
-                    let result = Ok(WordToken::ArrayVariable(
+                    let result = WordToken::ArrayVariable(
                         &self.data[start..self.read],
                         self.quotes == Quotes::Double,
-                        self.read_selection(iterator)?,
-                    ));
+                        Some(self.read_selection(iterator)),
+                    );
                     self.read += 1;
                     if let Some(b'}') = iterator.next() {
                         return result;
@@ -348,33 +344,25 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 b'}' => {
                     let output = &self.data[start..self.read];
                     self.read += 1;
-                    return Ok(WordToken::ArrayVariable(
-                        output,
-                        self.quotes == Quotes::Double,
-                        Select::All,
-                    ));
+                    return WordToken::ArrayVariable(output, self.quotes == Quotes::Double, None);
                 }
                 // Only alphanumerical and underscores are allowed in variable names
                 0..=47 | 58..=64 | 91..=94 | 96 | 123..=127 => {
-                    return Ok(WordToken::ArrayVariable(
+                    return WordToken::ArrayVariable(
                         &self.data[start..self.read],
                         self.quotes == Quotes::Double,
-                        Select::All,
-                    ));
+                        None,
+                    );
                 }
                 _ => (),
             }
             self.read += 1;
         }
-        Ok(WordToken::ArrayVariable(
-            &self.data[start..],
-            self.quotes == Quotes::Double,
-            Select::All,
-        ))
+        WordToken::ArrayVariable(&self.data[start..], self.quotes == Quotes::Double, None)
     }
 
     /// Contains the logic for parsing array variable syntax
-    fn array_variable<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
+    fn array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
     where
         I: Iterator<Item = u8>,
     {
@@ -408,25 +396,25 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                                             self.data.as_bytes().get(self.read)
                                         {
                                             let _ = iterator.next();
-                                            Ok(WordToken::ArrayMethod(
+                                            WordToken::ArrayMethod(
                                                 ArrayMethod::new(
                                                     method,
                                                     variable.trim(),
                                                     Pattern::StringPattern(pattern),
-                                                    self.read_selection(iterator)?,
+                                                    Some(self.read_selection(iterator)),
                                                 ),
                                                 self.quotes == Quotes::Double,
-                                            ))
+                                            )
                                         } else {
-                                            Ok(WordToken::ArrayMethod(
+                                            WordToken::ArrayMethod(
                                                 ArrayMethod::new(
                                                     method,
                                                     variable.trim(),
                                                     Pattern::StringPattern(pattern),
-                                                    Select::All,
+                                                    None,
                                                 ),
                                                 self.quotes == Quotes::Double,
-                                            ))
+                                            )
                                         };
                                     }
                                     self.read += 1;
@@ -439,25 +427,25 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
 
                                 return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                     let _ = iterator.next();
-                                    Ok(WordToken::ArrayMethod(
+                                    WordToken::ArrayMethod(
                                         ArrayMethod::new(
                                             method,
                                             variable.trim(),
                                             Pattern::Whitespace,
-                                            self.read_selection(iterator)?,
+                                            Some(self.read_selection(iterator)),
                                         ),
                                         self.quotes == Quotes::Double,
-                                    ))
+                                    )
                                 } else {
-                                    Ok(WordToken::ArrayMethod(
+                                    WordToken::ArrayMethod(
                                         ArrayMethod::new(
                                             method,
                                             variable.trim(),
                                             Pattern::Whitespace,
-                                            Select::All,
+                                            None,
                                         ),
                                         self.quotes == Quotes::Double,
-                                    ))
+                                    )
                                 };
                             }
                             b')' => depth -= 1,
@@ -470,33 +458,29 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     panic!("ion: fatal error with syntax validation parsing: unterminated method");
                 }
                 b'[' => {
-                    return Ok(WordToken::ArrayVariable(
+                    return WordToken::ArrayVariable(
                         &self.data[start..self.read],
                         self.quotes == Quotes::Double,
-                        self.read_selection(iterator)?,
-                    ));
+                        Some(self.read_selection(iterator)),
+                    );
                 }
                 // Only alphanumerical and underscores are allowed in variable names
                 0..=47 | 58..=64 | 91..=94 | 96 | 123..=127 => {
-                    return Ok(WordToken::ArrayVariable(
+                    return WordToken::ArrayVariable(
                         &self.data[start..self.read],
                         self.quotes == Quotes::Double,
-                        Select::All,
-                    ));
+                        None,
+                    );
                 }
                 _ => (),
             }
             self.read += 1;
         }
 
-        Ok(WordToken::ArrayVariable(
-            &self.data[start..],
-            self.quotes == Quotes::Double,
-            Select::All,
-        ))
+        WordToken::ArrayVariable(&self.data[start..], self.quotes == Quotes::Double, None)
     }
 
-    fn read_selection<I>(&mut self, iterator: &mut I) -> Result<Select<types::Str>, E::Error>
+    fn read_selection<I>(&mut self, iterator: &mut I) -> &'a str
     where
         I: Iterator<Item = u8>,
     {
@@ -504,11 +488,9 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         let start = self.read;
         for character in iterator {
             if let b']' = character {
-                let value = self.expanders.expand_string(&self.data[start..self.read])?.join(" ");
+                let value = &self.data[start..self.read];
                 self.read += 1;
-                return value
-                    .parse::<Select<types::Str>>()
-                    .map_err(|_| super::Error::IndexParsingError(value));
+                return value;
             }
             self.read += 1;
         }
@@ -517,7 +499,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     /// Contains the logic for parsing variable syntax
-    fn variable<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
+    fn variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
     where
         I: Iterator<Item = u8>,
     {
@@ -555,19 +537,19 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                                             self.data.as_bytes().get(self.read)
                                         {
                                             let _ = iterator.next();
-                                            Ok(WordToken::StringMethod(StringMethod {
+                                            WordToken::StringMethod(StringMethod {
                                                 method,
                                                 variable: variable.trim(),
                                                 pattern,
-                                                selection: self.read_selection(iterator)?,
-                                            }))
+                                                selection: Some(self.read_selection(iterator)),
+                                            })
                                         } else {
-                                            Ok(WordToken::StringMethod(StringMethod {
+                                            WordToken::StringMethod(StringMethod {
                                                 method,
                                                 variable: variable.trim(),
                                                 pattern,
-                                                selection: Select::All,
-                                            }))
+                                                selection: None,
+                                            })
                                         };
                                     } else if character == b'(' {
                                         depth += 1;
@@ -585,19 +567,19 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
 
                                 return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                     let _ = iterator.next();
-                                    Ok(WordToken::StringMethod(StringMethod {
+                                    WordToken::StringMethod(StringMethod {
                                         method,
                                         variable: variable.trim(),
                                         pattern: " ",
-                                        selection: self.read_selection(iterator)?,
-                                    }))
+                                        selection: Some(self.read_selection(iterator)),
+                                    })
                                 } else {
-                                    Ok(WordToken::StringMethod(StringMethod {
+                                    WordToken::StringMethod(StringMethod {
                                         method,
                                         variable: variable.trim(),
                                         pattern: " ",
-                                        selection: Select::All,
-                                    }))
+                                        selection: None,
+                                    })
                                 };
                             }
                             b')' => depth -= 1,
@@ -614,9 +596,9 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     let variable = &self.data[start..self.read];
 
                     return if character == b'[' {
-                        Ok(WordToken::Variable(variable, self.read_selection(iterator)?))
+                        WordToken::Variable(variable, Some(self.read_selection(iterator)))
                     } else {
-                        Ok(WordToken::Variable(variable, Select::All))
+                        WordToken::Variable(variable, None)
                     };
                 }
                 _ => (),
@@ -624,7 +606,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             self.read += 1;
         }
 
-        Ok(WordToken::Variable(&self.data[start..], Select::All))
+        WordToken::Variable(&self.data[start..], None)
     }
 
     // Contains the logic for parsing braced variables
@@ -637,7 +619,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             if character == b'}' {
                 let output = &self.data[start..self.read];
                 self.read += 1;
-                return WordToken::Variable(output, Select::All);
+                return WordToken::Variable(output, None);
             }
             self.read += 1;
         }
@@ -664,16 +646,13 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     /// Creates a new iterator with a given expander
-    pub fn new(data: &'a str, expanders: &'a E, do_glob: bool) -> WordIterator<'a, E> {
-        WordIterator { data, backsl: false, read: 0, quotes: Quotes::None, expanders, do_glob }
+    pub fn new(data: &'a str, do_glob: bool) -> WordIterator<'a> {
+        WordIterator { data, backsl: false, read: 0, quotes: Quotes::None, do_glob }
     }
 }
 
-impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E>
-where
-    <E as Expander>::Error: 'static,
-{
-    type Item = Result<WordToken<'a>, E::Error>;
+impl<'a> Iterator for WordIterator<'a> {
+    type Item = WordToken<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.read == self.data.len() {
@@ -721,7 +700,7 @@ where
                     break;
                 }
                 b' ' if self.quotes == Quotes::None => {
-                    return Some(Ok(self.whitespaces(&mut iterator)));
+                    return Some(self.whitespaces(&mut iterator));
                 }
                 b'~' if self.quotes == Quotes::None => {
                     tilde = true;
@@ -730,7 +709,7 @@ where
                 }
                 b'{' if self.quotes == Quotes::None => {
                     self.read += 1;
-                    return Some(Ok(self.braces(&mut iterator)));
+                    return Some(self.braces(&mut iterator));
                 }
                 b'[' if self.quotes == Quotes::None => {
                     if self.glob_check(&mut iterator) {
@@ -752,7 +731,7 @@ where
                         Some(b' ') | None => {
                             self.read += 1;
                             let output = &self.data[start..self.read];
-                            Some(Ok(WordToken::Normal(output.into(), glob, tilde)))
+                            Some(WordToken::Normal(output.into(), glob, tilde))
                         }
                         _ => {
                             self.read += 1;
@@ -768,19 +747,19 @@ where
                                 // Pop the incoming left paren
                                 let _ = iterator.next();
                                 self.read += 1;
-                                Some(Ok(self.arithmetic_expression(&mut iterator)))
+                                Some(self.arithmetic_expression(&mut iterator))
                             } else {
                                 Some(self.process(&mut iterator))
                             }
                         }
                         Some(b'{') => {
                             self.read += 2;
-                            Some(Ok(self.braced_variable(&mut iterator)))
+                            Some(self.braced_variable(&mut iterator))
                         }
                         Some(b' ') | None => {
                             self.read += 1;
                             let output = &self.data[start..self.read];
-                            Some(Ok(WordToken::Normal(output.into(), glob, tilde)))
+                            Some(WordToken::Normal(output.into(), glob, tilde))
                         }
                         _ => {
                             self.read += 1;
@@ -809,7 +788,7 @@ where
                     if self.quotes == Quotes::Double {
                         let _ = iterator.next();
                         self.read += 1;
-                        return Some(Ok(WordToken::Normal(
+                        return Some(WordToken::Normal(
                             if next.map_or(true, |c| [b'$', b'@', b'\\', b'"'].contains(&c)) {
                                 unescape(&self.data[start..self.read])
                             } else {
@@ -817,7 +796,7 @@ where
                             },
                             glob,
                             tilde,
-                        )));
+                        ));
                     }
                 }
                 b'\'' if self.quotes != Quotes::Double => {
@@ -828,7 +807,7 @@ where
                     }
                     let output = &self.data[start..self.read];
                     self.read += 1;
-                    return Some(Ok(WordToken::Normal(output.into(), glob, tilde)));
+                    return Some(WordToken::Normal(output.into(), glob, tilde));
                 }
                 b'"' if self.quotes != Quotes::Single => {
                     if self.quotes == Quotes::Double {
@@ -838,39 +817,39 @@ where
                     }
                     let output = &self.data[start..self.read];
                     self.read += 1;
-                    return Some(Ok(WordToken::Normal(output.into(), glob, tilde)));
+                    return Some(WordToken::Normal(output.into(), glob, tilde));
                 }
                 b' ' | b'{' if self.quotes == Quotes::None => {
-                    return Some(Ok(WordToken::Normal(
+                    return Some(WordToken::Normal(
                         unescape(&self.data[start..self.read]),
                         glob,
                         tilde,
-                    )));
+                    ));
                 }
                 b'$' | b'@' if self.quotes != Quotes::Single => {
                     if let Some(&character) = self.data.as_bytes().get(self.read) {
                         if character == b' ' {
                             self.read += 1;
                             let output = &self.data[start..self.read];
-                            return Some(Ok(WordToken::Normal(output.into(), glob, tilde)));
+                            return Some(WordToken::Normal(output.into(), glob, tilde));
                         }
                     }
                     if self.read == start {
                         return self.next();
                     } else {
                         let output = &self.data[start..self.read];
-                        return Some(Ok(WordToken::Normal(unescape(output), glob, tilde)));
+                        return Some(WordToken::Normal(unescape(output), glob, tilde));
                     };
                 }
                 b'[' if self.quotes == Quotes::None => {
                     if self.glob_check(&mut iterator) {
                         glob = self.do_glob;
                     } else {
-                        return Some(Ok(WordToken::Normal(
+                        return Some(WordToken::Normal(
                             self.data[start..self.read].into(),
                             glob,
                             tilde,
-                        )));
+                        ));
                     }
                 }
                 b'*' | b'?' if self.quotes != Quotes::Single => {
@@ -884,7 +863,7 @@ where
         if start == self.read {
             None
         } else {
-            Some(Ok(WordToken::Normal(unescape(&self.data[start..]), glob, tilde)))
+            Some(WordToken::Normal(unescape(&self.data[start..]), glob, tilde))
         }
     }
 }

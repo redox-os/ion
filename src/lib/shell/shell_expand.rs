@@ -152,30 +152,26 @@ impl<'a, 'b> Expander for Shell<'b> {
         }
     }
 
-    fn map_keys(&self, name: &str, sel: &Select<types::Str>) -> Result<types::Args, Self::Error> {
+    fn map_keys(&self, name: &str) -> Result<types::Args, Self::Error> {
         match self.variables.get(name) {
             Some(&Value::HashMap(ref map)) => {
-                Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or_else(|| Error::InvalidIndex(sel.clone(), "map-like", name.into()))
+                Ok(map.keys().map(|x| x.to_string().into()).collect())
             }
             Some(&Value::BTreeMap(ref map)) => {
-                Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or_else(|| Error::InvalidIndex(sel.clone(), "map-like", name.into()))
+                Ok(map.keys().map(|x| x.to_string().into()).collect())
             }
             Some(_) => Err(Error::NotAMap(name.into())),
             None => Err(Error::VarNotFound),
         }
     }
 
-    fn map_values(&self, name: &str, sel: &Select<types::Str>) -> Result<types::Args, Self::Error> {
+    fn map_values(&self, name: &str) -> Result<types::Args, Self::Error> {
         match self.variables.get(name) {
             Some(&Value::HashMap(ref map)) => {
-                Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or_else(|| Error::InvalidIndex(sel.clone(), "map-like", name.into()))
+                Ok(map.values().map(|x| x.to_string().into()).collect())
             }
             Some(&Value::BTreeMap(ref map)) => {
-                Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
-                    .ok_or_else(|| Error::InvalidIndex(sel.clone(), "map-like", name.into()))
+                Ok(map.values().map(|x| x.to_string().into()).collect())
             }
             Some(_) => Err(Error::NotAMap(name.into())),
             None => Err(Error::VarNotFound),
