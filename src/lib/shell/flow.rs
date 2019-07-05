@@ -445,7 +445,7 @@ impl<'a> Shell<'a> {
             _ => {}
         }
         if let Some(signal) = signals::SignalHandler.next() {
-            self.handle_signal(signal).map_err(PipelineError::KillFailed)?;
+            let _ = self.handle_signal(signal);
             Err(IonError::from(PipelineError::Interrupted(Pid::this(), signal)))
         } else {
             Ok(Condition::NoOp)

@@ -480,8 +480,7 @@ impl<'b> Shell<'b> {
                     unistd::tcsetpgrp(nix::libc::STDIN_FILENO, pgid.unwrap())
                         .map_err(PipelineError::TerminalGrabFailed)?;
                 }
-                signal::killpg(pgid.unwrap(), signal::Signal::SIGCONT)
-                    .map_err(PipelineError::KillFailed)?;
+                let _ = signal::killpg(pgid.unwrap(), signal::Signal::SIGCONT);
 
                 // Waits for all of the children of the assigned pgid to finish executing,
                 // returning the exit status of the last process in the queue.

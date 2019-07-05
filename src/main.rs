@@ -1,9 +1,9 @@
 use self::binary::{builtins, InteractiveShell};
 use atty::Stream;
-use ion_shell::{BackgroundEvent, BuiltinMap, Shell, Value};
+use ion_shell::{BackgroundEvent, BuiltinMap, IonError, PipelineError, Shell, Value};
 use liner::KeyBindings;
 use nix::{
-    sys::signal::{self, SigHandler, Signal},
+    sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal},
     unistd,
 };
 use std::{
@@ -215,12 +215,15 @@ fn main() {
         interactive.execute_interactive();
     } else {
         shell.execute_command(BufReader::new(stdin()))
-    };
-    if let Err(why) = err {
-        eprintln!("ion: {}", why);
-        process::exit(1);
     }
-    if let Err(why) = shell.wait_for_background() {
+    .and_then(|_| shell.wait_for_background().map_err(Into::into));
+    if let Err(IonError::PipelineExecutionError(PipelineError::Interrupted(_, signal))) = err {
+        // When the job was aborted because of an interrupt signal, abort with this same signal
+        let action = SigAction::new(SigHandler::SigDfl, SaFlags::empty(), SigSet::empty());
+        let _ = unsafe { nix::sys::signal::sigaction(signal, &action) };
+        let _ = nix::sys::signal::raise(signal);
+    }
+    if let Err(why) = err {
         eprintln!("ion: {}", why);
         process::exit(1);
     }

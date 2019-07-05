@@ -270,11 +270,10 @@ impl<'a> Shell<'a> {
                         signaled = Some(PipelineError::CoreDump(pid));
                     } else {
                         if signal == Signal::SIGINT {
-                            signal::kill(pid, signal)
+                            let _ = signal::kill(pid, signal);
                         } else {
-                            self.handle_signal(signal).map(|_| ())
+                            let _ = self.handle_signal(signal);
                         }
-                        .map_err(PipelineError::KillFailed)?;
                         signaled = Some(PipelineError::Interrupted(pid, signal));
                     }
                 }
