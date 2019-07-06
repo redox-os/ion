@@ -1,7 +1,21 @@
 extern crate proc_macro;
+use darling::{util::Flag, FromMeta};
 use proc_macro::TokenStream;
 use quote::quote;
+use std::{fs::File, io::Write};
 use syn;
+
+#[derive(Debug, FromMeta)]
+struct MacroArgs {
+    #[darling(default)]
+    names: Option<String>,
+    #[darling(rename = "man")]
+    help: String,
+    #[darling(default)]
+    authors: Flag,
+    #[darling(rename = "desc")]
+    short_description: String,
+}
 
 // TODO: It would be better if Man pages could be parsed of comments
 #[proc_macro_attribute]
@@ -10,47 +24,16 @@ pub fn builtin(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = syn::parse_macro_input!(attr as syn::AttributeArgs);
     let syn::ItemFn { vis, decl, block, ident, .. } = &input;
     let syn::FnDecl { ref fn_token, ref inputs, ref output, .. } = **decl;
-    let mut help = None;
-    let mut short_description = None;
-    let mut names = None;
-    let mut authors = true;
+
+    let args = match MacroArgs::from_list(&attrs) {
+        Ok(v) => v,
+        Err(e) => return e.write_errors().into(),
+    };
 
     let name = syn::Ident::new(&format!("builtin_{}", &ident), input.ident.span());
 
-    for attr in attrs {
-        match attr {
-            syn::NestedMeta::Meta(syn::Meta::NameValue(ref attr)) if attr.ident == "man" => {
-                if let syn::Lit::Str(h) = &attr.lit {
-                    help = Some(h.value());
-                } else {
-                    panic!("`man` attribute should be a string variable");
-                }
-            }
-            syn::NestedMeta::Meta(syn::Meta::NameValue(ref attr)) if attr.ident == "desc" => {
-                if let syn::Lit::Str(h) = &attr.lit {
-                    short_description = Some(h.value());
-                } else {
-                    panic!("`desc` attribute should be a string variable");
-                }
-            }
-            syn::NestedMeta::Meta(syn::Meta::NameValue(ref attr)) if attr.ident == "names" => {
-                if let syn::Lit::Str(h) = &attr.lit {
-                    names = Some(h.value());
-                } else {
-                    panic!("`desc` attribute should be a string variable");
-                }
-            }
-            syn::NestedMeta::Meta(syn::Meta::Word(ref ident)) if ident == "no_authors" => {
-                authors = false;
-            }
-            _ => panic!("Only the `man` and `desc` attributes are allowed"),
-        }
-    }
-    let help = help.expect("A man page is required! Please add an attribute with name `man`");
-    let help = help.trim();
-    let short_description = short_description
-        .expect("A short description is required! Please add an attribute with name `desc`");
-    let names = names.unwrap_or_else(|| ident.to_string());
+    let help = args.help.trim();
+    let names = args.names.unwrap_or_else(|| ident.to_string());
 
     let bugs = "BUGS
     Please report all bugs at https://gitlab.redox-os.org/redox-os/ion/issues.
@@ -65,12 +48,17 @@ AUTHORS
     let man = format!(
         "NAME\n    {names} - {short_description}\n\n{help}\n\n{bugs}{extra}",
         names = names,
-        short_description = short_description,
+        short_description = args.short_description,
         help = help,
         bugs = bugs,
-        extra = if authors { &extra } else { "" },
+        extra = if args.authors.is_none() { &extra } else { "" },
     );
-    let help = format!("{} - {}\n\n```txt\n{}\n```", names, short_description, help);
+    let help = format!("{} - {}\n\n```txt\n{}\n```", names, args.short_description, help);
+
+    if cfg!(feature = "man") {
+        let mut man = File::create(format!("manual/builtins/{}.1", &ident)).unwrap();
+        man.write(help.as_bytes()).unwrap();
+    }
 
     let result = quote! {
         #[doc = #help]

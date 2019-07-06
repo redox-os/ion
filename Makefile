@@ -30,7 +30,7 @@ ifeq ($(RUSTUP),1)
 	TOOLCHAIN_ARG = +$(TOOLCHAIN)
 endif
 
-.PHONY: tests all clean distclean install uninstall
+.PHONY: tests all clean distclean install uninstall manual
 
 all: $(SRC) $(GIT_REVISION)
 ifeq ($(REDOX),1)
@@ -41,6 +41,14 @@ ifeq ($(VENDORED),1)
 	tar pxf vendor.tar.xz
 endif
 	cargo $(TOOLCHAIN_ARG) build $(ARGS) $(ARGSV)
+
+manual:
+	cargo build --features man
+	echo -n "# Builtin commands" > manual/src/builtins.md
+	for man in manual/builtins/*; do \
+		echo -n "\n\n## " >> manual/src/builtins.md; \
+		cat $$man >> manual/src/builtins.md; \
+	done
 
 clean:
 	cargo clean

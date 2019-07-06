@@ -7,9 +7,13 @@ edition = "2018"
 [dependencies]
 quote = "0.6"
 syn = { version = "0.15", features = ["full"] }
+darling = "0.9"
 
 [dev-dependencies]
 ion-shell = { path = "../.." }
 
 [lib]
 proc-macro = true
+
+[features]
+man = []

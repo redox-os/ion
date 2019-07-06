@@ -45,6 +45,7 @@ pages:
   image: hrektts/mdbook
   stage: deploy
   script:
+  - make manual
   - mdbook build -d ../public manual
   artifacts:
     paths:

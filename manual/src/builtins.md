@@ -1,445 +1,607 @@
-# Builtin Commands
+# Builtin commands
 
-## alias
+## bg - sends jobs to background
 
-```
-alias NAME=DEFINITION
-alias NAME DEFINITION
+```txt
+SYNOPSIS
+    bg PID
+
+DESCRIPTION
+    bg sends the job to the background resuming it if it has stopped.
 ```
 
-View, set or unset aliases
+## bool - Returns true if the value given to it is equal to '1' or 'true'.
 
-## and
+```txt
+SYNOPSIS
+    bool VALUE
 
+DESCRIPTION
+    Returns true if the value given to it is equal to '1' or 'true'.
 ```
-COMMAND; and COMMAND
-```
 
-Execute the command if the shell's previous status is success
+## calc - Floating-point calculator
 
-## bg
+```txt
+SYNOPSIS
+    calc [EXPRESSION]
 
-```
-bg [PID]
-```
+DESCRIPTION
+    Evaluates arithmetic expressions
 
-Resumes a stopped background process. If no process is specified, the previous
-job will resume.
+SPECIAL EXPRESSIONS
+    help (only in interactive mode)
+        prints this help text
 
-## calc
+    --help (only in non-interactive mode)
+        prints this help text
 
-```
-calc [EXPRESSION]
-```
+    exit (only in interactive mode)
+        exits the program
 
-Calculate a mathematical expression. If no expression is given, it will open
-an interactive expression engine. Type exit to leave the engine.
+NOTATIONS
+    infix notation
+        e.g. 3 * 4 + 5
 
-## cd
+    polish notation
+        e.g. + * 3 4 5
 
-```
-cd [PATH]
+EXAMPLES
+    Add two plus two in infix notation
+        calc 2+2
+
+    Add two plus two in polish notation
+        calc + 2 2
+
+AUTHOR
+    Written by Hunter Goldstein.
 ```
 
-Change the current directory and push it to the stack.
-Omit the directory to change to home
+## cd - Change directory.
 
-## contains
+```txt
+SYNOPSIS
+    cd DIRECTORY
 
+DESCRIPTION
+    Without arguments cd changes the working directory to your home directory.
+    With arguments cd changes the working directory to the directory you provided.
 ```
-contains KEY [VALUE...]
-```
 
-Evaluates if the supplied argument contains a given string
+## contains - check if a given string starts with another one
 
-## dirs
+```txt
+SYNOPSIS
+    starts_with <PATTERN> tests...
 
-```
-dirs
+DESCRIPTION
+    Returns 0 if any argument starts_with contains the first argument, else returns 0
 ```
 
-Display the current directory stack
+## dir_depth - set the dir stack depth
 
-## disown
+```txt
+SYNOPSYS
+    dir_depth [DEPTH]
 
+DESCRIPTION
+    If DEPTH is given, set the dir stack max depth to DEPTH, else remove the limit
 ```
-disown [-r | -h | -a ][PID...]
-```
 
-Disowning a process removes that process from the shell's background process table.
-If no process is specified, the most recently-used job is removed
+## dirs - prints the directory stack
 
-## drop
+```txt
+SYNOPSIS
+    dirs
 
+DESCRIPTION
+    dirs prints the current directory stack.
 ```
-drop VARIABLE
-drop -a ARRAY_VARIABLE
-```
 
-Drops a variable from the shell's variable map. By default, this will drop string variables from
-the string variable map. If the `-a` flag is specified, array variables will be dropped from the
-array variable map instead.
+## disown - disown processes
 
-## echo
+```txt
+SYNOPSIS
+    disown [ --help | -r | -h | -a ][PID...]
 
-```
-echo [ -h | --help ] [-e] [-n] [-s] [STRING]...
+DESCRIPTION
+    Disowning a process removes that process from the shell's background process table.
+
+OPTIONS
+    -r  Remove all running jobs from the background process list.
+    -h  Specifies that each job supplied will not receive the SIGHUP signal when the shell receives a SIGHUP.
+    -a  If no job IDs were supplied, remove all jobs from the background process list.
 ```
 
-Display a line of text
+## drop - delete some variables or arrays
 
-#### Options
+```txt
+SYNOPSIS
+    drop VARIABLES...
 
-- **-e**: enable the interpretation of backslash escapes
-- **-n**: do not output the trailing newline
-- **-s**: do not separate arguments with spaces
+DESCRIPTION
+    Deletes the variables given to it as arguments. The variables name must be supplied.
+    Instead of '$x' use 'x'.
+```
 
-#### Escape Sequences
+## echo - display text
 
-When the -e argument is used, the following sequences will be interpreted:
+```txt
+SYNOPSIS
+    echo [ -h | --help ] [-e] [-n] [-s] [STRING]...
 
-- **\\**: backslash
-- **\a**: alert (BEL)
-- **\b**: backspace (BS)
-- **\c**: produce no further output
-- **\e**: escape (ESC)
-- **\f**: form feed (FF)
-- **\n**: new line
-- **\r**: carriage return
-- **\t**: horizontal tab (HT)
-- **\v**: vertical tab (VT)
+DESCRIPTION
+    Print the STRING(s) to standard output.
 
-## ends-with
+OPTIONS
+    -e
+        enable the interpretation of backslash escapes
+    -n
+        do not output the trailing newline
+    -s
+        do not separate arguments with spaces
 
-```
-ends-with KEY [VALUE...]
+    Escape Sequences
+        When the -e argument is used, the following sequences will be interpreted:
+        \\  backslash
+        \a  alert (BEL)
+        \b  backspace (BS)
+        \c  produce no further output
+        \e  escape (ESC)
+        \f  form feed (FF)
+        \n  new line
+        \r  carriage return
+        \t  horizontal tab (HT)
+        \v  vertical tab (VT)
 ```
 
-Evaluates if the supplied argument ends with a given string
+## ends_with - check if a given string starts with another one
 
-## eq
+```txt
+SYNOPSIS
+    starts_with <PATTERN> tests...
 
+DESCRIPTION
+    Returns 0 if any argument starts_with contains the first argument, else returns 0
 ```
-eq [ -h | --help ] [not]
-```
 
-Returns 0 if the two arguments are equal
+## eval - evaluates the specified commands
 
-## eval
+```txt
+SYNOPSIS
+    eval COMMANDS...
 
+DESCRIPTION
+    eval evaluates the given arguments as a command. If more than one argument is given,
+    all arguments are joined using a space as a separator.
 ```
-eval COMMAND
-```
 
-evaluates the evaluated expression
+## exec - replace the shell with the given command
 
-## exists
+```txt
+SYNOPSIS
+    exec [-ch] [--help] [command [arguments ...]]
 
-```
-exists [-a ARRAY] [-b BINARY] [-d PATH] [--fn FUNCTION] [[-s] STRING]
+DESCRIPTION
+    Execute <command>, replacing the shell with the specified program.
+    The <arguments> following the command become the arguments to
+    <command>.
+
+OPTIONS
+    -c  Execute command with an empty environment.
 ```
 
-Performs tests on files and text
+## exists - check whether items exist
 
-## exec
+```txt
+SYNOPSIS
+    exists [EXPRESSION]
 
-```
-exec [-ch] [--help] [command [arguments ...]]
-```
+DESCRIPTION
+    Checks whether the given item exists and returns an exit status of 0 if it does, else 1.
 
-Execute a command, replacing the shell with the specified program.
-The arguments following the command become the arguments to the command.
+OPTIONS
+    -a ARRAY
+        array var is not empty
 
-#### options
+    -b BINARY
+        binary is in PATH
 
-- **-a ARRAY**:      array var is not empty
-- **-b BINARY**:     binary is in PATH
-- **-d PATH**:       path is a directory
-- **-f PATH**:       path is a file
-- **--fn FUNCTION**: function is defined
-- **-s STRING**:     string var is not empty
-- **STRING**:        string is not empty
+    -d PATH
+        path is a directory
+        This is the same as test -d
 
-## exit
+    -f PATH
+        path is a file
+        This is the same as test -f
 
-```
-exit
-```
+    --fn FUNCTION
+        function is defined
 
-Exits the current session and kills all background tasks
+    -s STRING
+        string var is not empty
 
-## false
+    STRING
+        string is not empty
+        This is the same as test -n
 
-```
-false
-```
+EXAMPLES
+    Test if the file exists:
+        exists -f FILE && echo 'The FILE exists' || echo 'The FILE does not exist'
 
-Do nothing, unsuccessfully
+    Test if some-command exists in the path and is executable:
+        exists -b some-command && echo 'some-command exists' || echo 'some-command does not exist'
 
-## fg
+    Test if variable exists AND is not empty
+        exists -s myVar && echo "myVar exists: $myVar" || echo 'myVar does not exist or is empty'
+        NOTE: Don't use the '$' sigil, but only the name of the variable to check
 
-```
-fg [PID]
+    Test if array exists and is not empty
+        exists -a myArr && echo "myArr exists: @myArr" || echo 'myArr does not exist or is empty'
+        NOTE: Don't use the '@' sigil, but only the name of the array to check
+
+    Test if a function named 'myFunc' exists
+        exists --fn myFunc && myFunc || echo 'No function with name myFunc found'
+
+AUTHOR
+    Written by Fabian Würfl.
+    Heavily based on implementation of the test builtin, which was written by Michael Murphy.
 ```
 
-Resumes and sets a background process as the active process. If no process is specified, the previous job will be the active process.
+## exit - exit the shell
 
-## fn
+```txt
+SYNOPSIS
+    exit
 
+DESCRIPTION
+    Makes ion exit. The exit status will be that of the last command executed.
 ```
-fn
-```
 
-Print list of functions
+## false - does nothing unsuccessfully
 
-## help
+```txt
+SYNOPSIS
+    false
 
-```
-help COMMAND
+DESCRIPTION
+    Sets the exit status to 1.
 ```
 
-Display helpful information about a given command or list commands if
-none specified
+## fg - bring job to the foreground
 
-## history
+```txt
+SYNOPSIS
+    fg PID
 
+DESCRIPTION
+    fg brings the specified job to foreground resuming it if it has stopped.
 ```
-history
-````
 
-Display a log of all commands previously executed
+## fn - print a short description of every defined function
 
-## ion_docs
+```txt
+SYNOPSIS
+    fn [ -h | --help ]
 
+DESCRIPTION
+    Prints all the defined functions along with their help, if provided
 ```
-ion_docs
-```
 
-Opens the Ion manual
+## help - get help for builtins
 
-## jobs
+```txt
+SYNOPSIS
+    help [BUILTIN]
 
+DESCRIPTION
+    Get the short description for BUILTIN. If no argument is provided, list all the builtins
 ```
-jobs
-```
 
-Displays all jobs that are attached to the background
+## eq, is - checks if two arguments are the same
 
-## matches
+```txt
+SYNOPSIS
+    is [ -h | --help ] [not]
 
-```
-matches VARIABLE REGEX
+DESCRIPTION
+    Returns 0 if the two arguments are equal
+
+OPTIONS
+    not
+        returns 0 if the two arguments are not equal.
 ```
 
-Checks if a string matches a given regex
+## isatty - checks if the provided file descriptor is a tty
 
-## not
+```txt
+SYNOPSIS
+    isatty [FD]
 
+DESCRIPTION
+    Returns 0 exit status if the supplied file descriptor is a tty.
 ```
-not COMMAND
-```
-Reverses the exit status value of the given command.
 
-## or
+## jobs - list all jobs running in the background
 
-```
-COMMAND; or COMMAND
+```txt
+SYNOPSIS
+    jobs
+
+DESCRIPTION
+    Prints a list of all jobs running in the background.
 ```
 
-Execute the command if the shell's previous status is failure
+## matches - checks if the second argument contains any proportion of the first
 
-## popd
+```txt
+SYNOPSIS
+    matches VALUE VALUE
 
-```
-popd
+DESCRIPTION
+    Makes the exit status equal 0 if the first argument contains the second.
+    Otherwise matches makes the exit status equal 1.
+
+EXAMPLES
+    Returns true:
+        matches xs x
+    Returns false:
+        matches x xs
 ```
 
-Pop a directory from the stack and returns to the previous directory
+## popd - shift through the directory stack
 
-## pushd
+```txt
+SYNOPSIS
+    popd
 
+DESCRIPTION
+    popd removes the top directory from the directory stack and changes the working directory to the new top directory.
+    pushd adds directories to the stack.
 ```
-pushd DIRECTORY
-```
-Push a directory to the stack.
 
-## random
+## pushd - push a directory to the directory stack
 
-```
-random
-random SEED
-random START END
-random START STEP END
-random choice [ITEMS...]
-```
+```txt
+SYNOPSIS
+    pushd DIRECTORY
 
-RANDOM generates a pseudo-random integer from a uniform distribution. The range (inclusive) is
-dependent on the arguments passed. No arguments indicate a range of [0; 32767]. If one argument
-is specified, the internal engine will be seeded with the argument for future invocations of
-RANDOM and no output will be produced. Two arguments indicate a range of [START; END]. Three
-arguments indicate a range of [START; END] with a spacing of STEP between possible outputs.
-RANDOM choice will select one random item from the succeeding arguments.
+DESCRIPTION
+    pushd pushes a directory to the directory stack.
+```
 
-> Due to limitations in the rand crate, seeding is not yet implemented
+## random - generate a random number
 
-## read
+```txt
+SYNOPSIS
+    random
+    random START END
 
+DESCRIPTION
+    random generates a pseudo-random integer. IT IS NOT SECURE.
+    The range depends on what arguments you pass. If no arguments are given the range is [0, 32767].
+    If two arguments are given the range is [START, END].
 ```
-read VARIABLE
 
-```
-Read some variables
+## read - read a line of input into some variables
 
-## set
+```txt
+SYNOPSIS
+    read VARIABLES...
 
+DESCRIPTION
+    For each variable reads from standard input and stores the results in the variable.
 ```
-set [ --help ] [-e | +e] [- | --] [STRING]...
-```
 
-Set or unset values of shell options and positional parameters.
-Shell options may be set using the '-' character,
-and unset using the '+' character.
+## set - Set or unset values of shell options and positional parameters.
 
-### OPTIONS
+```txt
+SYNOPSIS
+    set [ --help ] [-e | +e] [-x | +x] [-o [vi | emacs]] [- | --] [STRING]...
 
-- **e**: Exit immediately if a command exits with a non-zero status.
+DESCRIPTION
+    Shell options may be set using the '-' character, and unset using the '+' character.
 
-- **--**: Following arguments will be set as positional arguments in the shell.
-    - If no argument are supplied, arguments will be unset.
+OPTIONS
+    -e  Exit immediately if a command exits with a non-zero status.
 
-- **-**: Following arguments will be set as positional arguments in the shell.
-    - If no arguments are suppled, arguments will not be unset.
+    -o  Specifies that an argument will follow that sets the key map.
+        The keymap argument may be either `vi` or `emacs`.
 
-## source
+    -x  Specifies that commands will be printed as they are executed.
 
-```
-source [PATH]
+    --  Following arguments will be set as positional arguments in the shell.
+        If no argument are supplied, arguments will be unset.
+
+    -   Following arguments will be set as positional arguments in the shell.
+        If no arguments are suppled, arguments will not be unset.
 ```
 
-Evaluate the file following the command or re-initialize the init file
+## source - evaluates given file
 
-## starts-with
+```txt
+SYNOPSIS
+    source FILEPATH
 
+DESCRIPTION
+    Evaluates the commands in a specified file in the current shell. All changes in shell
+    variables will affect the current shell because of this.
 ```
-ends-with KEY [VALUE...]
-```
 
-Evaluates if the supplied argument starts with a given string
+## starts_with - check if a given string starts with another one
 
-## suspend
+```txt
+SYNOPSIS
+    starts_with <PATTERN> tests...
 
-```
-suspend
+DESCRIPTION
+    Returns 0 if any argument starts_with contains the first argument, else returns 0
 ```
 
-Suspends the shell with a SIGTSTOP signal
+## status - Evaluates the current runtime status
 
-## test
+```txt
+SYNOPSIS
+    status [ -h | --help ] [-l] [-i]
 
+DESCRIPTION
+    With no arguments status displays the current login information of the shell.
+
+OPTIONS
+    -l
+        returns true if the shell is a login shell. Also --is-login.
+    -i
+        returns true if the shell is interactive. Also --is-interactive.
+    -f
+        prints the filename of the currently running script or else stdio. Also --current-filename.
 ```
-test [EXPRESSION]
+
+## suspend - suspend the current shell
+
+```txt
+SYNOPSIS
+    suspend
+
+DESCRIPTION
+    Suspends the current shell by sending it the SIGTSTP signal,
+    returning to the parent process. It can be resumed by sending it SIGCONT.
 ```
 
-Performs tests on files and text
+## test - perform tests on files and text
 
-#### Options
+```txt
+SYNOPSIS
+    test [EXPRESSION]
 
-- **-n STRING**:         the length of STRING is nonzero
-- **STRING**:            equivalent to -n STRING
-- **-z STRING**:         the length of STRING is zero
-- **STRING = STRING**:   the strings are equivalent
-- **STRING != STRING**:  the strings are not equal
-- **INTEGER -eq INTEGER**: the integers are equal
-- **INTEGER -ge INTEGER**: the first INTEGER is greater than or equal to the first INTEGER
-- **INTEGER -gt INTEGER**: the first INTEGER is greater than the first INTEGER
-- **INTEGER -le INTEGER**: the first INTEGER is less than or equal to the first INTEGER
-- **INTEGER -lt INTEGER**: the first INTEGER is less than the first INTEGER
-- **INTEGER -ne INTEGER**: the first INTEGER is not equal to the first INTEGER
-- **FILE -ef FILE**:     both files have the same device and inode numbers
-- **FILE -nt FILE**:     the first FILE is newer than the second FILE
-- **FILE -ot FILE**:     the first file is older than the second FILE
-- **-b FILE**:          FILE exists and is a block device
-- **-c FILE**:           FILE exists and is a character device
-- **-d FILE**:           FILE exists and is a directory
-- **-e FILE**:           FILE exists
-- **-f FILE**:           FILE exists and is a regular file
-- **-h FILE**:           FILE exists and is a symbolic link (same as -L)
-- **-L FILE**:           FILE exists and is a symbolic link (same as -h)
-- **-r FILE**:           FILE exists and read permission is granted
-- **-s FILE**:           FILE exists and has a file size greater than zero
-- **-S FILE**:           FILE exists and is a socket
-- **-w FILE**:           FILE exists and write permission is granted
-- **-x FILE**:           FILE exists and execute (or search) permission is granted
+DESCRIPTION
+    Tests the expressions given and returns an exit status of 0 if true, else 1.
 
-## true
+OPTIONS
+    --help
+        prints this help text
 
-```
-true
-```
+    -n STRING
+        the length of STRING is nonzero
 
-Do nothing, successfully
+    STRING
+        equivalent to -n STRING
 
-## unalias
+    -z STRING
+        the length of STRING is zero
 
-```
-unalias VARIABLE...
-```
+    STRING = STRING
+        the strings are equivalent
 
-Delete an alias
+    STRING != STRING
+        the strings are not equal
 
-## wait
+    INTEGER -eq INTEGER
+        the integers are equal
 
-```
-wait
-```
+    INTEGER -ge INTEGER
+        the first INTEGER is greater than or equal to the first INTEGER
 
-Waits until all running background processes have completed
+    INTEGER -gt INTEGER
+        the first INTEGER is greater than the first INTEGER
 
-## which
+    INTEGER -le INTEGER
+        the first INTEGER is less than or equal to the first INTEGER
 
-```
-which COMMAND
-```
+    INTEGER -lt INTEGER
+        the first INTEGER is less than the first INTEGER
 
-Shows the full path of commands
+    INTEGER -ne INTEGER
+        the first INTEGER is not equal to the first INTEGER
 
-## status
+    FILE -ef FILE
+        both files have the same device and inode numbers
 
-```
-status COMMAND
-```
+    FILE -nt FILE
+        the first FILE is newer than the second FILE
 
-Evaluates the current runtime status
+    FILE -ot FILE
+        the first file is older than the second FILE
 
-### Options
+    -b FILE
+        FILE exists and is a block device
 
-- **-l**: returns true if shell is a login shell
-- **-i**: returns true if shell is interactive
-- **-f**: prints the filename of the currently running script or stdio
+    -c FILE
+        FILE exists and is a character device
 
-## bool
+    -d FILE
+        FILE exists and is a directory
 
-```
-bool VALUE
-```
+    -e FILE
+        FILE exists
 
-If the value is '1' or 'true', returns the 0 exit status
+    -f FILE
+        FILE exists and is a regular file
 
-## is
+    -h FILE
+        FILE exists and is a symbolic link (same as -L)
 
-```
-is VALUE VALUE
+    -L FILE
+        FILE exists and is a symbolic link (same as -h)
+
+    -r FILE
+        FILE exists and read permission is granted
+
+    -s FILE
+        FILE exists and has a file size greater than zero
+
+    -S FILE
+        FILE exists and is a socket
+
+    -w FILE
+        FILE exists and write permission is granted
+
+    -x FILE
+        FILE exists and execute (or search) permission is granted
+
+EXAMPLES
+    Test if the file exists:
+        test -e FILE && echo "The FILE exists" || echo "The FILE does not exist"
+
+    Test if the file exists and is a regular file, and if so, write to it:
+        test -f FILE && echo "Hello, FILE" >> FILE || echo "Cannot write to a directory"
+
+    Test if 10 is greater than 5:
+        test 10 -gt 5 && echo "10 is greater than 5" || echo "10 is not greater than 5"
+
+    Test if the user is running a 64-bit OS (POSIX environment only):
+        test $(getconf LONG_BIT) = 64 && echo "64-bit OS" || echo "32-bit OS"
+
+AUTHOR
+    Written by Michael Murphy.
 ```
 
-Returns 0 if the two arguments are equal
+## true - does nothing sucessfully
 
-## isatty
+```txt
+SYNOPSIS
+    true
 
+DESCRIPTION
+    Sets the exit status to 0.
 ```
-isatty [FD]
+
+## wait - wait for a background job
+
+```txt
+SYNOPSIS
+    wait
+
+DESCRIPTION
+    Wait for the background jobs to finish
 ```
 
-Returns 0 exit status if the supplied file descriptor is a tty.
+## which, type - locate a program file in the current user's path
 
-### Options
-- **not**: returns 0 if the two arguments are not equal.
+```txt
+SYNOPSIS
+    which PROGRAM
+
+DESCRIPTION
+    The which utility takes a list of command names and searches for the
+    alias/builtin/function/executable that would be executed if you ran that command.
+```
