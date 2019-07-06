@@ -151,61 +151,29 @@ pub trait Expander: Sized {
             _ => None,
         }
     }
+
     /// Get an array that exists in the shell.
     fn get_array(&self, value: &str) -> Result<Args, Self::Error> { self.expand_string(value) }
+
     /// Performs shell expansions to an input string, efficiently returning the final
     /// expanded form. Shells must provide their own batteries for expanding tilde
     /// and variable words.
     fn expand_string(&self, original: &str) -> Result<Args, Self::Error> {
+        if original.is_empty() {
+            return Ok(args![""]);
+        }
+
         let mut token_buffer = Vec::new();
         let mut contains_brace = false;
 
         for word in WordIterator::new(original, self, true) {
             let word = word?;
-            match word {
-                WordToken::Brace(_) => {
-                    contains_brace = true;
-                    token_buffer.push(word);
-                }
-                WordToken::ArrayVariable(data, contains_quote, selection) => {
-                    if let Select::Key(key) = selection {
-                        if key.contains(' ') {
-                            let keys = key.split(' ');
-                            token_buffer.reserve(2 * keys.size_hint().0);
-                            for index in keys {
-                                let select = index
-                                    .parse::<Select<types::Str>>()
-                                    .map_err(|_| Error::IndexParsingError(index.into()))?;
-                                token_buffer.push(WordToken::ArrayVariable(
-                                    data,
-                                    contains_quote,
-                                    select,
-                                ));
-                                token_buffer.push(WordToken::Whitespace(" "));
-                            }
-                            token_buffer.pop(); // Pop out the last unneeded whitespace token
-                        } else {
-                            token_buffer.push(WordToken::ArrayVariable(
-                                data,
-                                contains_quote,
-                                Select::Key(key),
-                            ));
-                        }
-                    } else {
-                        token_buffer.push(WordToken::ArrayVariable(
-                            data,
-                            contains_quote,
-                            selection,
-                        ));
-                    }
-                }
-                _ => token_buffer.push(word),
+            if let WordToken::Brace(_) = word {
+                contains_brace = true;
             }
+            token_buffer.push(word)
         }
 
-        if original.is_empty() {
-            token_buffer.push(WordToken::Normal("".into(), true, false));
-        }
         self.expand_tokens(&token_buffer, contains_brace)
     }
 }
@@ -361,6 +329,33 @@ trait ExpanderInternal: Expander {
             WordToken::Array(ref elements, ref index) => {
                 self.array_expand(elements, index).map_err(Into::into)
             }
+            WordToken::ArrayVariable(array, quoted, Select::Key(ref key)) if key.contains(' ') => {
+                if quoted {
+                    let mut output = types::Str::new();
+                    for index in key.split(' ') {
+                        let select = index
+                            .parse::<Select<types::Str>>()
+                            .map_err(|_| Error::IndexParsingError(index.into()))?;
+                        let _ = write!(
+                            &mut output,
+                            "{}",
+                            self.array(array, &select)?.iter().format(" ")
+                        );
+                        output.push(' ');
+                    }
+                    output.pop(); // Pop out the last unneeded whitespace token
+                    Ok(args![output])
+                } else {
+                    let mut out = Args::with_capacity(10);
+                    for index in key.split(' ') {
+                        let select = index
+                            .parse::<Select<types::Str>>()
+                            .map_err(|_| Error::IndexParsingError(index.into()))?;
+                        out.extend(self.array(array, &select)?);
+                    }
+                    Ok(out)
+                }
+            }
             WordToken::ArrayVariable(array, quoted, ref index) => {
                 let array = self.array(array, index)?;
                 if quoted {
@@ -503,6 +498,20 @@ trait ExpanderInternal: Expander {
                         "{}",
                         self.array_expand(elements, index)?.iter().format(" ")
                     );
+                }
+                WordToken::ArrayVariable(array, _, Select::Key(ref key)) if key.contains(' ') => {
+                    for index in key.split(' ') {
+                        let select = index
+                            .parse::<Select<types::Str>>()
+                            .map_err(|_| Error::IndexParsingError(index.into()))?;
+                        let _ = write!(
+                            &mut output,
+                            "{}",
+                            self.array(array, &select)?.iter().format(" ")
+                        );
+                        output.push(' ');
+                    }
+                    output.pop(); // Pop out the last unneeded whitespace token
                 }
                 WordToken::ArrayVariable(array, _, ref index) => {
                     let _ = write!(&mut output, "{}", self.array(array, index)?.iter().format(" "));
