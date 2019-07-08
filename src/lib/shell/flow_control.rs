@@ -157,6 +157,8 @@ pub enum Statement<'a> {
     Break,
     /// Next loop
     Continue,
+    /// Exit from the current function/script
+    Return(Option<types::Str>),
     /// Execute a pipeline
     Pipeline(Pipeline<Job<'a>>),
     /// Time the statement
@@ -195,6 +197,7 @@ impl<'a> fmt::Display for Statement<'a> {
                 Statement::And(_) => "And { .. }",
                 Statement::Or(_) => "Or { .. }",
                 Statement::Not(_) => "Not { .. }",
+                Statement::Return(_) => "Return",
                 Statement::Default => "Default",
             }
         )

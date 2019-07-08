@@ -21,6 +21,10 @@ pub fn is_valid_name(name: &str) -> bool {
 pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
     let cmd = code.trim();
     match cmd {
+        "return" => Ok(Statement::Return(None)),
+        _ if cmd.starts_with("return ") => {
+            Ok(Statement::Return(Some(cmd[7..].trim_start().into())))
+        }
         "end" => Ok(Statement::End),
         "break" => Ok(Statement::Break),
         "continue" => Ok(Statement::Continue),

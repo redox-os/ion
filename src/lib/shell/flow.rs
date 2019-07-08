@@ -5,6 +5,7 @@ use super::{
 };
 use crate::{
     assignments::is_array,
+    builtins::Status,
     expansion::{
         pipelines::{PipeItem, Pipeline},
         Expander, ForValueExpression,
@@ -23,6 +24,7 @@ pub enum Condition {
     Continue,
     Break,
     NoOp,
+    Return,
 }
 
 type Result = std::result::Result<Condition, IonError>;
@@ -287,8 +289,10 @@ impl<'a> Shell<'a> {
                     }
                 }
 
-                if self.execute_statements(statements)? == Condition::Break {
-                    break;
+                match self.execute_statements(statements)? {
+                    Condition::Break => break,
+                    Condition::Return => return Ok(Condition::Return),
+                    Condition::Continue | Condition::NoOp => (),
                 }
             };
         }
@@ -327,13 +331,15 @@ impl<'a> Shell<'a> {
     ) -> Result {
         loop {
             self.execute_statements(expression)?;
-            if !self.previous_status.is_success() {
+            if self.previous_status.is_failure() {
                 return Ok(Condition::NoOp);
             }
 
             // Cloning is needed so the statement can be re-iterated again if needed.
-            if self.execute_statements(statements)? == Condition::Break {
-                return Ok(Condition::NoOp);
+            match self.execute_statements(statements)? {
+                Condition::Break => return Ok(Condition::NoOp),
+                Condition::Return => return Ok(Condition::Return),
+                Condition::Continue | Condition::NoOp => (),
             }
         }
     }
@@ -350,10 +356,16 @@ impl<'a> Shell<'a> {
                 self.variables.set("?", self.previous_status);
             }
             Statement::While { expression, statements } => {
-                self.execute_while(expression, statements)?;
+                let condition = self.execute_while(expression, statements)?;
+                if condition != Condition::NoOp {
+                    return Ok(condition);
+                }
             }
             Statement::For { variables, values, statements } => {
-                self.execute_for(variables, values, statements)?;
+                let condition = self.execute_for(variables, values, statements)?;
+                if condition != Condition::NoOp {
+                    return Ok(condition);
+                }
             }
             Statement::If { expression, success, else_if, failure, .. } => {
                 let condition = self.execute_if(expression, success, else_if, failure)?;
@@ -441,6 +453,15 @@ impl<'a> Shell<'a> {
                 if condition != Condition::NoOp {
                     return Ok(condition);
                 }
+            }
+            Statement::Return(expression) => {
+                if let Some(expression) = expression {
+                    let value = self.expand_string(expression.as_ref())?.join(" ");
+                    if let Ok(status) = value.parse::<i32>() {
+                        self.previous_status = Status::from_exit_code(status);
+                    }
+                }
+                return Ok(Condition::Return);
             }
             _ => {}
         }
