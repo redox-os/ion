@@ -1,0 +1,42 @@
+fn ex
+    let a = 1
+    if true
+        if true
+            if true
+                while true
+                    return $a
+                    echo should not be printed
+                end
+                echo should not be printed
+            end
+            echo should not be printed
+        end
+        echo should not be printed
+    end
+    echo should not be printed
+end
+
+fn test_for
+    while true
+        return
+        echo should not be printed
+    end
+    echo should not be printed
+end
+
+fn ex_wrapper
+    if ex
+        echo should not be printed
+    else
+        echo should be printed
+    end
+    if test_for
+        echo should be printed
+    else
+        echo should not be printed
+    end
+end
+
+ex_wrapper
+echo should$(if true; return; else printf ' not'; end) be printed
+echo should be printed
