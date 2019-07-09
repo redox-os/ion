@@ -43,6 +43,8 @@ endif
 	cargo $(TOOLCHAIN_ARG) build $(ARGS) $(ARGSV)
 
 manual:
+	rm -rf manual/builtins
+	mkdir manual/builtins
 	cargo build --features man
 	echo -n "# Builtin commands" > manual/src/builtins.md
 	for man in manual/builtins/*; do \
