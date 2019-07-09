@@ -666,8 +666,11 @@ DESCRIPTION
     Wait for the background jobs to finish"
 )]
 pub fn wait(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    let _ = shell.wait_for_background();
-    Status::SUCCESS
+    if let Err(err) = shell.wait_for_background() {
+        Status::error(err.to_string())
+    } else {
+        Status::SUCCESS
+    }
 }
 
 #[builtin(
