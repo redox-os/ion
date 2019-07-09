@@ -17,6 +17,7 @@ use self::{
     directory_stack::DirectoryStack,
     flow_control::{Block, Function, FunctionError, Statement},
     pipe_exec::foreground,
+    sys::NULL_PATH,
     variables::Variables,
 };
 pub use self::{
@@ -30,7 +31,10 @@ pub use self::{
 use crate::{
     assignments::value_check,
     builtins::{BuiltinMap, Status},
-    expansion::{pipelines::Pipeline, Error as ExpansionError},
+    expansion::{
+        pipelines::{PipeType, Pipeline},
+        Error as ExpansionError,
+    },
     parser::{
         lexers::{Key, Primitive},
         Error as ParseError, Terminator,
@@ -290,6 +294,14 @@ impl<'a> Shell<'a> {
         let command_start_time = SystemTime::now();
 
         let mut pipeline = pipeline.expand(self)?;
+
+        let null_file =
+            if pipeline.pipe == PipeType::Disown { File::open(NULL_PATH).ok() } else { None };
+        let (stderr, stdout) = (
+            null_file.as_ref().or(self.stderr.as_ref()),
+            null_file.as_ref().or(self.stdout.as_ref()),
+        );
+
         for item in &mut pipeline.items {
             // TODO: Once the rust version is shifted to 1.33, use the transpose method
             item.job.stdin = if let Some(file) = &self.stdin {
@@ -297,12 +309,12 @@ impl<'a> Shell<'a> {
             } else {
                 None
             };
-            item.job.stdout = if let Some(file) = &self.stdout {
+            item.job.stdout = if let Some(file) = &stdout {
                 Some(file.try_clone().map_err(PipelineError::ClonePipeFailed)?)
             } else {
                 None
             };
-            item.job.stderr = if let Some(file) = &self.stderr {
+            item.job.stderr = if let Some(file) = &stderr {
                 Some(file.try_clone().map_err(PipelineError::ClonePipeFailed)?)
             } else {
                 None
