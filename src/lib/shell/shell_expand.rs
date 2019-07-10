@@ -29,21 +29,22 @@ impl<'a, 'b> Expander for Shell<'b> {
         let prev_stderr = self.stderr(null_file);
 
         // Execute the command
-        self.on_command(command).map_err(|err| Error::Subprocess(Box::new(err)))?;
+        let result = self.on_command(command).map_err(|err| Error::Subprocess(Box::new(err)));
 
         // Reset the pipes, droping the stdout
         self.stdout(prev_stdout);
         self.stderr(prev_stderr);
 
-        let mut string = String::with_capacity(1024);
-        let output = match reader.read_to_string(&mut string) {
-            Ok(_) => Ok(string.into()),
-            Err(why) => Err(Error::Subprocess(Box::new(PipelineError::CaptureFailed(why).into()))),
-        };
-
         // Ensure that the parent retains ownership of the terminal before exiting.
         let _ = tcsetpgrp(nix::libc::STDIN_FILENO, Pid::this());
-        output
+
+        result?;
+
+        let mut string = String::with_capacity(1024);
+        match reader.read_to_string(&mut string) {
+            Ok(_) => Ok(string.into()),
+            Err(why) => Err(Error::Subprocess(Box::new(PipelineError::CaptureFailed(why).into()))),
+        }
     }
 
     /// Expand a string variable given if its quoted / unquoted
