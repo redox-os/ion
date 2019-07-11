@@ -63,7 +63,7 @@ impl<T> FromIterator<Value<T>> for Value<T> {
 #[macro_export]
 macro_rules! array [
     ( $($x:expr), *) => ({
-        let mut _arr = crate::types::Array::new();
+        let mut _arr = $crate::types::Array::new();
         $(_arr.push($x.into());)*
         _arr
     })
