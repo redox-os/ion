@@ -4,7 +4,6 @@ use crate::{
     shell::IonError,
     types::{self, Array},
 };
-use directories::BaseDirs;
 use nix::unistd::{geteuid, gethostname, getpid, getuid};
 use scopes::{Namespace, Scope, Scopes};
 use std::{env, rc::Rc};
@@ -250,13 +249,6 @@ impl<'a> Default for Variables<'a> {
         map.set("EUID", Value::Str(geteuid().to_string().into()));
 
         map.set("CDPATH", Array::new());
-
-        // Initialize the HOME variable
-        if let Some(base_dirs) = BaseDirs::new() {
-            env::set_var("HOME", base_dirs.home_dir().to_string_lossy().as_ref());
-        } else {
-            env::set_var("HOME", "?");
-        }
 
         // Initialize the HOST variable
         let mut host_name = [0_u8; 512];

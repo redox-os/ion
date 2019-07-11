@@ -86,7 +86,7 @@ auto_enums = "0.5.5"
 structopt = "^0.2"
 atty = "0.2"
 permutate = "0.3"
-directories = "2.0"
+xdg = "2.1"
 nix = "0.14"
 
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]

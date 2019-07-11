@@ -1,4 +1,3 @@
-use directories::BaseDirs;
 use err_derive::Error;
 use std::{
     collections::VecDeque,
@@ -6,6 +5,7 @@ use std::{
     io,
     path::{Component, Path, PathBuf},
 };
+use users::os::unix::UserExt;
 
 #[derive(Debug, Error)]
 pub enum DirStackError {
@@ -52,7 +52,7 @@ impl Default for DirectoryStack {
 }
 
 impl DirectoryStack {
-    fn normalize_path(&mut self, dir: &str) -> PathBuf {
+    fn normalize_path(&mut self, dir: &Path) -> PathBuf {
         // Create a clone of the current directory.
         let mut new_dir = match self.dirs.front() {
             Some(cur_dir) => cur_dir.clone(),
@@ -61,7 +61,7 @@ impl DirectoryStack {
 
         // Iterate through components of the specified directory
         // and calculate the new path based on them.
-        for component in Path::new(dir).components() {
+        for component in dir.components() {
             match component {
                 Component::CurDir => {}
                 Component::ParentDir => {
@@ -127,7 +127,7 @@ impl DirectoryStack {
         }
     }
 
-    pub fn change_and_push_dir(&mut self, dir: &str) -> Result<(), DirStackError> {
+    pub fn change_and_push_dir(&mut self, dir: &Path) -> Result<(), DirStackError> {
         let new_dir = self.normalize_path(dir);
         set_current_dir_ion(&new_dir)?;
         self.push_dir(new_dir);
@@ -143,15 +143,17 @@ impl DirectoryStack {
 
         self.dirs.remove(0);
         println!("{}", prev);
-        self.change_and_push_dir(&prev)
+        self.change_and_push_dir(&Path::new(&prev))
     }
 
     pub fn switch_to_home_directory(&mut self) -> Result<(), DirStackError> {
-        BaseDirs::new().map_or(Err(DirStackError::FailedFetchHome), |base_dir| {
-            base_dir.home_dir().to_str().map_or(Err(DirStackError::PathConversionFailed), |home| {
-                self.change_and_push_dir(home)
-            })
-        })
+        match env::var_os("HOME") {
+            Some(home) => self.change_and_push_dir(Path::new(&home)),
+            None => users::get_user_by_uid(users::get_current_uid())
+                .map_or(Err(DirStackError::FailedFetchHome), |user| {
+                    self.change_and_push_dir(user.home_dir())
+                }),
+        }
     }
 
     pub fn swap(&mut self, index: usize) -> Result<(), DirStackError> {
@@ -164,7 +166,7 @@ impl DirectoryStack {
 
     pub fn pushd(&mut self, path: &Path, keep_front: bool) -> Result<(), DirStackError> {
         let index = if keep_front { 1 } else { 0 };
-        let new_dir = self.normalize_path(path.to_str().unwrap());
+        let new_dir = self.normalize_path(path);
         self.insert_dir(index, new_dir);
         self.set_current_dir_by_index(index)
     }
