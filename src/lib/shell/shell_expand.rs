@@ -8,6 +8,7 @@ use crate::{
     expansion::{Error, Expander, Result, Select},
     types,
 };
+use directories::BaseDirs;
 use nix::unistd::{tcsetpgrp, Pid};
 use std::{env, fs::File, io::Read, iter::FromIterator};
 
@@ -210,8 +211,10 @@ impl<'a, 'b> Expander for Shell<'b> {
         let (tilde_prefix, rest) = input[1..].split_at(separator.unwrap_or(input.len() - 1));
 
         match tilde_prefix {
-            "" => dirs::home_dir()
-                .map(|home| types::Str::from(home.to_string_lossy().as_ref()) + rest)
+            "" => BaseDirs::new()
+                .map(|base_dirs| {
+                    types::Str::from(base_dirs.home_dir().to_string_lossy().as_ref()) + rest
+                })
                 .ok_or(Error::HomeNotFound),
             "+" => Ok((env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest).into()),
             "-" => Ok((self.variables.get_str("OLDPWD")?.to_string() + rest).into()),

@@ -1,3 +1,4 @@
+use directories::BaseDirs;
 use err_derive::Error;
 use std::{
     collections::VecDeque,
@@ -146,8 +147,8 @@ impl DirectoryStack {
     }
 
     pub fn switch_to_home_directory(&mut self) -> Result<(), DirStackError> {
-        dirs::home_dir().map_or(Err(DirStackError::FailedFetchHome), |home| {
-            home.to_str().map_or(Err(DirStackError::PathConversionFailed), |home| {
+        BaseDirs::new().map_or(Err(DirStackError::FailedFetchHome), |base_dir| {
+            base_dir.home_dir().to_str().map_or(Err(DirStackError::PathConversionFailed), |home| {
                 self.change_and_push_dir(home)
             })
         })

@@ -40,7 +40,7 @@ serial_test = "*"
 serial_test_derive = "*"
 # window example
 piston-ai_behavior = "0.31"
-piston_window = "0.99"
+piston_window = "0.100"
 piston2d-sprite = "0.55"
 
 [[bench]]
@@ -69,12 +69,11 @@ err-derive = "0.1"
 glob = "0.3"
 itoa = "0.4"
 liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }
-rand = "0.6.1"
+rand = "0.7"
 regex = "1.1"
 small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"] }
 smallvec = "0.6"
 unicode-segmentation = "1.2"
-xdg = "2.2.0"
 ion-ranges = { version = "0.1", path = "members/ranges" }
 scopes = { version = "0.1", path = "members/scopes-rs" }
 types-rs = { version = "0.1", path = "members/types-rs" }
@@ -87,7 +86,7 @@ auto_enums = "0.5.5"
 structopt = "^0.2"
 atty = "0.2"
 permutate = "0.3"
-dirs = "1.0"
+directories = "2.0"
 nix = "0.14"
 
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]

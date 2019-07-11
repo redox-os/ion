@@ -1,6 +1,6 @@
 use small;
 use smallvec::SmallVec;
-pub use types_rs::types::*;
+pub use types_rs::{array, types::*};
 
 pub use crate::shell::flow_control::Function;
 /// A owned version of a set of arguments for spawning a command
@@ -29,7 +29,7 @@ pub type Args = SmallVec<[small::String; 4]>;
 #[macro_export]
 macro_rules! args [
     ( $($x:expr), *) => ({
-        let mut _arr = crate::types::Args::new();
+        let mut _arr = $crate::types::Args::new();
         $(_arr.push($x.into());)*
         _arr
     })

@@ -4,12 +4,11 @@ use crate::{
     shell::IonError,
     types::{self, Array},
 };
+use directories::BaseDirs;
 use nix::unistd::{geteuid, gethostname, getpid, getuid};
 use scopes::{Namespace, Scope, Scopes};
 use std::{env, rc::Rc};
-use types_rs::array;
 use unicode_segmentation::UnicodeSegmentation;
-use xdg::BaseDirectories;
 
 /// Contain a dynamically-typed variable value
 pub use types_rs::Value;
@@ -250,26 +249,14 @@ impl<'a> Default for Variables<'a> {
         map.set("UID", Value::Str(getuid().to_string().into()));
         map.set("EUID", Value::Str(geteuid().to_string().into()));
 
-        // Initialize the HISTFILE variable
-        if let Ok(base_dirs) = BaseDirectories::with_prefix("ion") {
-            if let Ok(path) = base_dirs.place_data_file("history") {
-                map.set("HISTFILE", path.to_str().unwrap_or("?"));
-                map.set("HISTFILE_ENABLED", "1");
-            }
-        }
-
-        // History Timestamps enabled variable, disabled by default
-        map.set("HISTORY_TIMESTAMP", "0");
-
-        map.set("HISTORY_IGNORE", array!["no_such_command", "whitespace", "duplicates"]);
-
         map.set("CDPATH", Array::new());
 
         // Initialize the HOME variable
-        dirs::home_dir().map_or_else(
-            || env::set_var("HOME", "?"),
-            |path| env::set_var("HOME", path.to_str().unwrap_or("?")),
-        );
+        if let Some(base_dirs) = BaseDirs::new() {
+            env::set_var("HOME", base_dirs.home_dir().to_string_lossy().as_ref());
+        } else {
+            env::set_var("HOME", "?");
+        }
 
         // Initialize the HOST variable
         let mut host_name = [0_u8; 512];
@@ -277,7 +264,8 @@ impl<'a> Default for Variables<'a> {
             "HOST",
             &gethostname(&mut host_name)
                 .ok()
-                .map_or("?", |hostname| hostname.to_str().unwrap_or("?")),
+                .map_or_else(|| "?".into(), |hostname| hostname.to_string_lossy())
+                .as_ref(),
         );
 
         Variables(map)
