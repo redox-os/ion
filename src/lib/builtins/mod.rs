@@ -45,7 +45,7 @@ use liner::{Completer, Context};
 use std::{
     borrow::Cow,
     io::{self, BufRead},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
@@ -283,7 +283,7 @@ DESCRIPTION
 pub fn cd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let err = match args.get(1) {
         Some(dir) => {
-            let dir = dir.as_ref();
+            let dir = dir.as_str();
             if let Some(Value::Array(cdpath)) = shell.variables().get("CDPATH").cloned() {
                 if dir == "-" {
                     shell.dir_stack_mut().switch_to_previous_directory()
@@ -291,16 +291,18 @@ pub fn cd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                     let check_cdpath_first = cdpath
                         .iter()
                         .map(|path| {
-                            let path_dir = format!("{}/{}", path, dir);
+                            let path_dir = Path::new(&path.to_string()).join(dir);
                             shell.dir_stack_mut().change_and_push_dir(&path_dir)
                         })
                         .find(Result::is_ok)
-                        .unwrap_or_else(|| shell.dir_stack_mut().change_and_push_dir(dir));
+                        .unwrap_or_else(|| {
+                            shell.dir_stack_mut().change_and_push_dir(&Path::new(dir))
+                        });
                     shell.dir_stack_mut().popd(1);
                     check_cdpath_first
                 }
             } else {
-                shell.dir_stack_mut().change_and_push_dir(dir)
+                shell.dir_stack_mut().change_and_push_dir(&Path::new(dir))
             }
         }
         None => shell.dir_stack_mut().switch_to_home_directory(),

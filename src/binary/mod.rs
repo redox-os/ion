@@ -7,7 +7,6 @@ mod lexer;
 mod prompt;
 mod readln;
 
-use directories::ProjectDirs;
 use ion_shell::{
     builtins::{man_pages, BuiltinFunction, Status},
     expansion::Expander,
@@ -24,6 +23,7 @@ use std::{
     path::Path,
     rc::Rc,
 };
+use xdg::BaseDirectories;
 
 #[cfg(not(feature = "advanced_arg_parsing"))]
 pub const MAN_ION: &str = r#"Ion - The Ion Shell 1.0.0-alpha
@@ -123,10 +123,8 @@ impl<'a> InteractiveShell<'a> {
         })));
     }
 
-    fn create_config_file(path: &Path) -> Result<(), io::Error> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
+    fn create_config_file(base_dirs: &BaseDirectories) -> Result<(), io::Error> {
+        let path = base_dirs.place_config_file(Self::CONFIG_FILE_NAME)?;
         OpenOptions::new().write(true).create_new(true).open(path).map(|_| ())
     }
 
@@ -233,22 +231,19 @@ impl<'a> InteractiveShell<'a> {
             .add("exec", exec, "Replace the shell with the given command.")
             .add("huponexit", set_huponexit, "Hangup the shell's background jobs on exit");
 
-        match ProjectDirs::from("org", "Redox OS", "ion") {
-            Some(project_dir) => {
+        match BaseDirectories::with_prefix("ion") {
+            Ok(project_dir) => {
                 Self::exec_init_file(&project_dir, &mut shell);
                 Self::load_history(&project_dir, &mut shell, &mut context.borrow_mut());
             }
-            None => eprintln!("ion: unable to get base directory"),
+            Err(err) => eprintln!("ion: unable to get xdg base directory: {}", err),
         }
 
         InteractiveShell { context, shell: RefCell::new(shell), terminated, huponexit }
             .exec(prep_for_exit)
     }
 
-    fn load_history(project_dir: &ProjectDirs, shell: &mut Shell, context: &mut Context) {
-        // Initialize the HISTFILE variable
-        let path = project_dir.data_dir().join("history");
-        shell.variables_mut().set("HISTFILE", path.to_string_lossy().as_ref());
+    fn load_history(project_dir: &BaseDirectories, shell: &mut Shell, context: &mut Context) {
         shell.variables_mut().set("HISTFILE_ENABLED", "1");
 
         // History Timestamps enabled variable, disabled by default
@@ -256,22 +251,32 @@ impl<'a> InteractiveShell<'a> {
         shell
             .variables_mut()
             .set("HISTORY_IGNORE", array!["no_such_command", "whitespace", "duplicates"]);
-        if !path.exists() {
-            eprintln!("ion: creating history file at \"{}\"", path.display());
+        // Initialize the HISTFILE variable
+        if let Some(histfile) = project_dir.find_data_file("history") {
+            shell.variables_mut().set("HISTFILE", histfile.to_string_lossy().as_ref());
+            let _ = context.history.set_file_name_and_load_history(&histfile);
+        } else {
+            match project_dir.place_data_file("history") {
+                Ok(histfile) => {
+                    eprintln!("ion: creating history file at \"{}\"", histfile.display());
+                    shell.variables_mut().set("HISTFILE", histfile.to_string_lossy().as_ref());
+                    let _ = context.history.set_file_name_and_load_history(&histfile);
+                }
+                Err(err) => println!("ion: could not create history file: {}", err),
+            }
         }
-        let _ = context.history.set_file_name_and_load_history(&path);
     }
 
-    fn exec_init_file(project_dir: &ProjectDirs, shell: &mut Shell) {
-        let initrc = project_dir.config_dir().join(Self::CONFIG_FILE_NAME);
-        match fs::File::open(&initrc) {
-            Ok(script) => {
+    fn exec_init_file(project_dir: &BaseDirectories, shell: &mut Shell) {
+        let initrc = project_dir.find_config_file(Self::CONFIG_FILE_NAME);
+        match initrc.and_then(|initrc| fs::File::open(&initrc).ok()) {
+            Some(script) => {
                 if let Err(err) = shell.execute_command(std::io::BufReader::new(script)) {
                     eprintln!("ion: could not exec initrc: {}", err);
                 }
             }
-            Err(_) => {
-                if let Err(err) = Self::create_config_file(&initrc) {
+            None => {
+                if let Err(err) = Self::create_config_file(project_dir) {
                     eprintln!("ion: could not create config file: {}", err);
                 }
             }

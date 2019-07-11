@@ -1,16 +1,13 @@
 use super::{
-    pipe_exec::create_pipe,
-    sys::{variables, NULL_PATH},
-    variables::Value,
-    IonError, PipelineError, Shell,
+    pipe_exec::create_pipe, sys::NULL_PATH, variables::Value, IonError, PipelineError, Shell,
 };
 use crate::{
     expansion::{Error, Expander, Result, Select},
     types,
 };
-use directories::BaseDirs;
 use nix::unistd::{tcsetpgrp, Pid};
 use std::{env, fs::File, io::Read, iter::FromIterator};
+use users::os::unix::UserExt;
 
 impl<'a, 'b> Expander for Shell<'b> {
     type Error = IonError;
@@ -211,13 +208,8 @@ impl<'a, 'b> Expander for Shell<'b> {
         let (tilde_prefix, rest) = input[1..].split_at(separator.unwrap_or(input.len() - 1));
 
         match tilde_prefix {
-            "" => BaseDirs::new()
-                .map(|base_dirs| {
-                    types::Str::from(base_dirs.home_dir().to_string_lossy().as_ref()) + rest
-                })
-                .ok_or(Error::HomeNotFound),
-            "+" => Ok((env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest).into()),
-            "-" => Ok((self.variables.get_str("OLDPWD")?.to_string() + rest).into()),
+            "+" => Ok(env::var("PWD").unwrap_or_else(|_| "?".into()).into()),
+            "-" => Ok(self.variables.get_str("OLDPWD")?.into()),
             _ => {
                 let (neg, tilde_num) = if tilde_prefix.starts_with('+') {
                     (false, &tilde_prefix[1..])
@@ -235,11 +227,20 @@ impl<'a, 'b> Expander for Shell<'b> {
                     }
                     .map(|path| path.to_str().unwrap().into())
                     .ok_or_else(|| Error::OutOfStack(num)),
-                    Err(_) => variables::get_user_home(tilde_prefix)
-                        .map(|home| (home + rest).into())
-                        .ok_or(Error::HomeNotFound),
+                    Err(_) => {
+                        let user = if tilde_prefix.is_empty() {
+                            users::get_user_by_uid(users::get_current_uid())
+                        } else {
+                            users::get_user_by_name(tilde_prefix)
+                        };
+                        match user {
+                            Some(user) => Ok(user.home_dir().to_string_lossy().as_ref().into()),
+                            None => Err(Error::HomeNotFound),
+                        }
+                    }
                 }
             }
         }
+        .map(|home: types::Str| home + rest)
     }
 }
