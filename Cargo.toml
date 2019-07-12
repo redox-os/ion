@@ -38,6 +38,8 @@ members = [ "members/builtins-proc", "members/ranges", "members/scopes-rs", "mem
 criterion = "0.2"
 serial_test = "*"
 serial_test_derive = "*"
+
+[target."cfg(not(target_os = \"redox\"))".dev-dependencies]
 # window example
 piston-ai_behavior = "0.31"
 piston_window = "0.100"
@@ -86,7 +88,7 @@ structopt = "^0.2"
 atty = "0.2"
 permutate = "0.3"
 xdg = "2.1"
-nix = "0.14"
+nix = { path = "../nix" }
 
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
 users = "0.9"
