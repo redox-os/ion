@@ -428,6 +428,7 @@ fn test_file_is_directory() {
 }
 
 #[test]
+#[cfg(not(target_os = "redox"))]
 fn test_file_is_symlink() {
     assert_eq!(file_is_symlink("testing/symlink"), true);
     assert_eq!(file_is_symlink("testing/empty_file"), false);

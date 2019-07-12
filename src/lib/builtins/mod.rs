@@ -807,9 +807,6 @@ DESCRIPTION
 pub fn isatty(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     if args.len() > 1 {
         // sys::isatty expects a usize if compiled for redox but otherwise a i32.
-        #[cfg(target_os = "redox")]
-        let pid = args[1].parse::<usize>();
-        #[cfg(not(target_os = "redox"))]
         let pid = args[1].parse::<i32>();
 
         match pid {

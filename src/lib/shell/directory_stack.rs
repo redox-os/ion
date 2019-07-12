@@ -5,6 +5,7 @@ use std::{
     io,
     path::{Component, Path, PathBuf},
 };
+#[cfg(not(target_os = "redox"))]
 use users::os::unix::UserExt;
 
 #[derive(Debug, Error)]
@@ -149,10 +150,13 @@ impl DirectoryStack {
     pub fn switch_to_home_directory(&mut self) -> Result<(), DirStackError> {
         match env::var_os("HOME") {
             Some(home) => self.change_and_push_dir(Path::new(&home)),
+            #[cfg(not(target_os = "redox"))]
             None => users::get_user_by_uid(users::get_current_uid())
                 .map_or(Err(DirStackError::FailedFetchHome), |user| {
                     self.change_and_push_dir(user.home_dir())
                 }),
+            #[cfg(target_os = "redox")]
+            None => Err(DirStackError::FailedFetchHome),
         }
     }
 

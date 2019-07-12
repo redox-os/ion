@@ -322,7 +322,9 @@ mod tests {
         let mut completer = IonFileCompleter::new(None, &shell);
         assert_eq!(completer.completions("testing"), vec!["testing/"]);
         assert_eq!(completer.completions("testing/file"), vec!["testing/file_with_text"]);
-        assert_eq!(completer.completions("~"), vec!["~/"]);
+        if cfg!(not(target_os = "redox")) {
+            assert_eq!(completer.completions("~"), vec!["~/"]);
+        }
         assert_eq!(completer.completions("tes/fil"), vec!["testing/file_with_text"]);
     }
 }
