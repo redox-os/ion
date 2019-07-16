@@ -57,6 +57,12 @@ struct CommandLineArgs {
     /// Print commands before execution
     #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-x"))]
     print_commands: bool,
+    /// Use a fake interactive mode, where errors don't exit the shell
+    #[cfg_attr(
+        feature = "advanced_arg_parsing",
+        structopt(short = "-f", long = "--fake-interactive")
+    )]
+    fake_interactive: bool,
     /// Force interactive mode
     #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-i", long = "--interactive"))]
     interactive: bool,
@@ -88,8 +94,10 @@ fn parse_args() -> CommandLineArgs {
     let mut no_execute = false;
     let mut print_commands = false;
     let mut interactive = false;
+    let mut fake_interactive = false;
     let mut version = false;
     let mut additional_arguments = Vec::new();
+
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-o" => {
@@ -115,6 +123,7 @@ fn parse_args() -> CommandLineArgs {
                 process::exit(0);
             }
             "-i" | "--interactive" => interactive = true,
+            "-f" | "--fake-interactive" => fake_interactive = true,
             _ => {
                 additional_arguments.push(arg);
             }
@@ -124,6 +133,7 @@ fn parse_args() -> CommandLineArgs {
         key_bindings,
         print_commands,
         interactive,
+        fake_interactive,
         no_execute,
         command,
         version,
@@ -213,6 +223,13 @@ fn main() {
         }
         interactive.add_callbacks();
         interactive.execute_interactive();
+    } else if command_line_args.fake_interactive {
+        let mut reader = BufReader::new(stdin());
+        loop {
+            if let Err(err) = shell.execute_command(&mut reader) {
+                eprintln!("ion: {}", err);
+            }
+        }
     } else {
         shell.execute_command(BufReader::new(stdin()))
     }

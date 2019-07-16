@@ -34,11 +34,12 @@ USAGE:
     ion [FLAGS] [OPTIONS] [args]...
 
 FLAGS:
-    -h, --help           Prints help information
-    -i, --interactive    Force interactive mode
-    -n, --no-execute     Do not execute any commands, perform only syntax checking
-    -x                   Print commands before execution
-    -v, --version        Print the version, platform and revision of Ion then exit
+    -f, --fake-interactive    Use a fake interactive mode, where errors don't exit the shell
+    -h, --help                Prints help information
+    -i, --interactive         Force interactive mode
+    -n, --no-execute          Do not execute any commands, perform only syntax checking
+    -x                        Print commands before execution
+    -v, --version             Print the version, platform and revision of Ion then exit
 
 OPTIONS:
     -c <command>             Evaluate given commands instead of reading from the commandline
