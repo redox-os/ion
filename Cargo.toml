@@ -88,7 +88,7 @@ structopt = "^0.2"
 atty = "0.2"
 permutate = "0.3"
 xdg = "2.1"
-nix = { path = "../nix" }
+nix = "0.14"
 
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
 users = "0.9"

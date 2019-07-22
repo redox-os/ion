@@ -5,12 +5,11 @@ variables:
 before_script:
   - apt-get update -qq
   - apt-get install -qq build-essential curl git
-cache:
-  paths:
-    - cargo/
-    - target/
-
 format:
+  cache:
+    paths:
+      - cargo/
+      - target/
   script:
     - rustup default nightly
     - rustup component add rustfmt
@@ -18,11 +17,19 @@ format:
 
 linux:
   image: 'rust:1.35.0'
+  cache:
+    paths:
+      - cargo/
+      - target/
   script:
     - cargo check
     - FULL=1 make tests
 
 linux:stable:
+  cache:
+    paths:
+      - cargo/
+      - target/
   script:
     - cargo check
     - TOOLCHAIN= make tests
