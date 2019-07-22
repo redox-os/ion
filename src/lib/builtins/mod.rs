@@ -296,13 +296,13 @@ pub fn cd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                         })
                         .find(Result::is_ok)
                         .unwrap_or_else(|| {
-                            shell.dir_stack_mut().change_and_push_dir(&Path::new(dir))
+                            shell.dir_stack_mut().change_and_push_dir(Path::new(dir))
                         });
                     shell.dir_stack_mut().popd(1);
                     check_cdpath_first
                 }
             } else {
-                shell.dir_stack_mut().change_and_push_dir(&Path::new(dir))
+                shell.dir_stack_mut().change_and_push_dir(Path::new(dir))
             }
         }
         None => shell.dir_stack_mut().switch_to_home_directory(),

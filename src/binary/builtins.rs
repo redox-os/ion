@@ -18,6 +18,29 @@ pub fn suspend(args: &[Str], _shell: &mut Shell<'_>) -> Status {
 }
 
 #[builtin(
+    desc = "toggle debug mode (print commands)",
+    man = "
+SYNOPSIS
+    debug on | off
+
+DESCRIPTION
+    Turn on or off the feature to print each command executed to stderr (debug mode)."
+)]
+pub fn debug(args: &[Str], shell: &mut Shell<'_>) -> Status {
+    match args.get(1).map(Str::as_str) {
+        Some("on") => shell.set_pre_command(Some(Box::new(|_shell, pipeline| {
+            // A string representing the command is stored here.
+            eprintln!("> {}", pipeline);
+        }))),
+        Some("off") => shell.set_pre_command(None),
+        _ => {
+            return Status::bad_argument("debug: the debug builtin requires on or off as argument")
+        }
+    }
+    Status::SUCCESS
+}
+
+#[builtin(
     desc = "exit the shell",
     man = "
 SYNOPSIS

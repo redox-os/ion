@@ -209,7 +209,7 @@ impl<'a, 'b> Expander for Shell<'b> {
 
         match tilde_prefix {
             "+" => Ok(env::var("PWD").unwrap_or_else(|_| "?".into()).into()),
-            "-" => Ok(self.variables.get_str("OLDPWD")?.into()),
+            "-" => Ok(self.variables.get_str("OLDPWD")?),
             _ => {
                 let (neg, tilde_num) = if tilde_prefix.starts_with('+') {
                     (false, &tilde_prefix[1..])
@@ -219,24 +219,23 @@ impl<'a, 'b> Expander for Shell<'b> {
                     (false, tilde_prefix)
                 };
 
-                match tilde_num.parse() {
-                    Ok(num) => if neg {
+                if let Ok(num) = tilde_num.parse() {
+                    if neg {
                         self.directory_stack.dir_from_top(num)
                     } else {
                         self.directory_stack.dir_from_bottom(num)
                     }
                     .map(|path| path.to_str().unwrap().into())
-                    .ok_or_else(|| Error::OutOfStack(num)),
-                    Err(_) => {
-                        let user = if tilde_prefix.is_empty() {
-                            users::get_user_by_uid(users::get_current_uid())
-                        } else {
-                            users::get_user_by_name(tilde_prefix)
-                        };
-                        match user {
-                            Some(user) => Ok(user.home_dir().to_string_lossy().as_ref().into()),
-                            None => Err(Error::HomeNotFound),
-                        }
+                    .ok_or_else(|| Error::OutOfStack(num))
+                } else {
+                    let user = if tilde_prefix.is_empty() {
+                        users::get_user_by_uid(users::get_current_uid())
+                    } else {
+                        users::get_user_by_name(tilde_prefix)
+                    };
+                    match user {
+                        Some(user) => Ok(user.home_dir().to_string_lossy().as_ref().into()),
+                        None => Err(Error::HomeNotFound),
                     }
                 }
             }
