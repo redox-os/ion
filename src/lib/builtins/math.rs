@@ -5,7 +5,7 @@ use calc::{eval, eval_polish, CalcError, Value};
 use liner::Context;
 use std::io::{self, Read};
 
-const REPL_GUIDE: &str = r#"ion-calc
+const REPL_GUIDE: &str = r#"Ion's integrated calculator
 Type in expressions to have them evaluated.
 Type "help" for help."#;
 
@@ -20,7 +20,7 @@ fn calc_or_polish_calc(args: &str) -> Result<Value, CalcError> {
     desc = "Floating-point calculator",
     man = "
 SYNOPSIS
-    calc [EXPRESSION]
+    math [EXPRESSION]
 
 DESCRIPTION
     Evaluates arithmetic expressions
@@ -44,15 +44,15 @@ NOTATIONS
 
 EXAMPLES
     Add two plus two in infix notation
-        calc 2+2
+        math 2+2
 
     Add two plus two in polish notation
-        calc + 2 2
+        math + 2 2
 
 AUTHOR
     Written by Hunter Goldstein."
 )]
-pub fn calc(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
+pub fn math(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
     if args.get(1).is_some() {
         let result = calc_or_polish_calc(&args[1..].join(" "));
         match result {
@@ -67,7 +67,7 @@ pub fn calc(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
         let mut context = Context::new();
         loop {
             match context
-                .read_line("ion-calc: ", None, &mut EmptyCompleter)
+                .read_line("ion-math: ", None, &mut EmptyCompleter)
                 .as_ref()
                 .map(AsRef::as_ref)
             {

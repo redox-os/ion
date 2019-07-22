@@ -2,7 +2,7 @@
 
 We've exported our arithmetic logic into a separate crate
 [calculate](https://crates.io/crates/calculate). We use this library for both our `calc` builtin,
-and for parsing arithmetic expansions. Use `calc` if you want a REPL for arithmetic, else use
+and for parsing arithmetic expansions. Use `math` if you want a REPL for arithmetic, else use
 arithmetic expansions (`$((a + b))`) if you want the result inlined. Variables may be passed into
 arithmetic expansions without the **$** sigil, as it is automatically inferred that text references
 string variables. Supported operators are as below:

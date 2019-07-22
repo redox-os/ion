@@ -20,11 +20,11 @@ DESCRIPTION
     Returns true if the value given to it is equal to '1' or 'true'.
 ```
 
-## calc - Floating-point calculator
+## math - Floating-point calculator
 
 ```txt
 SYNOPSIS
-    calc [EXPRESSION]
+    math [EXPRESSION]
 
 DESCRIPTION
     Evaluates arithmetic expressions
@@ -48,10 +48,10 @@ NOTATIONS
 
 EXAMPLES
     Add two plus two in infix notation
-        calc 2+2
+        math 2+2
 
     Add two plus two in polish notation
-        calc + 2 2
+        math + 2 2
 
 AUTHOR
     Written by Hunter Goldstein.

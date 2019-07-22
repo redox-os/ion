@@ -987,10 +987,10 @@ mod tests {
 
     #[test]
     fn herestring() {
-        let input = "calc <<< $(cat math.txt)";
+        let input = "math <<< $(cat math.txt)";
         let expected = Pipeline {
             items: vec![PipeItem {
-                job: Job::new(args!["calc"], RedirectFrom::None, None),
+                job: Job::new(args!["math"], RedirectFrom::None, None),
 
                 inputs:  vec![Input::HereString("$(cat math.txt)".into())],
                 outputs: vec![],

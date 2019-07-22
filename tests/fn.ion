@@ -15,7 +15,7 @@ end
 another_test
 
 fn square n:int
-    calc $n \* $n
+    math $n \* $n
 end
 
 for num in 1 2 3 4 5 a 1.5
