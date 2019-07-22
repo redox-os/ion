@@ -22,7 +22,7 @@ linux:
       - cargo/
       - target/
   script:
-    - cargo check
+    - cargo check --features=piston
     - FULL=1 make tests
 
 linux:stable:
@@ -31,7 +31,7 @@ linux:stable:
       - cargo/
       - target/
   script:
-    - cargo check
+    - cargo check --features=piston
     - TOOLCHAIN= make tests
 
 redox:
