@@ -171,15 +171,9 @@ impl<'a> StringMethod<'a> {
             "parent" => path_eval!(parent),
             "to_lowercase" => string_case!(to_lowercase),
             "to_uppercase" => string_case!(to_uppercase),
-            "trim" => {
-                output.push_str(get_var!().trim());
-            }
-            "trim_right" => {
-                output.push_str(get_var!().trim_end());
-            }
-            "trim_left" => {
-                output.push_str(get_var!().trim_start());
-            }
+            "trim" => output.push_str(get_var!().trim()),
+            "trim_end" => output.push_str(get_var!().trim_end()),
+            "trim_start" => output.push_str(get_var!().trim_start()),
             "repeat" => match MethodArgs::new(self.pattern, expand).join(" ")?.parse::<usize>() {
                 Ok(repeat) => output.push_str(&get_var!().repeat(repeat)),
                 Err(_) => Err(MethodError::WrongArgument(
@@ -553,10 +547,10 @@ mod test {
     }
 
     #[test]
-    fn test_trim_right_with_string() {
+    fn test_trim_end_with_string() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method:    "trim_right",
+            method:    "trim_end",
             variable:  "\"  Foo Bar \"",
             pattern:   "",
             selection: None,
@@ -566,10 +560,10 @@ mod test {
     }
 
     #[test]
-    fn test_trim_right_with_variable() {
+    fn test_trim_end_with_variable() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method:    "trim_right",
+            method:    "trim_end",
             variable:  "$BAZ",
             pattern:   "",
             selection: None,
@@ -579,10 +573,10 @@ mod test {
     }
 
     #[test]
-    fn test_trim_left_with_string() {
+    fn test_trim_start_with_string() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method:    "trim_left",
+            method:    "trim_start",
             variable:  "\"  Foo Bar \"",
             pattern:   "",
             selection: None,
@@ -592,10 +586,10 @@ mod test {
     }
 
     #[test]
-    fn test_trim_left_with_variable() {
+    fn test_trim_start_with_variable() {
         let mut output = types::Str::new();
         let method = StringMethod {
-            method:    "trim_left",
+            method:    "trim_start",
             variable:  "$BAZ",
             pattern:   "",
             selection: None,

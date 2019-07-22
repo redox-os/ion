@@ -50,7 +50,7 @@ echo $escape("'one two'")
 let spacey = "  Spacey "
 echo $trim(" So Space  ")!
 echo $trim($spacey)!
-echo $trim_right(" So Space  ")!
-echo $trim_right($spacey)!
-echo $trim_left(" So Space  ")!
-echo $trim_left($spacey)!
+echo $trim_end(" So Space  ")!
+echo $trim_end($spacey)!
+echo $trim_start(" So Space  ")!
+echo $trim_start($spacey)!
