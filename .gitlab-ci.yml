@@ -17,7 +17,7 @@ format:
     - cargo +nightly fmt --all -- --check
 
 linux:
-  image: 'rust:1.32.0'
+  image: 'rust:1.35.0'
   script:
     - cargo build
     - FULL=1 make tests

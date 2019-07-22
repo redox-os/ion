@@ -150,7 +150,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
         let start = self.read;
 
         let mut levels = Levels::default();
-        let mut bytes = data.iter().cloned().skip(self.read);
+        let mut bytes = data.iter().skip(self.read).cloned();
         while let Some(character) = bytes.next() {
             match character {
                 // Skip the next byte.

@@ -60,7 +60,6 @@ name = "ion"
 path = "src/main.rs"
 
 [build-dependencies]
-ansi_term = "0.11"
 version_check = "0.9"
 
 [dependencies]

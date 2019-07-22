@@ -8,6 +8,7 @@ use nix::{
     sys::signal::{self, SigHandler, Signal},
     unistd::{self, ForkResult, Pid},
 };
+use std::{io, os::unix::io::AsRawFd};
 
 impl<'a> Shell<'a> {
     /// Ensures that the forked child is given a unique process ID.
@@ -28,7 +29,7 @@ impl<'a> Shell<'a> {
                     signal::signal(Signal::SIGHUP, SigHandler::SigDfl).unwrap();
                     signal::signal(Signal::SIGTERM, SigHandler::SigDfl).unwrap();
                 }
-                unistd::close(nix::libc::STDIN_FILENO).unwrap();
+                unistd::close(io::stdin().as_raw_fd()).unwrap();
 
                 // This ensures that the child fork has a unique PGID.
                 Self::create_process_group();

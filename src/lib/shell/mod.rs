@@ -303,22 +303,17 @@ impl<'a> Shell<'a> {
         );
 
         for item in &mut pipeline.items {
-            // TODO: Once the rust version is shifted to 1.33, use the transpose method
-            item.job.stdin = if let Some(file) = &self.stdin {
-                Some(file.try_clone().map_err(PipelineError::ClonePipeFailed)?)
-            } else {
-                None
-            };
-            item.job.stdout = if let Some(file) = &stdout {
-                Some(file.try_clone().map_err(PipelineError::ClonePipeFailed)?)
-            } else {
-                None
-            };
-            item.job.stderr = if let Some(file) = &stderr {
-                Some(file.try_clone().map_err(PipelineError::ClonePipeFailed)?)
-            } else {
-                None
-            };
+            item.job.stdin = self
+                .stdin
+                .as_ref()
+                .map(|file| file.try_clone().map_err(PipelineError::ClonePipeFailed))
+                .transpose()?;
+            item.job.stdout = stdout
+                .map(|file| file.try_clone().map_err(PipelineError::ClonePipeFailed))
+                .transpose()?;
+            item.job.stderr = stderr
+                .map(|file| file.try_clone().map_err(PipelineError::ClonePipeFailed))
+                .transpose()?;
         }
         if let Some(ref callback) = self.pre_command {
             callback(self, &pipeline);
