@@ -519,10 +519,12 @@ fn spawn_proc(
             command.stderr(stderr.map_or_else(Stdio::inherit, Into::into));
 
             let grp = *group;
-            command.before_exec(move || {
-                let _ = unistd::setpgid(Pid::this(), grp.unwrap_or_else(Pid::this));
-                Ok(())
-            });
+            unsafe {
+                command.pre_exec(move || {
+                    let _ = unistd::setpgid(Pid::this(), grp.unwrap_or_else(Pid::this));
+                    Ok(())
+                })
+            };
             match command.spawn() {
                 Ok(child) => Ok(Pid::from_raw(child.id() as i32)),
                 Err(err) => {

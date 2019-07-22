@@ -62,7 +62,7 @@ pub fn calc(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
             }
             Err(e) => Status::error(format!("{}", e)),
         }
-    } else if nix::unistd::isatty(nix::libc::STDIN_FILENO).unwrap() {
+    } else if atty::is(atty::Stream::Stdin) {
         println!("{}", REPL_GUIDE);
         let mut context = Context::new();
         loop {

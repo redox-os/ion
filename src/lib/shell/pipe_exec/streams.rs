@@ -2,13 +2,14 @@ use crate::PipelineError;
 use nix::unistd;
 use std::{
     fs::File,
-    os::unix::io::{AsRawFd, FromRawFd, RawFd},
+    io,
+    os::unix::io::{AsRawFd, FromRawFd},
 };
 
 /// Use dup2 to replace `old` with `new` using `old`s file descriptor ID
-fn redir(old: &Option<File>, new: RawFd) -> Result<(), PipelineError> {
+fn redir<F: AsRawFd>(old: &Option<File>, new: &F) -> Result<(), PipelineError> {
     if let Some(old) = old.as_ref().map(AsRawFd::as_raw_fd) {
-        unistd::dup2(old, new).map_err(PipelineError::CloneFdFailed)?;
+        unistd::dup2(old, new.as_raw_fd()).map_err(PipelineError::CloneFdFailed)?;
     }
     Ok(())
 }
@@ -19,10 +20,10 @@ fn redir(old: &Option<File>, new: RawFd) -> Result<(), PipelineError> {
 pub fn duplicate() -> nix::Result<(Option<File>, File, File)> {
     // STDIN may have been closed for a background shell, so it is ok if it cannot be duplicated.
     let stdin =
-        unistd::dup(nix::libc::STDIN_FILENO).ok().map(|fd| unsafe { File::from_raw_fd(fd) });
+        unistd::dup(io::stdin().as_raw_fd()).ok().map(|fd| unsafe { File::from_raw_fd(fd) });
 
-    let stdout = unsafe { File::from_raw_fd(unistd::dup(nix::libc::STDOUT_FILENO)?) };
-    let stderr = unsafe { File::from_raw_fd(unistd::dup(nix::libc::STDERR_FILENO)?) };
+    let stdout = unsafe { File::from_raw_fd(unistd::dup(io::stdout().as_raw_fd())?) };
+    let stderr = unsafe { File::from_raw_fd(unistd::dup(io::stderr().as_raw_fd())?) };
     // And then meld stderr alongside stdin and stdout
     Ok((stdin, stdout, stderr))
 }
@@ -33,7 +34,7 @@ pub fn redirect(
     out: &Option<File>,
     err: &Option<File>,
 ) -> Result<(), PipelineError> {
-    redir(inp, nix::libc::STDIN_FILENO)?;
-    redir(out, nix::libc::STDOUT_FILENO)?;
-    redir(err, nix::libc::STDERR_FILENO)
+    redir(inp, &io::stdin())?;
+    redir(out, &io::stdout())?;
+    redir(err, &io::stderr())
 }

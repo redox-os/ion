@@ -292,8 +292,7 @@ impl<'a> InteractiveShell<'a> {
             if let Err(err) = io::stderr().flush() {
                 println!("ion: failed to flush stderr: {}", err);
             }
-            let mut lines = std::iter::repeat_with(|| self.readln(prep_for_exit))
-                .filter_map(|cmd| cmd)
+            let mut lines = std::iter::from_fn(|| self.readln(prep_for_exit))
                 .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
             match Terminator::new(&mut lines).terminate() {
                 Some(command) => {
