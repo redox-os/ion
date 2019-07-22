@@ -1,25 +1,14 @@
 // This is based on the sprite example from piston-examples, available at https://github.com/PistonDevelopers/piston-examples
 
-#[cfg(not(target_os = "redox"))]
-use std::{cell::RefCell, fs::File, path::Path, rc::Rc};
-
-#[cfg(not(target_os = "redox"))]
 use ai_behavior::{Action, Sequence, Wait, WaitForever, While};
-#[cfg(not(target_os = "redox"))]
 use ion_shell::{
     builtins::{BuiltinFunction, Status},
     types, Shell,
 };
-#[cfg(not(target_os = "redox"))]
 use piston_window::*;
-#[cfg(not(target_os = "redox"))]
 use sprite::*;
+use std::{cell::RefCell, fs::File, path::Path, rc::Rc};
 
-#[cfg(target_os = "redox")]
-// Don't run the test on redox
-fn main() {}
-
-#[cfg(not(target_os = "redox"))]
 fn main() {
     // This is specific to piston. It does not matter
     // Skip to the next *****
