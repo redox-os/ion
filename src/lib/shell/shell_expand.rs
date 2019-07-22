@@ -228,17 +228,20 @@ impl<'a, 'b> Expander for Shell<'b> {
                     }
                     .map(|path| path.to_str().unwrap().into())
                     .ok_or_else(|| Error::OutOfStack(num))
-                } else if cfg!(not(target_os = "redox")) {
-                    let user = if tilde_prefix.is_empty() {
-                        users::get_user_by_uid(users::get_current_uid())
-                    } else {
-                        users::get_user_by_name(tilde_prefix)
-                    };
-                    match user {
-                        Some(user) => Ok(user.home_dir().to_string_lossy().as_ref().into()),
-                        None => Err(Error::HomeNotFound),
-                    }
                 } else {
+                    #[cfg(not(target_os = "redox"))]
+                    {
+                        let user = if tilde_prefix.is_empty() {
+                            users::get_user_by_uid(users::get_current_uid())
+                        } else {
+                            users::get_user_by_name(tilde_prefix)
+                        };
+                        match user {
+                            Some(user) => Ok(user.home_dir().to_string_lossy().as_ref().into()),
+                            None => Err(Error::HomeNotFound),
+                        }
+                    }
+                    #[cfg(target_os = "redox")]
                     Err(Error::HomeNotFound)
                 }
             }

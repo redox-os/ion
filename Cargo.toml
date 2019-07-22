@@ -30,6 +30,7 @@ maintenance = { status = "experimental" }
 [features]
 advanced_arg_parsing = []
 man = ["builtins-proc/man"]
+piston = ["piston-ai_behavior", "piston_window", "piston2d-sprite"]
 
 [workspace]
 members = [ "members/builtins-proc", "members/ranges", "members/scopes-rs", "members/types-rs" ]
@@ -38,12 +39,6 @@ members = [ "members/builtins-proc", "members/ranges", "members/scopes-rs", "mem
 criterion = "0.2"
 serial_test = "*"
 serial_test_derive = "*"
-
-[target."cfg(not(target_os = \"redox\"))".dev-dependencies]
-# window example
-piston-ai_behavior = "0.31"
-piston_window = "0.100"
-piston2d-sprite = "0.55"
 
 [[bench]]
 name = "terminator"
@@ -56,6 +51,10 @@ harness = false
 [[bench]]
 name = "builtins"
 harness = false
+
+[[example]]
+name = "window"
+required-features = ["piston"]
 
 [[bin]]
 name = "ion"
@@ -89,6 +88,11 @@ atty = "0.2"
 permutate = "0.3"
 xdg = "2.1"
 nix = "0.14"
+
+# window example
+piston-ai_behavior = { version = "0.31", optional = true }
+piston_window = { version = "0.100", optional = true }
+piston2d-sprite = { version = "0.55", optional = true }
 
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
 users = "0.9"
