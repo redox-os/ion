@@ -22,17 +22,24 @@ format:
 linux:
   image: 'rust:1.35.0'
   script:
-    - cargo build
+    - cargo check
     - FULL=1 make tests
 
 linux:stable:
   script:
-    - cargo build
+    - cargo check
     - TOOLCHAIN= make tests
 
 redox:
+  before_script:
+    - apt-get update -qq
+    - apt-get install -qq build-essential curl git
+    - git clone --single-branch --branch=extra-traits-redox --depth=1 https://github.com/AdminXVII/libc
+    - git clone --single-branch --branch=add-redox-support --depth=1 https://github.com/AdminXVII/nix
+    - mkdir .cargo
+    - echo 'paths = [ "libc", "nix" ]' >> .cargo/config
   script:
-    - redoxer build
+    - redoxer check
 
 pages:
   image: hrektts/mdbook
