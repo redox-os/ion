@@ -17,7 +17,7 @@ enum PositionalArgs {
     desc = "Set or unset values of shell options and positional parameters.",
     man = "
 SYNOPSIS
-    set [ --help ] [-e | +e] [-x | +x] [-o [vi | emacs]] [- | --] [STRING]...
+    set [ --help ] [-e | +e] [- | --] [STRING]...
 
 DESCRIPTION
     Shell options may be set using the '-' character, and unset using the '+' character.
@@ -25,45 +25,38 @@ DESCRIPTION
 OPTIONS
     -e  Exit immediately if a command exits with a non-zero status.
 
-    -o  Specifies that an argument will follow that sets the key map.
-        The keymap argument may be either `vi` or `emacs`.
-
-    -x  Specifies that commands will be printed as they are executed.
-
     --  Following arguments will be set as positional arguments in the shell.
         If no argument are supplied, arguments will be unset.
 
     -   Following arguments will be set as positional arguments in the shell.
-        If no arguments are suppled, arguments will not be unset."
+        If no arguments are suppled, arguments will not be unset.
+
+BASH EQUIVALENTS
+    To set the keybindings, see the `keybindings` builtin
+    To print commands as they are executed (only with the Ion Shell), see `debug`"
 )]
 pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let mut args_iter = args.iter();
     let mut positionals = None;
 
     while let Some(arg) = args_iter.next() {
-        if arg.starts_with("--") {
-            if arg.len() == 2 {
+        match arg.as_str() {
+            "--" => {
                 positionals = Some(PositionalArgs::UnsetIfNone);
                 break;
             }
-            return Status::SUCCESS;
-        } else if arg.starts_with('-') {
-            if arg.len() == 1 {
+            "-" => {
                 positionals = Some(PositionalArgs::RetainIfNone);
                 break;
             }
-            for flag in arg.bytes().skip(1) {
-                match flag {
-                    b'e' => shell.opts_mut().err_exit = true,
-                    _ => return Status::SUCCESS,
-                }
-            }
-        } else if arg.starts_with('+') {
-            for flag in arg.bytes().skip(1) {
-                match flag {
-                    b'e' => shell.opts_mut().err_exit = false,
-                    _ => return Status::SUCCESS,
-                }
+            "-e" => shell.opts_mut().err_exit = true,
+            "+e" => shell.opts_mut().err_exit = false,
+            _ => {
+                return Status::bad_argument(format!(
+                    "set: argument '{}' is not recognized. Try adding `--` before it to pass it \
+                     as argument to the shell script",
+                    arg
+                ))
             }
         }
     }

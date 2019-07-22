@@ -6,7 +6,7 @@ use crate::{
 };
 use nix::unistd::{geteuid, gethostname, getpid, getuid};
 use scopes::{Namespace, Scope, Scopes};
-use std::{env, rc::Rc};
+use std::{env, ffi::CStr, rc::Rc};
 use unicode_segmentation::UnicodeSegmentation;
 
 /// Contain a dynamically-typed variable value
@@ -256,7 +256,7 @@ impl<'a> Default for Variables<'a> {
             "HOST",
             &gethostname(&mut host_name)
                 .ok()
-                .map_or_else(|| "?".into(), |hostname| hostname.to_string_lossy())
+                .map_or_else(|| "?".into(), CStr::to_string_lossy)
                 .as_ref(),
         );
 

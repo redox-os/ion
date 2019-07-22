@@ -97,7 +97,7 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
                 let file_completers: Vec<_> = if let Some(paths) = env::var_os("PATH") {
                     env::split_paths(&paths)
                         .map(|s| {
-                            let s = if !s.to_string_lossy().ends_with("/") {
+                            let s = if !s.to_string_lossy().ends_with('/') {
                                 let mut oss = s.into_os_string();
                                 oss.push("/");
                                 oss.into()
@@ -134,9 +134,9 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
                             .nth(index - 1)
                             .map(|(start, end)| event.editor.current_buffer().range(start, end))
                             .filter(|filename| {
-                                filename.ends_with("|")
-                                    || filename.ends_with("&")
-                                    || filename.ends_with(";")
+                                filename.ends_with('|')
+                                    || filename.ends_with('&')
+                                    || filename.ends_with(';')
                             })
                             .is_some();
                         if is_pipe {

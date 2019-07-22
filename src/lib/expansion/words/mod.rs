@@ -646,7 +646,7 @@ impl<'a> WordIterator<'a> {
     }
 
     /// Creates a new iterator with a given expander
-    pub fn new(data: &'a str, do_glob: bool) -> WordIterator<'a> {
+    pub const fn new(data: &'a str, do_glob: bool) -> WordIterator<'a> {
         WordIterator { data, backsl: false, read: 0, quotes: Quotes::None, do_glob }
     }
 }

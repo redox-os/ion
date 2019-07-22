@@ -164,6 +164,7 @@ fn main() {
     let mut builtins = BuiltinMap::default();
     builtins
         .with_unsafe()
+        .add("debug", &builtins::builtin_debug, "Toggle debug mode (print commands on exec)")
         .add("exec", &builtins::builtin_exec, "Replace the shell with the given command.")
         .add("exit", &builtins::builtin_exit, "Exits the current session")
         .add("suspend", &builtins::builtin_suspend, "Suspends the shell with a SIGTSTOP signal");

@@ -298,8 +298,8 @@ impl<'a> Shell<'a> {
         let null_file =
             if pipeline.pipe == PipeType::Disown { File::open(NULL_PATH).ok() } else { None };
         let (stderr, stdout) = (
-            null_file.as_ref().or(self.stderr.as_ref()),
-            null_file.as_ref().or(self.stdout.as_ref()),
+            null_file.as_ref().or_else(|| self.stderr.as_ref()),
+            null_file.as_ref().or_else(|| self.stdout.as_ref()),
         );
 
         for item in &mut pipeline.items {

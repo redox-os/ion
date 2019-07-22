@@ -143,7 +143,7 @@ impl DirectoryStack {
 
         self.dirs.remove(0);
         println!("{}", prev);
-        self.change_and_push_dir(&Path::new(&prev))
+        self.change_and_push_dir(Path::new(&prev))
     }
 
     pub fn switch_to_home_directory(&mut self) -> Result<(), DirStackError> {
