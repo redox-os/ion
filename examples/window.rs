@@ -5,7 +5,7 @@ use std::{cell::RefCell, fs::File, path::Path, rc::Rc};
 use ai_behavior::{Action, Sequence, Wait, WaitForever, While};
 use ion_shell::{
     builtins::{BuiltinFunction, Status},
-    types, Shell, Value,
+    types, Shell,
 };
 use piston_window::*;
 use sprite::*;
@@ -161,9 +161,9 @@ fn main() {
 
         if e.render_args().is_some() {
             // Get the on_render function
-            if let Some(Value::Function(function)) = shell.variables().get("on_render") {
+            if let Some(function) = shell.get_func("on_render") {
                 // and then call it. N.B.: the first argument must always be ion
-                if let Err(why) = shell.execute_function(&function.clone(), &["ion"]) {
+                if let Err(why) = shell.execute_function(&function, &["ion"]) {
                     // check for errors
                     eprintln!("window example: error in on_render callback: {}", why);
                 }
@@ -171,10 +171,10 @@ fn main() {
         }
 
         if let Some(Button::Keyboard(key)) = e.press_args() {
-            if let Some(Value::Function(function)) = shell.variables().get("on_key") {
+            if let Some(function) = shell.get_func("on_key") {
                 if let Err(why) =
                     // provide a parameter for the callback
-                    shell.execute_function(&function.clone(), &["ion", &key.code().to_string()])
+                    shell.execute_function(&function, &["ion", &key.code().to_string()])
                 {
                     eprintln!("window example: error in on_key callback: {}", why);
                 }
@@ -182,9 +182,9 @@ fn main() {
         }
 
         if let Some([x, y]) = e.mouse_cursor_args() {
-            if let Some(Value::Function(function)) = shell.variables().get("on_mouse") {
-                if let Err(why) = shell
-                    .execute_function(&function.clone(), &["ion", &x.to_string(), &y.to_string()])
+            if let Some(function) = shell.get_func("on_mouse") {
+                if let Err(why) =
+                    shell.execute_function(&function, &["ion", &x.to_string(), &y.to_string()])
                 {
                     eprintln!("window example: error in on_mouse callback: {}", why);
                 }

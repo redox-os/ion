@@ -424,6 +424,15 @@ impl<'a> Shell<'a> {
         self.background.lock().expect("Could not lock the mutex")
     }
 
+    /// Get a function if it exists
+    pub fn get_func<T: AsRef<str>>(&self, f: T) -> Option<Rc<Function<'a>>> {
+        if let Some(Value::Function(function)) = self.variables().get(f.as_ref()) {
+            Some(function.clone())
+        } else {
+            None
+        }
+    }
+
     /// Get the last command's return code and/or the code for the error
     pub const fn previous_status(&self) -> Status { self.previous_status }
 
