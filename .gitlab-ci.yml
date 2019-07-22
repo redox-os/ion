@@ -39,7 +39,7 @@ redox:
     - mkdir .cargo
     - echo 'paths = [ "libc", "nix" ]' >> .cargo/config
   script:
-    - redoxer check
+    - redoxer test
 
 pages:
   image: hrektts/mdbook
