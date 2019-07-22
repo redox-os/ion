@@ -9,9 +9,6 @@ cache:
   paths:
     - cargo/
     - target/
-    # Redox only:
-    - prefix/
-    - rust/
 
 format:
   script:
@@ -38,6 +35,7 @@ redox:
     - git clone --single-branch --branch=add-redox-support --depth=1 https://github.com/AdminXVII/nix
     - mkdir .cargo
     - echo 'paths = [ "libc", "nix" ]' >> .cargo/config
+    - cargo clean
   script:
     - redoxer test
 
