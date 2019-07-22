@@ -1,7 +1,6 @@
 /// helpers for creating help
 pub mod man_pages;
 
-mod calc;
 mod command_info;
 mod conditionals;
 mod echo;
@@ -10,6 +9,7 @@ mod functions;
 mod helpers;
 mod is;
 mod job_control;
+mod math;
 mod random;
 mod set;
 mod source;
@@ -18,7 +18,6 @@ mod test;
 mod variables;
 
 pub use self::{
-    calc::builtin_calc,
     command_info::builtin_which,
     conditionals::{builtin_contains, builtin_ends_with, builtin_starts_with},
     echo::builtin_echo,
@@ -27,6 +26,7 @@ pub use self::{
     helpers::Status,
     is::builtin_is,
     man_pages::check_help,
+    math::builtin_math,
     set::builtin_set,
     source::builtin_source,
     status::builtin_status,
@@ -196,11 +196,11 @@ impl<'a> BuiltinMap<'a> {
 
     /// Utilities to test values
     ///
-    /// Contains `bool`, `calc`, `eq`, `is`, `true`, `false`, `starts-with`, `ends-with`,
+    /// Contains `bool`, `math`, `eq`, `is`, `true`, `false`, `starts-with`, `ends-with`,
     /// `contains`, `matches`, `random`
     pub fn with_values_tests(&mut self) -> &mut Self {
         self.add("bool", &builtin_bool, "If the value is '1' or 'true', return 0 exit status")
-            .add("calc", &builtin_calc, "Calculate a mathematical expression")
+            .add("math", &builtin_math, "Calculate a mathematical expression")
             .add("eq", &builtin_is, "Simple alternative to == and !=")
             .add("is", &builtin_is, "Simple alternative to == and !=")
             .add("true", &builtin_true_, "Do nothing, successfully")
