@@ -39,24 +39,24 @@ pub fn is(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
 }
 
 fn eval_arg(arg: &str, shell: &mut Shell<'_>) -> types::Str {
-    let value = get_var_string(arg, shell);
-    if &*value != "" {
-        return value;
+    if let Some(value) = get_var_string(arg, shell) {
+        value
+    } else {
+        arg.into()
     }
-    arg.into()
 }
 
 // On error returns an empty String.
-fn get_var_string(name: &str, shell: &mut Shell<'_>) -> types::Str {
-    if name.chars().nth(0).unwrap() != '$' {
-        return "".into();
+fn get_var_string(name: &str, shell: &mut Shell<'_>) -> Option<types::Str> {
+    if name.chars().nth(0)? != '$' {
+        return None;
     }
 
     match shell.variables().get_str(&name[1..]) {
-        Ok(s) => s,
+        Ok(s) => Some(s),
         Err(why) => {
             eprintln!("{}", why);
-            "".into()
+            None
         }
     }
 }
