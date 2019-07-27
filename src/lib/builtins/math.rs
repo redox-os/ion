@@ -9,6 +9,22 @@ const REPL_GUIDE: &str = r#"Ion's integrated calculator
 Type in expressions to have them evaluated.
 Type "help" for help."#;
 
+const REPL_HELP: &str = r#"
+Ion-math is a floating-point calculator
+You can use infix (ex: 1 + 2 * 3) or polish (+ * 2 3 1) notations.
+Non-operator, non-number sequences will be treated as variables for interpolation.
+
+Examples:
+    $ 1 + 3-2
+    >> 2
+    $ 0.00001 + 0.0001
+    >> 0.00011
+
+    In Ion if $a = 2, $b = 3, $c = 7
+    $ a * b * c
+    >> 42
+"#;
+
 fn calc_or_polish_calc(args: &str) -> Result<Value, CalcError> {
     match eval(args) {
         Ok(t) => Ok(t),
@@ -73,6 +89,7 @@ pub fn math(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
             {
                 Ok("") => return Status::SUCCESS,
                 Ok(text) if text.trim() == "exit" => return Status::SUCCESS,
+                Ok(text) if text.trim() == "help" => eprintln!("{}", REPL_HELP),
                 Ok(s) => {
                     let result = calc_or_polish_calc(s);
                     match result {
