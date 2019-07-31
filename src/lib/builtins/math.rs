@@ -1,7 +1,7 @@
 use super::{EmptyCompleter, Status};
 use crate as ion_shell;
 use builtins_proc::builtin;
-use calc::{eval, eval_polish, CalcError, Value};
+use calc::{eval_polish_with_env, eval_with_env, CalcError, Value};
 use liner::Context;
 use std::io::{self, Read};
 
@@ -26,9 +26,20 @@ Examples:
 "#;
 
 fn calc_or_polish_calc(args: &str) -> Result<Value, CalcError> {
-    match eval(args) {
+    let mut env = calc::parse::DefaultEnvironment::new();
+    match eval_with_env(args, &mut env) {
         Ok(t) => Ok(t),
-        Err(_) => eval_polish(args),
+        Err(_) => eval_polish_with_env(args, &mut env),
+    }
+}
+
+fn calc_or_polish_calc_with_env(
+    args: &str,
+    env: &mut impl calc::parse::Environment,
+) -> Result<Value, CalcError> {
+    match eval_with_env(args, env) {
+        Ok(t) => Ok(t),
+        Err(_) => eval_polish_with_env(args, env),
     }
 }
 
@@ -81,6 +92,7 @@ pub fn math(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
     } else if atty::is(atty::Stream::Stdin) {
         println!("{}", REPL_GUIDE);
         let mut context = Context::new();
+        let mut ans = None;
         loop {
             match context
                 .read_line("ion-math: ", None, &mut EmptyCompleter)
@@ -91,9 +103,13 @@ pub fn math(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
                 Ok(text) if text.trim() == "exit" => return Status::SUCCESS,
                 Ok(text) if text.trim() == "help" => eprintln!("{}", REPL_HELP),
                 Ok(s) => {
-                    let result = calc_or_polish_calc(s);
+                    let mut env = calc::parse::DefaultEnvironment::with_ans(ans.clone());
+                    let result = calc_or_polish_calc_with_env(s, &mut env);
                     match result {
-                        Ok(v) => println!("{}", v),
+                        Ok(v) => {
+                            println!("{}", v);
+                            ans = Some(v);
+                        }
                         Err(e) => eprintln!("{}", e),
                     }
                 }
