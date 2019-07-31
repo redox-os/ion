@@ -57,7 +57,7 @@ CPU_CORES=$(nproc --all)
 # Build debug binary
 # Check if the variabl $RUSTUP is set. If yes the $TOOLCHAIN can be choosen via cargo, otherwise cargo might not now
 # about that feature.
-if [ -v RUSTUP ]; then
+if [ -v RUSTUP ] && [ "${RUSTUP}" -eq 1 ]; then
 	cargo +$TOOLCHAIN build
 else
 	cargo build
