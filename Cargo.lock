@@ -180,7 +180,7 @@ dependencies = [
 [[package]]
 name = "calculate"
 version = "0.7.0"
-source = "git+https://gitlab.redox-os.org/redox-os/calc#48d847491f74f4324bc31bec008ec80374226eeb"
+source = "git+https://gitlab.redox-os.org/redox-os/calc#afba9c5d184ddb9db5e4e71dc357da0499e212cf"
 dependencies = [
  "atty 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
