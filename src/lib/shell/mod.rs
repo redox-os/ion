@@ -228,12 +228,12 @@ impl<'a> Shell<'a> {
         mem::replace(&mut self.stdin, stdin.into())
     }
 
-    /// Replace the default stdin
+    /// Replace the default stdout
     pub fn stdout<T: Into<Option<File>>>(&mut self, stdout: T) -> Option<File> {
         mem::replace(&mut self.stdout, stdout.into())
     }
 
-    /// Replace the default stdin
+    /// Replace the default stderr
     pub fn stderr<T: Into<Option<File>>>(&mut self, stderr: T) -> Option<File> {
         mem::replace(&mut self.stderr, stderr.into())
     }
