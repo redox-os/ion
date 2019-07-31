@@ -79,7 +79,7 @@ vendor: $(VENDOR)
 version: $(GIT_REVISION)
 
 $(GIT_REVISION):
-	git rev-parse master > git_revision.txt
+	git rev-parse HEAD > git_revision.txt
 
 $(VENDOR):
 	rm -rf .cargo vendor vendor.tar.xz

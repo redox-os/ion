@@ -55,7 +55,11 @@ export EXAMPLES_DIR
 CPU_CORES=$(nproc --all)
 
 # Build debug binary
-cargo +$TOOLCHAIN build
+if [ $RUSTUP -eq 1 ]; then
+	cargo +$TOOLCHAIN build
+else
+	cargo build
+fi
 test_generic
 test_params
 
