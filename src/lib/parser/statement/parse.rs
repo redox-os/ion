@@ -6,17 +6,13 @@ use super::{
 use crate::{
     builtins::BuiltinMap,
     parser::lexers::{assignment_lexer, ArgumentSplitter},
-    shell::flow_control::{Case, ElseIf, ExportAction, IfMode, LocalAction, Statement},
+    shell::{
+        flow_control::{Case, ElseIf, ExportAction, IfMode, LocalAction, Statement},
+        variables::Variables,
+    },
     types,
 };
 use std::char;
-
-/// Check if the given name is valid for functions, aliases & variables
-pub fn is_valid_name(name: &str) -> bool {
-    let mut chars = name.chars();
-    chars.next().map_or(false, |b| char::is_alphabetic(b) || b == '_')
-        && chars.all(|b| b.is_alphanumeric() || b == '_')
-}
 
 pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
     let cmd = code.trim();
@@ -115,7 +111,7 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
             let cmd = cmd[3..].trim_start();
             let pos = cmd.find(char::is_whitespace).unwrap_or_else(|| cmd.len());
             let name = &cmd[..pos];
-            if !is_valid_name(name) {
+            if !Variables::is_valid_name(name) {
                 return Err(Error::InvalidFunctionName(name.into()));
             }
 
