@@ -23,6 +23,12 @@ enum Binding {
     KeyValue(types::Str, types::Str),
 }
 
+fn is_valid_alias(name: &str) -> bool {
+    let mut iter = name.chars();
+    iter.next().map_or(false, |c| c.is_alphabetic() || c == '_')
+        && iter.all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '!')
+}
+
 /// Parses alias as a `(key, value)` tuple.
 fn parse_alias(args: &str) -> Binding {
     // Write all the arguments into a single `String`
@@ -55,7 +61,7 @@ fn parse_alias(args: &str) -> Binding {
         let value: String = char_iter.skip_while(|&x| x == ' ').collect();
         if value.is_empty() {
             Binding::KeyOnly(key)
-        } else if Variables::is_valid_name(&key) {
+        } else if is_valid_alias(&key) {
             Binding::KeyValue(key, value.into())
         } else {
             Binding::InvalidKey(key)

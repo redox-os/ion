@@ -346,8 +346,8 @@ impl<'a> WordIterator<'a> {
                     self.read += 1;
                     return WordToken::ArrayVariable(output, self.quotes == Quotes::Double, None);
                 }
-                // Only [a-zA-Z0-9_-!] are allowed in variable names
-                0..=32 | 34..=44 | 46..=47 | 58..=64 | 91..=94 | 96 | 123..=127 => {
+                // Only alphanumerical and underscores are allowed in variable names
+                0..=47 | 58..=64 | 91..=94 | 96 | 123..=127 => {
                     return WordToken::ArrayVariable(
                         &self.data[start..self.read],
                         self.quotes == Quotes::Double,
@@ -464,8 +464,8 @@ impl<'a> WordIterator<'a> {
                         Some(self.read_selection(iterator)),
                     );
                 }
-                // Only [a-zA-Z0-9_-!] are allowed in variable names
-                0..=32 | 34..=44 | 46..=47 | 58..=64 | 91..=94 | 96 | 123..=127 => {
+                // Only alphanumerical and underscores are allowed in variable names
+                0..=47 | 58..=64 | 91..=94 | 96 | 123..=127 => {
                     return WordToken::ArrayVariable(
                         &self.data[start..self.read],
                         self.quotes == Quotes::Double,
@@ -591,8 +591,8 @@ impl<'a> WordIterator<'a> {
 
                     panic!("ion: fatal error with syntax validation parsing: unterminated method");
                 }
-                // Only [a-zA-Z0-9_-!] are allowed in variable names
-                0..=32 | 34..=44 | 46..=47 | 58..=64 | 91..=94 | 96 | 123..=127 => {
+                // Only alphanumerical and underscores are allowed in variable names
+                0..=47 | 58..=64 | 91..=94 | 96 | 123..=127 => {
                     let variable = &self.data[start..self.read];
 
                     return if character == b'[' {
