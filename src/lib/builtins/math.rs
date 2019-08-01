@@ -27,20 +27,14 @@ Examples:
 
 fn calc_or_polish_calc(args: &str) -> Result<Value, CalcError> {
     let mut env = calc::parse::DefaultEnvironment::new();
-    match eval_with_env(args, &mut env) {
-        Ok(t) => Ok(t),
-        Err(_) => eval_polish_with_env(args, &mut env),
-    }
+    eval_with_env(args, &mut env).or_else(|_| eval_polish_with_env(args, &mut env))
 }
 
 fn calc_or_polish_calc_with_env(
     args: &str,
     env: &mut impl calc::parse::Environment,
 ) -> Result<Value, CalcError> {
-    match eval_with_env(args, env) {
-        Ok(t) => Ok(t),
-        Err(_) => eval_polish_with_env(args, env),
-    }
+    eval_with_env(args, env).or_else(|_| eval_polish_with_env(args, env))
 }
 
 #[builtin(

@@ -1080,5 +1080,4 @@ mod tests {
         assert_parse_error("}");
         assert_parse_error(")");
     }
-
 }
