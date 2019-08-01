@@ -314,22 +314,6 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn set_var_with_nonalphanumerical_name() {
-        let mut variables = Variables::default();
-        variables.set("FOO!-", "BAR");
-        let expanded = VariableExpander(variables).expand_string("$FOO!-").unwrap().join("");
-        assert_eq!("BAR", &expanded);
-    }
-
-    #[test]
-    fn set_var_with_nonalphanumerical_braces_name() {
-        let mut variables = Variables::default();
-        variables.set("FOO!-", "BAR");
-        let expanded = VariableExpander(variables).expand_string("${FOO!-}").unwrap().join("");
-        assert_eq!("BAR", &expanded);
-    }
-
-    #[test]
     #[serial]
     fn minimal_directory_var_should_compact_path() {
         let variables = Variables::default();
