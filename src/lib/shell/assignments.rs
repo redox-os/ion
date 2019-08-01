@@ -116,8 +116,7 @@ impl<'b> Shell<'b> {
             }
 
             if !Variables::is_valid_name(key.name) {
-                return Err("invalid variable name\nVariable names may only be (unicode) \
-                            alphanumeric or `_`\nThe first character must be alphabetic or `_`"
+                return Err("invalid variable name: only alphanumerical characters and underscores are supported"
                     .to_string());
             }
 
