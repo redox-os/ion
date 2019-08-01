@@ -145,11 +145,11 @@ impl<'a> Variables<'a> {
         env::var("PWD").unwrap().replace(&*home, "~").into()
     }
 
-    /// Indicates if name is valid for functions, variables ans aliases
+    /// Indicates if name is valid for functions and variables
     pub fn is_valid_name(name: &str) -> bool {
         let mut iter = name.chars();
         iter.next().map_or(false, |c| c.is_alphabetic() || c == '_')
-            && iter.all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '!')
+            && iter.all(|c| c.is_alphanumeric() || c == '_')
     }
 
     /// Remove a variable from the current scope. If the value can't be removed (it is outside a
