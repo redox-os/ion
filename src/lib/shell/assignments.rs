@@ -5,11 +5,8 @@ use super::{
 use crate::{
     assignments::*,
     builtins::Status,
-    parser::{
-        is_valid_name,
-        lexers::assignments::{Key, Operator, Primitive},
-    },
-    shell::{flow_control::Function, Value},
+    parser::lexers::assignments::{Key, Operator, Primitive},
+    shell::{flow_control::Function, Value, Variables},
 };
 use std::{
     env,
@@ -118,7 +115,7 @@ impl<'b> Shell<'b> {
                 return Err(format!("not allowed to set `{}`", key.name));
             }
 
-            if !is_valid_name(key.name) {
+            if !Variables::is_valid_name(key.name) {
                 return Err("invalid variable name\nVariable names may only be (unicode) \
                             alphanumeric or `_`\nThe first character must be alphabetic or `_`"
                     .to_string());

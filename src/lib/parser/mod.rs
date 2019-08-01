@@ -13,7 +13,7 @@ mod statement;
 
 pub use self::{
     quotes::Terminator,
-    statement::{is_valid_name, parse_and_validate, Error, StatementSplitter},
+    statement::{parse_and_validate, Error, StatementSplitter},
 };
 
 #[cfg(fuzzing)]

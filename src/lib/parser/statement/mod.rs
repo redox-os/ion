@@ -4,7 +4,7 @@ mod parse;
 mod splitter;
 
 pub use self::{
-    parse::{is_valid_name, parse},
+    parse::parse,
     splitter::{StatementSplitter, StatementVariant},
 };
 use super::{
