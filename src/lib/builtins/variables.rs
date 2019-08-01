@@ -75,7 +75,11 @@ pub fn builtin_alias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
         }
         Binding::ListEntries => print_list(shell.variables()),
         Binding::KeyOnly(key) => {
-            return Status::error(format!("ion: please provide value for alias '{}'", key));
+            if let Some(alias) = shell.variables().get(&key) {
+                println!("alias {}='{}'", key, alias);
+            } else {
+                return Status::error(format!("ion: alias '{}' not found", key));
+            }
         }
     }
     Status::SUCCESS
