@@ -48,7 +48,6 @@ use nix::{
 };
 use std::{
     fs::File,
-    io::{self, Write},
     mem,
     ops::{Deref, DerefMut},
     rc::Rc,
@@ -178,17 +177,10 @@ impl<'a> Shell<'a> {
             signals::PENDING.store(signal as usize, Ordering::SeqCst);
         }
 
-        extern "C" fn sigpipe_handler(signal: i32) {
-            let _ = io::stdout().flush();
-            let _ = io::stderr().flush();
-            unsafe { nix::libc::_exit(127 + signal) };
-        }
-
         unsafe {
             let _ = signal::signal(signal::Signal::SIGHUP, SigHandler::Handler(handler));
             let _ = signal::signal(signal::Signal::SIGINT, SigHandler::Handler(handler));
             let _ = signal::signal(signal::Signal::SIGTERM, SigHandler::Handler(handler));
-            let _ = signal::signal(signal::Signal::SIGPIPE, SigHandler::Handler(sigpipe_handler));
         }
     }
 
