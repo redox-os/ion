@@ -36,9 +36,11 @@ Attributes for the command line are also available:
  - reverse
  - underlined
 
-You can also access the full 256 colors using hex or decimal representation. For example ${c::F} accesses the 16nth color, ${c::0xFF} the 255th, and ${c::14} would use color #14.
+You can also access the full 256 colors using hex or decimal representation. For example ${c::F} accesses the 16th color, ${c::0xFF} the 255th, and ${c::14} would use color #14.
 
 Lastly, you can use true colors using hexes. ${c::0x000000} and ${c::0x000} would print pure black independent of the terminal's color scheme. It should be advised to avoid using those colors except specific use cases where the exact color is required.
+
+As a last tip, you can delimit different attributes using commas, so ${c::black}${c::redbg} is also ${c::black,redbg}.
 
 ### Example
 ```
