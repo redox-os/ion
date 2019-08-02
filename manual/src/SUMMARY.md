@@ -2,6 +2,8 @@
 
 - [Introduction](introduction.md)
 
+- [Migrating from POSIX shells](migration.md)
+
 - [Miscellaneous](misc/index.md)
 
     - [Implicit `cd`](misc/01-implicitcd.md)
@@ -20,6 +22,7 @@
     - [Arithmetic Variables](variables/04-arithmetic.md)
     - [Exporting Variables](variables/05-exporting.md)
     - [Scopes](variables/06-scopes.md)
+    - [Namespaces (colors, scopes and env vars)](variables/07-namespaces.md)
 
 - [Expansions](expansions/00-expansions.md)
 
