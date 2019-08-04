@@ -543,15 +543,12 @@ pub fn popd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     }
 
     // pop element
-    if shell.dir_stack_mut().popd(index).is_some() {
-        println!(
-            "{}",
-            shell
-                .dir_stack()
-                .dirs()
-                .map(|dir| dir.to_str().unwrap_or("ion: no directory found"))
-                .format(" ")
-        );
+    let dir_stack = shell.dir_stack_mut();
+    if dir_stack.popd(index).is_some() {
+        if let Err(err) = dir_stack.set_current_dir_by_index(0) {
+            return Status::error(format!("ion: popd: {}", err));
+        }
+        println!("{}", shell.dir_stack().dirs().map(|dir| dir.display()).format(" "));
         Status::SUCCESS
     } else {
         Status::error(format!("ion: popd: {}: directory stack index out of range", index))
