@@ -142,7 +142,7 @@ impl DirectoryStack {
     pub fn switch_to_previous_directory(&mut self) -> Result<(), DirStackError> {
         let prev = self.get_previous_dir().ok_or(DirStackError::NoPreviousDir)?;
 
-        self.dirs.remove(0);
+        self.popd(0);
         println!("{}", prev);
         self.change_and_push_dir(Path::new(&prev))
     }
