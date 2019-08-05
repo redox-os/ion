@@ -329,7 +329,7 @@ impl<'a> InteractiveShell<'a> {
                     }
                     self.save_command(&cmd);
                 }
-                None => self.terminated.set(false),
+                None => self.terminated.set(true),
             }
         }
     }
