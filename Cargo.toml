@@ -91,8 +91,8 @@ nix = "0.14"
 
 # window example
 piston-ai_behavior = { version = "0.31", optional = true }
-piston_window = { version = "0.100", optional = true }
-piston2d-sprite = { version = "0.55", optional = true }
+piston_window = { version = "0.103", optional = true }
+piston2d-sprite = { version = "0.57", optional = true }
 
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
 users = "0.9"
