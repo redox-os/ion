@@ -38,10 +38,9 @@ redox:
   before_script:
     - apt-get update -qq
     - apt-get install -qq build-essential curl git
-    - git clone --single-branch --branch=extra-traits-redox --depth=1 https://github.com/AdminXVII/libc
     - git clone --single-branch --branch=add-redox-support --depth=1 https://github.com/AdminXVII/nix
     - mkdir .cargo
-    - echo 'paths = [ "libc", "nix" ]' >> .cargo/config
+    - echo 'paths = [ "nix" ]' >> .cargo/config
     - cargo clean
   script:
     - redoxer test
