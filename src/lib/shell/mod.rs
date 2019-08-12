@@ -250,7 +250,7 @@ impl<'a> Shell<'a> {
     /// A method for executing a function, using `args` as the input.
     pub fn execute_function<S: AsRef<str>>(
         &mut self,
-        function: &Function<'a>,
+        function: &Rc<Function<'a>>,
         args: &[S],
     ) -> Result<Status, IonError> {
         function.clone().execute(self, args)?;
@@ -424,6 +424,9 @@ impl<'a> Shell<'a> {
             None
         }
     }
+
+    /// Get the last command's return code and/or the code for the error
+    pub fn set_previous_status(&mut self, status: Status) { self.previous_status = status; }
 
     /// Get the last command's return code and/or the code for the error
     pub const fn previous_status(&self) -> Status { self.previous_status }
