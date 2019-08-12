@@ -87,7 +87,7 @@ structopt = "^0.2"
 atty = "0.2"
 permutate = "0.3"
 xdg = "2.1"
-nix = "0.14"
+nix = "0.15"
 
 # window example
 piston-ai_behavior = { version = "0.31", optional = true }
