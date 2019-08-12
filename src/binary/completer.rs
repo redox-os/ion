@@ -1,15 +1,36 @@
 use auto_enums::auto_enum;
 use glob::{glob_with, MatchOptions};
-use ion_shell::{
-    expansion::{unescape, Expander},
-    Shell,
-};
+use ion_shell::{expansion::Expander, Shell};
 use liner::{Completer, CursorPosition, Event, EventKind};
 use std::{env, iter, path::PathBuf, str};
 
 pub struct IonCompleter<'a, 'b> {
     shell:      &'b Shell<'a>,
     completion: CompletionType,
+}
+
+/// Unescape filenames for the completer so that special characters will be properly shown.
+fn unescape(input: &str) -> String {
+    let mut output = Vec::with_capacity(input.len());
+    let mut check = false;
+    for character in input.bytes() {
+        match character {
+            b'\\' if !check => check = true,
+            b'(' | b')' | b'[' | b']' | b'&' | b'$' | b'@' | b'{' | b'}' | b'<' | b'>' | b';'
+            | b'"' | b'\'' | b'#' | b'^' | b'*' | b' '
+                if check =>
+            {
+                output.push(character);
+                check = false;
+            }
+            _ if check => {
+                output.extend(&[b'\\', character]);
+                check = false;
+            }
+            _ => output.push(character),
+        }
+    }
+    unsafe { String::from_utf8_unchecked(output) }
 }
 
 /// Escapes filenames from the completer so that special characters will be properly escaped.
@@ -227,9 +248,7 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
         } else if let Some(e_index) = expanded.rfind(search) {
             // And then we will need to take those completions and remove the expanded form
             // of the tilde pattern and replace it with that pattern yet again.
-            completions
-                .map(|completion| escape(&[tilde, &completion[e_index..]].concat()))
-                .collect()
+            completions.map(|completion| [tilde, &completion[e_index..]].concat()).collect()
         } else {
             Vec::new()
         }
@@ -291,7 +310,7 @@ fn filename_completion<'a>(start: &'a str, path: &'a PathBuf) -> impl Iterator<I
     #[auto_enum(Iterator)]
     match globs {
         Some(iter) => iter,
-        None => iter::once(escape(start)),
+        None => iter::once(start.into()),
     }
 }
 
