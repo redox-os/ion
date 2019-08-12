@@ -20,6 +20,7 @@ use std::{
     cell::{Cell, RefCell},
     fs::{self, OpenOptions},
     io::{self, Write},
+    os::unix::io::{AsRawFd, IntoRawFd},
     path::Path,
     rc::Rc,
 };
@@ -308,18 +309,36 @@ impl<'a> InteractiveShell<'a> {
                             Err(IonError::PipelineExecutionError(
                                 PipelineError::CommandNotFound(command),
                             )) => {
-                                if let Some(Value::Function(func)) =
-                                    shell.variables().get("COMMAND_NOT_FOUND").cloned()
+                                if Self::try_cd(&command, &mut shell)
+                                    .ok()
+                                    .map_or(false, |res| res.is_failure())
                                 {
-                                    if let Err(why) =
-                                        shell.execute_function(&func, &["ion", &command])
+                                    if let Some(Value::Function(func)) =
+                                        shell.variables().get("COMMAND_NOT_FOUND").cloned()
                                     {
-                                        eprintln!("ion: command not found handler: {}", why);
+                                        if let Err(why) =
+                                            shell.execute_function(&func, &["ion", &command])
+                                        {
+                                            eprintln!("ion: command not found handler: {}", why);
+                                        }
+                                    } else {
+                                        eprintln!("ion: command not found: {}", command);
                                     }
-                                } else {
-                                    eprintln!("ion: command not found: {}", command);
                                 }
                                 // Status::COULD_NOT_EXEC
+                            }
+                            Err(IonError::PipelineExecutionError(
+                                PipelineError::CommandExecError(ref err, ref command),
+                            )) if err.kind() == io::ErrorKind::PermissionDenied
+                                && command.len() == 1 =>
+                            {
+                                if Self::try_cd(&command[0], &mut shell)
+                                    .ok()
+                                    .map_or(false, |res| res.is_failure())
+                                {
+                                    eprintln!("ion: {}", err);
+                                    shell.reset_flow();
+                                }
                             }
                             Err(err) => {
                                 eprintln!("ion: {}", err);
@@ -332,6 +351,26 @@ impl<'a> InteractiveShell<'a> {
                 None => self.terminated.set(true),
             }
         }
+    }
+
+    /// Try to cd if the command failed
+    fn try_cd(dir: &str, shell: &mut Shell<'_>) -> nix::Result<Status> {
+        // Gag the cd output
+        let null = OpenOptions::new()
+            .write(true)
+            .open(if cfg!(target_os = "redox") { "null:" } else { "/dev/null" })
+            .map_err(|err| {
+                nix::Error::from_errno(nix::errno::Errno::from_i32(err.raw_os_error().unwrap()))
+            })?
+            .into_raw_fd();
+
+        let fd = io::stderr().as_raw_fd();
+        let fd_dup = nix::unistd::dup(fd)?;
+        nix::unistd::dup2(null, fd)?;
+        let out = ion_shell::builtins::builtin_cd(&["cd".into(), dir.into()], shell);
+        nix::unistd::dup2(fd_dup, fd)?;
+        nix::unistd::close(fd_dup)?;
+        Ok(out)
     }
 
     /// Set the keybindings of the underlying liner context

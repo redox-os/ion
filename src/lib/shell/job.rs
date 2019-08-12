@@ -1,27 +1,16 @@
 use super::{IonError, Shell};
 use crate::{
-    builtins::{self, BuiltinFunction},
+    builtins::BuiltinFunction,
     expansion::{self, pipelines::RedirectFrom, Expander},
     types, Value,
 };
-use std::{fmt, fs::File, iter, path::Path, str};
+use std::{fmt, fs::File, str};
 
 #[derive(Clone)]
 pub struct Job<'a> {
     pub args:        types::Args,
     pub redirection: RedirectFrom,
     pub builtin:     Option<BuiltinFunction<'a>>,
-}
-
-/// Determines if the supplied command implicitly defines to change the directory.
-///
-/// This is detected by first checking if the argument starts with a '.' or an '/', or ends
-/// with a '/'. If that validates, then it will check if the supplied argument is a valid
-/// directory path.
-#[inline(always)]
-fn is_implicit_cd(argument: &str) -> bool {
-    (argument.starts_with('.') || argument.starts_with('/') || argument.ends_with('/'))
-        && Path::new(argument).is_dir()
 }
 
 impl<'a> Job<'a> {
@@ -36,13 +25,7 @@ impl<'a> Job<'a> {
             args.extend(expand_arg(arg, shell)?);
         }
 
-        Ok(if is_implicit_cd(&args[0]) {
-            RefinedJob::builtin(
-                &builtins::builtin_cd,
-                iter::once("cd".into()).chain(args).collect(),
-                self.redirection,
-            )
-        } else if let Some(Value::Function(_)) = shell.variables.get(&self.args[0]) {
+        Ok(if let Some(Value::Function(_)) = shell.variables.get(&self.args[0]) {
             RefinedJob::function(self.args.clone(), self.redirection)
         } else if let Some(builtin) = self.builtin {
             RefinedJob::builtin(builtin, args, self.redirection)

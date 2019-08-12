@@ -85,7 +85,7 @@ pub enum PipelineError {
     TerminateJobsError(#[error(cause)] nix::Error),
     /// Could not execute the command
     #[error(display = "command exec error: {}", _0)]
-    CommandExecError(#[error(cause)] io::Error),
+    CommandExecError(#[error(cause)] io::Error, types::Args),
     /// Could not expand the alias
     #[error(display = "unable to pipe outputs of alias: '{} = {}'", _0, _1)]
     InvalidAlias(String, String),
@@ -106,7 +106,7 @@ pub enum PipelineError {
 
     /// A command could not be found in the pipeline
     #[error(display = "command not found: {}", _0)]
-    CommandNotFound(String),
+    CommandNotFound(types::Str),
 
     /// Failed to grab the tty
     #[error(display = "could not grab the terminal: {}", _0)]
@@ -508,7 +508,7 @@ fn spawn_proc(
     current_pid: &mut Pid,
     group: &mut Option<Pid>,
 ) -> Result<(), PipelineError> {
-    let RefinedJob { mut var, args, stdin, stdout, stderr, redirection } = cmd;
+    let RefinedJob { mut var, mut args, stdin, stdout, stderr, redirection } = cmd;
     let pid = match var {
         Variant::External => {
             let mut command = Command::new(&args[0].as_str());
@@ -529,9 +529,9 @@ fn spawn_proc(
                 Ok(child) => Ok(Pid::from_raw(child.id() as i32)),
                 Err(err) => {
                     if err.kind() == io::ErrorKind::NotFound {
-                        Err(PipelineError::CommandNotFound(args[0].to_string()))
+                        Err(PipelineError::CommandNotFound(args.swap_remove(0)))
                     } else {
-                        Err(PipelineError::CommandExecError(err))
+                        Err(PipelineError::CommandExecError(err, args))
                     }
                 }
             }
