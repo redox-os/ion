@@ -1,8 +1,8 @@
-use super::{EmptyCompleter, Status};
+use super::Status;
 use crate as ion_shell;
 use builtins_proc::builtin;
 use calc::{eval_polish_with_env, eval_with_env, CalcError, Value};
-use liner::Context;
+use rustyline::Editor;
 use std::io::{self, Read};
 
 const REPL_GUIDE: &str = r#"Ion's integrated calculator
@@ -85,14 +85,10 @@ pub fn math(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
         }
     } else if atty::is(atty::Stream::Stdin) {
         println!("{}", REPL_GUIDE);
-        let mut context = Context::new();
+        let mut context = Editor::<()>::new();
         let mut ans = None;
         loop {
-            match context
-                .read_line("ion-math: ", None, &mut EmptyCompleter)
-                .as_ref()
-                .map(AsRef::as_ref)
-            {
+            match context.readline("ion-math: ").as_ref().map(AsRef::as_ref) {
                 Ok("") => return Status::SUCCESS,
                 Ok(text) if text.trim() == "exit" => return Status::SUCCESS,
                 Ok(text) if text.trim() == "help" => eprintln!("{}", REPL_HELP),

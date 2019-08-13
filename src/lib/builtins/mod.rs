@@ -41,7 +41,7 @@ use crate::{
 use builtins_proc::builtin;
 use hashbrown::HashMap;
 use itertools::Itertools;
-use liner::{Completer, Context};
+use rustyline::Editor;
 use std::{
     borrow::Cow,
     io::{self, BufRead},
@@ -555,12 +555,6 @@ pub fn popd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-struct EmptyCompleter;
-
-impl Completer for EmptyCompleter {
-    fn completions(&mut self, _start: &str) -> Vec<String> { Vec::new() }
-}
-
 #[builtin(
     desc = "read a line of input into some variables",
     man = "
@@ -573,9 +567,9 @@ DESCRIPTION
 )]
 pub fn read(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if atty::is(atty::Stream::Stdin) {
-        let mut con = Context::new();
+        let mut con = Editor::<()>::new();
         for arg in args.iter().skip(1) {
-            match con.read_line(format!("{}=", arg.trim()), None, &mut EmptyCompleter) {
+            match con.readline(&format!("{}=", arg.trim())) {
                 Ok(buffer) => {
                     shell.variables_mut().set(arg.as_ref(), buffer.trim());
                 }

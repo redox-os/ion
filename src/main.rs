@@ -1,7 +1,6 @@
-use self::binary::{builtins, InteractiveShell};
+use self::binary::{builtins, InteractiveShell, KeyBindings};
 use atty::Stream;
 use ion_shell::{BackgroundEvent, BuiltinMap, IonError, PipelineError, Shell, Value};
-use liner::KeyBindings;
 use nix::{
     sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal},
     unistd,
@@ -24,17 +23,15 @@ use structopt::StructOpt;
 
 mod binary;
 
-struct KeyBindingsWrapper(KeyBindings);
-
 #[cfg(feature = "advanced_arg_parsing")]
-impl FromStr for KeyBindingsWrapper {
-    type Err = String;
+impl FromStr for KeyBindings {
+    type Err = &'static str;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input {
-            "vi" => Ok(KeyBindingsWrapper(KeyBindings::Vi)),
-            "emacs" => Ok(KeyBindingsWrapper(KeyBindings::Emacs)),
-            _ => Err("unknown key bindings".to_string()),
+            "vi" => Ok(KeyBindings::Vi),
+            "emacs" => Ok(KeyBindings::Emacs),
+            _ => Err("unknown key bindings"),
         }
     }
 }
@@ -53,7 +50,7 @@ impl FromStr for KeyBindingsWrapper {
 struct CommandLineArgs {
     /// Shortcut layout. Valid options: "vi", "emacs"
     #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-o"))]
-    key_bindings: Option<KeyBindingsWrapper>,
+    key_bindings: Option<KeyBindings>,
     /// Print commands before execution
     #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-x"))]
     print_commands: bool,
@@ -102,8 +99,8 @@ fn parse_args() -> CommandLineArgs {
         match arg.as_str() {
             "-o" => {
                 key_bindings = match args.next().as_ref().map(|s| s.as_str()) {
-                    Some("vi") => Some(KeyBindingsWrapper(KeyBindings::Vi)),
-                    Some("emacs") => Some(KeyBindingsWrapper(KeyBindings::Emacs)),
+                    Some("vi") => Some(KeyBindings::Vi),
+                    Some("emacs") => Some(KeyBindings::Emacs),
                     Some(_) => {
                         eprintln!("ion: invalid option for option -o");
                         process::exit(1);
@@ -225,10 +222,10 @@ fn main() {
             }
         }
     } else if stdin_is_a_tty || command_line_args.interactive {
-        let mut interactive = InteractiveShell::new(shell);
-        if let Some(key_bindings) = command_line_args.key_bindings {
-            interactive.set_keybindings(key_bindings.0);
-        }
+        let interactive = InteractiveShell::new(
+            shell,
+            command_line_args.key_bindings.unwrap_or(KeyBindings::Emacs),
+        );
         interactive.add_callbacks();
         interactive.execute_interactive();
     } else if command_line_args.fake_interactive {

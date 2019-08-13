@@ -1,12 +1,18 @@
 use auto_enums::auto_enum;
 use glob::{glob_with, MatchOptions};
 use ion_shell::{expansion::Expander, Shell};
-use liner::{Completer, CursorPosition, Event, EventKind};
-use std::{env, iter, path::PathBuf, str};
+use rustyline::{
+    completion::{Completer, FilenameCompleter, Pair},
+    highlight::Highlighter,
+    hint::{Hinter, HistoryHinter},
+    Context, Helper,
+};
+use std::{borrow::Cow, env, iter, path::PathBuf, rc::Rc, str};
 
-pub struct IonCompleter<'a, 'b> {
-    shell:      &'b Shell<'a>,
+pub struct IonCompleter<'a> {
+    shell:      Rc<Shell<'a>>,
     completion: CompletionType,
+    hinter:     HistoryHinter,
 }
 
 /// Unescape filenames for the completer so that special characters will be properly shown.
@@ -50,132 +56,220 @@ fn escape(input: &str) -> String {
     unsafe { String::from_utf8_unchecked(output) }
 }
 
+fn getword(input: &str, pos: usize) -> (&str, usize, CompletionType) {
+    if input.is_empty() {
+        return (input, pos, CompletionType::Nothing);
+    }
+
+    let mut last_space = 0;
+    let mut next_is_command = true;
+    for word in input.split_ascii_whitespace() {
+        if last_space + word.len() >= pos {
+            let completion_type = if next_is_command {
+                CompletionType::Command
+            } else {
+                CompletionType::VariableAndFiles
+            };
+            return (&input[last_space..last_space + word.len()], last_space, completion_type);
+        } else {
+            next_is_command = word.ends_with('|') || word.ends_with('&') || word.ends_with(';');
+            last_space += word.len() + 1;
+        }
+    }
+    let completion_type =
+        if next_is_command { CompletionType::Command } else { CompletionType::VariableAndFiles };
+    // This is the last word, so return the end of string
+    (&input[last_space..], last_space, completion_type)
+}
+
 enum CompletionType {
     Nothing,
     Command,
     VariableAndFiles,
 }
 
-impl<'a, 'b> IonCompleter<'a, 'b> {
-    pub fn new(shell: &'b Shell<'a>) -> Self {
-        IonCompleter { shell, completion: CompletionType::Nothing }
+impl<'a> IonCompleter<'a> {
+    pub fn new(shell: Rc<Shell<'a>>) -> Self {
+        IonCompleter { shell, completion: CompletionType::Nothing, hinter: HistoryHinter {} }
     }
 }
 
-impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
-    fn completions(&mut self, start: &str) -> Vec<String> {
-        let mut completions = IonFileCompleter::new(None, &self.shell).completions(start);
-        let vars = self.shell.variables();
+impl<'a> Hinter for IonCompleter<'a> {
+    fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
+        self.hinter.hint(line, pos, ctx)
+    }
+}
 
-        match self.completion {
-            CompletionType::VariableAndFiles => {
-                // Initialize a new completer from the definitions collected.
-                // Creates a list of definitions from the shell environment that
-                // will be used
-                // in the creation of a custom completer.
-                if start.is_empty() {
-                    completions.extend(vars.string_vars().map(|(s, _)| format!("${}", s)));
-                    completions.extend(vars.arrays().map(|(s, _)| format!("@{}", s)));
-                } else if start.starts_with('$') {
-                    completions.extend(
-                        // Add the list of available variables to the completer's
-                        // definitions. TODO: We should make
-                        // it free to do String->SmallString
-                        //       and mostly free to go back (free if allocated)
-                        vars.string_vars()
-                            .filter(|(s, _)| s.starts_with(&start[1..]))
-                            .map(|(s, _)| format!("${}", &s)),
-                    );
-                } else if start.starts_with('@') {
-                    completions.extend(
-                        vars.arrays()
-                            .filter(|(s, _)| s.starts_with(&start[1..]))
-                            .map(|(s, _)| format!("@{}", &s)),
-                    );
-                }
-            }
+impl<'a> Helper for IonCompleter<'a> {}
+
+impl<'a> Highlighter for IonCompleter<'a> {
+    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
+        &'s self,
+        prompt: &'p str,
+        _default: bool,
+    ) -> Cow<'b, str> {
+        Cow::Borrowed(prompt)
+    }
+
+    fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
+        Cow::Owned("\x1b[1m".to_owned() + hint + "\x1b[m")
+    }
+
+    fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> { Cow::Borrowed(line) }
+
+    fn highlight_char(&self, _line: &str, _pos: usize) -> bool { false }
+}
+
+impl<'a> Completer for IonCompleter<'a> {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        ctx: &Context,
+    ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
+        let (start, word_pos, completion_type) = getword(line, pos);
+        let vars = self.shell.variables();
+        match completion_type {
+            // Initialize a new completer from the definitions collected.
+            // Creates a list of definitions from the shell environment that
+            // will be used in the creation of a custom completer.
+            // Add the list of available variables to the completer's
+            // definitions.
+            //
+            // TODO: We should make it free to do String->SmallString and mostly free to go back
+            // (free if allocated)
+            CompletionType::VariableAndFiles if start.starts_with('$') => Ok((
+                word_pos,
+                vars.string_vars()
+                    .filter(|(s, _)| s.starts_with(&start[1..]))
+                    .map(|(s, _)| format!("${}", &s))
+                    .map(|s| Pair { display: s.clone(), replacement: s })
+                    .collect(),
+            )),
+            CompletionType::VariableAndFiles if start.starts_with('@') => Ok((
+                word_pos,
+                vars.arrays()
+                    .filter(|(s, _)| s.starts_with(&start[1..]))
+                    .map(|(s, _)| format!("@{}", &s))
+                    .map(|s| Pair { display: s.clone(), replacement: s })
+                    .collect(),
+            )),
+            CompletionType::VariableAndFiles => FilenameCompleter::new().complete(line, pos, ctx),
             CompletionType::Command => {
                 // Initialize a new completer from the definitions collected.
                 // Creates a list of definitions from the shell environment that
                 // will be used
                 // in the creation of a custom completer.
-                completions.extend(
-                    self.shell
-                        .builtins()
-                        .keys()
-                        // Add built-in commands to the completer's definitions.
-                        .map(ToString::to_string)
-                        // Add the aliases to the completer's definitions.
-                        .chain(vars.aliases().map(|(key, _)| key.to_string()))
-                        // Add the list of available functions to the completer's
-                        // definitions.
-                        .chain(vars.functions().map(|(key, _)| key.to_string()))
-                        .filter(|s| s.starts_with(start)),
-                );
+                let mut suggestions = self
+                    .shell
+                    .builtins()
+                    .keys()
+                    // Add built-in commands to the completer's definitions.
+                    .map(ToString::to_string)
+                    // Add the aliases to the completer's definitions.
+                    .chain(vars.aliases().map(|(key, _)| key.to_string()))
+                    // Add the list of available functions to the completer's
+                    // definitions.
+                    .chain(vars.functions().map(|(key, _)| key.to_string()))
+                    .filter(|s| s.starts_with(start))
+                    .map(|s| Pair { display: s.clone(), replacement: s })
+                    .collect::<Vec<_>>();
                 // Creates completers containing definitions from all directories
                 // listed
                 // in the environment's **$PATH** variable.
-                let file_completers: Vec<_> = if let Some(paths) = env::var_os("PATH") {
-                    env::split_paths(&paths)
-                        .map(|s| {
-                            let s = if !s.to_string_lossy().ends_with('/') {
-                                let mut oss = s.into_os_string();
-                                oss.push("/");
-                                oss.into()
-                            } else {
-                                s
-                            };
-                            IonFileCompleter::new(Some(s), &self.shell)
-                        })
-                        .collect()
-                } else {
-                    vec![IonFileCompleter::new(Some("/bin/".into()), &self.shell)]
-                };
-                // Merge the collected definitions with the file path definitions.
-                completions.extend(MultiCompleter::new(file_completers).completions(start));
-            }
-            CompletionType::Nothing => (),
-        }
-
-        completions
-    }
-
-    fn on_event<W: std::io::Write>(&mut self, event: Event<'_, '_, W>) {
-        if let EventKind::BeforeComplete = event.kind {
-            let (words, pos) = event.editor.get_words_and_cursor_position();
-            self.completion = match pos {
-                _ if words.is_empty() => CompletionType::Nothing,
-                CursorPosition::InWord(0) => CompletionType::Command,
-                CursorPosition::OnWordRightEdge(index) => {
-                    if index == 0 {
-                        CompletionType::Command
-                    } else {
-                        let is_pipe = words
-                            .into_iter()
-                            .nth(index - 1)
-                            .map(|(start, end)| event.editor.current_buffer().range(start, end))
-                            .filter(|filename| {
-                                filename.ends_with('|')
-                                    || filename.ends_with('&')
-                                    || filename.ends_with(';')
-                            })
-                            .is_some();
-                        if is_pipe {
-                            CompletionType::Command
+                if let Some(paths) = env::var_os("PATH") {
+                    for path in env::split_paths(&paths) {
+                        let path = if !path.to_string_lossy().ends_with('/') {
+                            let mut oss = path.into_os_string();
+                            oss.push("/");
+                            oss.into()
                         } else {
-                            CompletionType::VariableAndFiles
-                        }
+                            path
+                        };
+                        suggestions.extend(
+                            IonFileCompleter::new(Some(path), &self.shell).completions(start),
+                        );
                     }
+                } else {
+                    suggestions.extend(
+                        IonFileCompleter::new(Some("/bin/".into()), &self.shell).completions(start),
+                    )
                 }
-                _ => CompletionType::VariableAndFiles,
-            };
+                Ok((word_pos, suggestions))
+            }
+            CompletionType::Nothing => Ok((line.len(), Vec::new())),
         }
     }
+}
+
+#[derive(Debug)]
+struct WordDivide<I>
+where
+    I: Iterator<Item = (usize, char)>,
+{
+    iter:       I,
+    count:      usize,
+    word_start: Option<usize>,
+}
+impl<I> WordDivide<I>
+where
+    I: Iterator<Item = (usize, char)>,
+{
+    #[inline]
+    fn check_boundary(&mut self, c: char, index: usize, escaped: bool) -> Option<(usize, usize)> {
+        if let Some(start) = self.word_start {
+            if c == ' ' && !escaped {
+                self.word_start = None;
+                Some((start, index))
+            } else {
+                self.next()
+            }
+        } else {
+            if c != ' ' {
+                self.word_start = Some(index);
+            }
+            self.next()
+        }
+    }
+}
+impl<I> Iterator for WordDivide<I>
+where
+    I: Iterator<Item = (usize, char)>,
+{
+    type Item = (usize, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.count += 1;
+        match self.iter.next() {
+            Some((i, '\\')) => {
+                if let Some((_, cnext)) = self.iter.next() {
+                    self.count += 1;
+                    // We use `i` in order to include the backslash as part of the word
+                    self.check_boundary(cnext, i, true)
+                } else {
+                    self.next()
+                }
+            }
+            Some((i, c)) => self.check_boundary(c, i, false),
+            None => {
+                // When start has been set, that means we have encountered a full word.
+                self.word_start.take().map(|start| (start, self.count - 1))
+            }
+        }
+    }
+}
+
+fn word_divide(buf: &str) -> Vec<(usize, usize)> {
+    // -> impl Iterator<Item = (usize, usize)> + 'a
+    WordDivide { iter: buf.chars().enumerate(), count: 0, word_start: None }.collect() // TODO: return iterator directly :D
 }
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
 /// when a special character is contained within an expanded filename.
+#[derive(Clone)]
 pub struct IonFileCompleter<'a, 'b> {
     shell: &'b Shell<'a>,
     /// The directory the expansion takes place in
@@ -191,9 +285,7 @@ impl<'a, 'b> IonFileCompleter<'a, 'b> {
         let path = path.unwrap_or_default();
         IonFileCompleter { shell, path, for_command }
     }
-}
 
-impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
     /// When the tab key is pressed, **Liner** will use this method to perform completions of
     /// filenames. As our `IonFileCompleter` is a wrapper around **Liner**'s
     /// `FilenameCompleter`,
@@ -203,7 +295,7 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
     /// `FilenameCompleter`,
     /// and then escape the resulting filenames, as well as remove the expanded form of the `~`
     /// character and re-add the `~` character in it's place.
-    fn completions(&mut self, start: &str) -> Vec<String> {
+    fn completions(&self, start: &str) -> Vec<Pair> {
         // Dereferencing the raw pointers here should be entirely safe, theoretically,
         // because no changes will occur to either of the underlying references in the
         // duration between creation of the completers and execution of their
@@ -211,8 +303,8 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
         let expanded = match self.shell.tilde(start) {
             Ok(expanded) => expanded,
             Err(why) => {
-                eprintln!("ion: {}", why);
-                return vec![start.into()];
+                eprintln!("ion: failed to autocomplete: {}", why);
+                return Vec::new();
             }
         };
         // Now we obtain completions for the `expanded` form of the `start` value.
@@ -221,9 +313,10 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
             return if self.for_command {
                 completions
                     .map(|s| s.rsplit('/').next().map(|s| s.to_string()).unwrap_or(s))
+                    .map(|s| Pair { display: s.clone(), replacement: s })
                     .collect()
             } else {
-                completions.collect()
+                completions.map(|s| Pair { display: s.clone(), replacement: s }).collect()
             };
         }
         // We can do that by obtaining the index position where the tilde character
@@ -241,14 +334,20 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
             // The tilde pattern will actually be our `start` command in itself,
             // and the completed form will be all of the characters beyond the length of
             // the expanded form of the tilde pattern.
-            completions.map(|completion| [start, &completion[expanded.len()..]].concat()).collect()
+            completions
+                .map(|completion| [start, &completion[expanded.len()..]].concat())
+                .map(|s| Pair { display: s.clone(), replacement: s })
+                .collect()
         // To save processing time, we should get obtain the index position where our
         // search pattern begins, and re-use that index to slice the completions so
         // that we may re-add the tilde character with the completion that follows.
         } else if let Some(e_index) = expanded.rfind(search) {
             // And then we will need to take those completions and remove the expanded form
             // of the tilde pattern and replace it with that pattern yet again.
-            completions.map(|completion| [tilde, &completion[e_index..]].concat()).collect()
+            completions
+                .map(|completion| [tilde, &completion[e_index..]].concat())
+                .map(|s| Pair { display: s.clone(), replacement: s })
+                .collect()
         } else {
             Vec::new()
         }
@@ -314,36 +413,25 @@ fn filename_completion<'a>(start: &'a str, path: &'a PathBuf) -> impl Iterator<I
     }
 }
 
-/// A completer that combines suggestions from multiple completers.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MultiCompleter<A>(Vec<A>);
-
-impl<A> MultiCompleter<A> {
-    pub fn new(completions: Vec<A>) -> Self { MultiCompleter(completions) }
-}
-
-impl<A> Completer for MultiCompleter<A>
-where
-    A: Completer,
-{
-    fn completions(&mut self, start: &str) -> Vec<String> {
-        self.0.iter_mut().flat_map(|comp| comp.completions(start)).collect()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_comp<'a, 'b>(completer: &IonFileCompleter<'a, 'b>, comp: &str, results: &[&str]) {
+        let comp = completer.completions(comp);
+        assert!(comp.iter().map(|s| &s.display.as_str()).eq(results.into_iter()));
+    }
 
     #[test]
     fn filename_completion() {
         let shell = Shell::default();
         let mut completer = IonFileCompleter::new(None, &shell);
-        assert_eq!(completer.completions("testing"), vec!["testing/"]);
-        assert_eq!(completer.completions("testing/file"), vec!["testing/file_with_text"]);
+        let out = completer.completions("testing");
+        assert_comp(&completer, "testing", &["testing/"]);
+        assert_comp(&completer, "testing/file", &["testing/file_with_text"]);
         if cfg!(not(target_os = "redox")) {
-            assert_eq!(completer.completions("~"), vec!["~/"]);
+            assert_comp(&completer, "~", &["~/"]);
         }
-        assert_eq!(completer.completions("tes/fil"), vec!["testing/file_with_text"]);
+        assert_comp(&completer, "tes/fil", &["testing/file_with_text"]);
     }
 }

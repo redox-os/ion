@@ -1,12 +1,10 @@
 use super::lexer::{DesignatorLexer, DesignatorToken};
 use ion_shell::parser::lexers::ArgumentSplitter;
-use liner::Context;
+use rustyline::history::History;
 use std::{borrow::Cow, str};
 
-pub fn expand_designators<'a>(context: &Context, cmd: &'a str) -> Cow<'a, str> {
-    if let Some(buffer) = context.history.buffers.back() {
-        let buffer = buffer.as_bytes();
-        let buffer = unsafe { str::from_utf8_unchecked(&buffer) };
+pub fn expand_designators<'a>(history: &History, cmd: &'a str) -> Cow<'a, str> {
+    if let Some(buffer) = history.last() {
         let mut output = String::with_capacity(cmd.len());
         for token in DesignatorLexer::new(cmd.as_bytes()) {
             match token {

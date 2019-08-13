@@ -7,6 +7,7 @@ mod lexer;
 mod prompt;
 mod readln;
 
+use self::completer::IonCompleter;
 use ion_shell::{
     builtins::{man_pages, BuiltinFunction, Status},
     expansion::Expander,
@@ -15,7 +16,7 @@ use ion_shell::{
     IonError, PipelineError, Shell, Signal, Value,
 };
 use itertools::Itertools;
-use liner::{Buffer, Context, KeyBindings};
+use rustyline::Editor;
 use std::{
     cell::{Cell, RefCell},
     fs::{self, OpenOptions},
@@ -67,8 +68,14 @@ OPTIONS:
     -duplicates: Do not allow duplicates in history.
 "#;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyBindings {
+    Vi,
+    Emacs,
+}
+
 pub struct InteractiveShell<'a> {
-    context:    Rc<RefCell<Context>>,
+    context:    Rc<RefCell<Editor<IonCompleter<'a>>>>,
     shell:      RefCell<Shell<'a>>,
     terminated: Cell<bool>,
     huponexit:  Rc<Cell<bool>>,
@@ -77,11 +84,9 @@ pub struct InteractiveShell<'a> {
 impl<'a> InteractiveShell<'a> {
     const CONFIG_FILE_NAME: &'static str = "initrc";
 
-    pub fn new(shell: Shell<'a>) -> Self {
-        let mut context = Context::new();
-        context.word_divider_fn = Box::new(word_divide);
+    pub fn new(shell: Shell<'a>, _keybindings: KeyBindings) -> Self {
         InteractiveShell {
-            context:    Rc::new(RefCell::new(context)),
+            context:    Rc::new(RefCell::new(Editor::new())),
             shell:      RefCell::new(shell),
             terminated: Cell::new(true),
             huponexit:  Rc::new(Cell::new(false)),
@@ -117,9 +122,7 @@ impl<'a> InteractiveShell<'a> {
                     elapsed.subsec_nanos()
                 );
                 println!("{}", summary);
-                context.borrow_mut().history.push(summary.into()).unwrap_or_else(|err| {
-                    eprintln!("ion: history append: {}", err);
-                });
+                context.borrow_mut().history_mut().add(summary);
             }
         })));
     }
@@ -141,7 +144,9 @@ impl<'a> InteractiveShell<'a> {
                 shell.resume_stopped();
                 shell.background_send(Signal::SIGHUP).expect("Failed to prepare for exit");
             }
-            context_bis.borrow_mut().history.commit_to_file();
+            if let Some(Value::Str(histfile)) = shell.variables().get("HISTFILE") {
+                context_bis.borrow_mut().history().save(histfile.as_str());
+            }
         };
 
         let exit = self.shell.borrow().builtins().get("exit").unwrap();
@@ -163,26 +168,26 @@ impl<'a> InteractiveShell<'a> {
             }
 
             match args.get(1).map(|s| s.as_str()) {
-                Some("+inc_append") => {
-                    context_bis.borrow_mut().history.inc_append = true;
-                }
-                Some("-inc_append") => {
-                    context_bis.borrow_mut().history.inc_append = false;
-                }
-                Some("+share") => {
-                    context_bis.borrow_mut().history.inc_append = true;
-                    context_bis.borrow_mut().history.share = true;
-                }
-                Some("-share") => {
-                    context_bis.borrow_mut().history.inc_append = false;
-                    context_bis.borrow_mut().history.share = false;
-                }
-                Some("+duplicates") => {
-                    context_bis.borrow_mut().history.load_duplicates = true;
-                }
-                Some("-duplicates") => {
-                    context_bis.borrow_mut().history.load_duplicates = false;
-                }
+                // Some("+inc_append") => {
+                // context_bis.borrow_mut().history.inc_append = true;
+                // }
+                // Some("-inc_append") => {
+                // context_bis.borrow_mut().history.inc_append = false;
+                // }
+                // Some("+share") => {
+                // context_bis.borrow_mut().history.inc_append = true;
+                // context_bis.borrow_mut().history.share = true;
+                // }
+                // Some("-share") => {
+                // context_bis.borrow_mut().history.inc_append = false;
+                // context_bis.borrow_mut().history.share = false;
+                // }
+                // Some("+duplicates") => {
+                // context_bis.borrow_mut().history.load_duplicates = true;
+                // }
+                // Some("-duplicates") => {
+                // context_bis.borrow_mut().history.load_duplicates = false;
+                // }
                 Some(_) => {
                     Status::error(
                         "Invalid history option. Choices are [+|-] inc_append, duplicates and \
@@ -190,7 +195,7 @@ impl<'a> InteractiveShell<'a> {
                     );
                 }
                 None => {
-                    print!("{}", context_bis.borrow().history.buffers.iter().format("\n"));
+                    print!("{}", context_bis.borrow().history().iter().format("\n"));
                 }
             }
             Status::SUCCESS
@@ -208,14 +213,14 @@ impl<'a> InteractiveShell<'a> {
         let context_bis = self.context.clone();
         let keybindings = &move |args: &[types::Str], _shell: &mut Shell<'_>| -> Status {
             match args.get(1).map(|s| s.as_str()) {
-                Some("vi") => {
-                    context_bis.borrow_mut().key_bindings = KeyBindings::Vi;
-                    Status::SUCCESS
-                }
-                Some("emacs") => {
-                    context_bis.borrow_mut().key_bindings = KeyBindings::Emacs;
-                    Status::SUCCESS
-                }
+                // Some("vi") => {
+                // context_bis.borrow_mut().key_bindings = KeyBindings::Vi;
+                // Status::SUCCESS
+                // }
+                // Some("emacs") => {
+                // context_bis.borrow_mut().key_bindings = KeyBindings::Emacs;
+                // Status::SUCCESS
+                // }
                 Some(_) => Status::error("Invalid keybindings. Choices are vi and emacs"),
                 None => Status::error("keybindings need an argument"),
             }
@@ -244,7 +249,11 @@ impl<'a> InteractiveShell<'a> {
             .exec(prep_for_exit)
     }
 
-    fn load_history(project_dir: &BaseDirectories, shell: &mut Shell, context: &mut Context) {
+    fn load_history(
+        project_dir: &BaseDirectories,
+        shell: &mut Shell,
+        ed: &mut Editor<IonCompleter<'a>>,
+    ) {
         shell.variables_mut().set("HISTFILE_ENABLED", "1");
 
         // History Timestamps enabled variable, disabled by default
@@ -255,13 +264,13 @@ impl<'a> InteractiveShell<'a> {
         // Initialize the HISTFILE variable
         if let Some(histfile) = project_dir.find_data_file("history") {
             shell.variables_mut().set("HISTFILE", histfile.to_string_lossy().as_ref());
-            let _ = context.history.set_file_name_and_load_history(&histfile);
+            let _ = ed.history_mut().load(&histfile);
         } else {
             match project_dir.place_data_file("history") {
                 Ok(histfile) => {
                     eprintln!("ion: creating history file at \"{}\"", histfile.display());
                     shell.variables_mut().set("HISTFILE", histfile.to_string_lossy().as_ref());
-                    let _ = context.history.set_file_name_and_load_history(&histfile);
+                    let _ = ed.history_mut().load(&histfile);
                 }
                 Err(err) => println!("ion: could not create history file: {}", err),
             }
@@ -297,7 +306,7 @@ impl<'a> InteractiveShell<'a> {
             match Terminator::new(&mut lines).terminate() {
                 Some(command) => {
                     let cmd: &str = &designators::expand_designators(
-                        &self.context.borrow(),
+                        &self.context.borrow().history(),
                         command.trim_end(),
                     );
                     self.terminated.set(true);
@@ -333,71 +342,4 @@ impl<'a> InteractiveShell<'a> {
             }
         }
     }
-
-    /// Set the keybindings of the underlying liner context
-    pub fn set_keybindings(&mut self, key_bindings: KeyBindings) {
-        self.context.borrow_mut().key_bindings = key_bindings;
-    }
-}
-
-#[derive(Debug)]
-struct WordDivide<I>
-where
-    I: Iterator<Item = (usize, char)>,
-{
-    iter:       I,
-    count:      usize,
-    word_start: Option<usize>,
-}
-impl<I> WordDivide<I>
-where
-    I: Iterator<Item = (usize, char)>,
-{
-    #[inline]
-    fn check_boundary(&mut self, c: char, index: usize, escaped: bool) -> Option<(usize, usize)> {
-        if let Some(start) = self.word_start {
-            if c == ' ' && !escaped {
-                self.word_start = None;
-                Some((start, index))
-            } else {
-                self.next()
-            }
-        } else {
-            if c != ' ' {
-                self.word_start = Some(index);
-            }
-            self.next()
-        }
-    }
-}
-impl<I> Iterator for WordDivide<I>
-where
-    I: Iterator<Item = (usize, char)>,
-{
-    type Item = (usize, usize);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.count += 1;
-        match self.iter.next() {
-            Some((i, '\\')) => {
-                if let Some((_, cnext)) = self.iter.next() {
-                    self.count += 1;
-                    // We use `i` in order to include the backslash as part of the word
-                    self.check_boundary(cnext, i, true)
-                } else {
-                    self.next()
-                }
-            }
-            Some((i, c)) => self.check_boundary(c, i, false),
-            None => {
-                // When start has been set, that means we have encountered a full word.
-                self.word_start.take().map(|start| (start, self.count - 1))
-            }
-        }
-    }
-}
-
-fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
-    // -> impl Iterator<Item = (usize, usize)> + 'a
-    WordDivide { iter: buf.chars().cloned().enumerate(), count: 0, word_start: None }.collect() // TODO: return iterator directly :D
 }

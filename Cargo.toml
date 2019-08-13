@@ -68,7 +68,7 @@ calculate = { git = "https://gitlab.redox-os.org/redox-os/calc" }
 err-derive = "0.1"
 glob = "0.3"
 itoa = "0.4"
-liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }
+rustyline = "5"
 rand = "0.7"
 regex = "1.1"
 small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"] }
@@ -110,4 +110,3 @@ panic = "abort"
 # Required to make `cargo vendor` work
 [patch.crates-io]
 termion = { git = "https://gitlab.redox-os.org/redox-os/termion" }
-liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }

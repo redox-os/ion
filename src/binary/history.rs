@@ -69,18 +69,14 @@ impl<'a> InteractiveShell<'a> {
                 // Get current time stamp
                 let since_unix_epoch =
                     SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-                let cur_time_sys = ["#", &since_unix_epoch.to_owned().to_string()].concat();
+                let cur_time_sys = format!("#{}", &since_unix_epoch);
 
                 // Push current time to history
-                if let Err(err) = self.context.borrow_mut().history.push(cur_time_sys.into()) {
-                    eprintln!("ion: {}", err)
-                }
+                self.context.borrow_mut().history_mut().add(cur_time_sys);
             }
 
             // Push command itself to history
-            if let Err(err) = self.context.borrow_mut().history.push(command.into()) {
-                eprintln!("ion: {}", err);
-            }
+            self.context.borrow_mut().history_mut().add(command);
         }
     }
 
@@ -106,10 +102,6 @@ impl<'a> InteractiveShell<'a> {
             && self.shell.borrow().previous_status() == Status::NO_SUCH_COMMAND
         {
             return false;
-        }
-
-        if ignore.duplicates {
-            self.context.borrow_mut().history.remove_duplicates(command);
         }
 
         // ignore command when regex is matched but only if it does not contain

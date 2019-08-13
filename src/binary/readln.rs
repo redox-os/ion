@@ -1,17 +1,12 @@
-use super::{completer::IonCompleter, InteractiveShell};
+use super::InteractiveShell;
 use ion_shell::Shell;
-use std::io::ErrorKind;
+use rustyline::error::ReadlineError;
 
 impl<'a> InteractiveShell<'a> {
     /// Ion's interface to Liner's `read_line` method, which handles everything related to
     /// rendering, controlling, and getting input from the prompt.
     pub fn readln<T: Fn(&mut Shell<'_>)>(&self, prep_for_exit: &T) -> Option<String> {
-        let prompt = self.prompt();
-        let line = self.context.borrow_mut().read_line(
-            prompt,
-            None,
-            &mut IonCompleter::new(&self.shell.borrow()),
-        );
+        let line = self.context.borrow_mut().readline(&self.prompt());
 
         match line {
             Ok(line) => {
@@ -23,9 +18,9 @@ impl<'a> InteractiveShell<'a> {
                 Some(line)
             }
             // Handles Ctrl + C
-            Err(ref err) if err.kind() == ErrorKind::Interrupted => None,
+            Err(ReadlineError::Interrupted) => None,
             // Handles Ctrl + D
-            Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
+            Err(ReadlineError::Eof) => {
                 let mut shell = self.shell.borrow_mut();
                 if self.terminated.get() && shell.exit_block().is_err() {
                     prep_for_exit(&mut shell);
