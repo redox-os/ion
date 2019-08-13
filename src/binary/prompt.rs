@@ -1,13 +1,12 @@
 use super::InteractiveShell;
 use ion_shell::{
     expansion::{self, Expander},
-    IonError, PipelineError,
+    IonError, PipelineError, Shell,
 };
 
-impl<'a> InteractiveShell<'a> {
-    /// Generates the prompt that will be used by Liner.
-    pub fn prompt(&self) -> String {
-        let mut shell = self.shell.borrow_mut();
+impl InteractiveShell {
+    /// Generates the prompt that will be used by Rustyline.
+    pub fn prompt(&self, shell: &mut Shell<'_>) -> String {
         let previous_status = shell.previous_status();
         let blocks = if self.terminated.get() { shell.block_len() } else { shell.block_len() + 1 };
 

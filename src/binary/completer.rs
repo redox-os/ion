@@ -7,12 +7,11 @@ use rustyline::{
     hint::{Hinter, HistoryHinter},
     Context, Helper,
 };
-use std::{borrow::Cow, env, iter, path::PathBuf, rc::Rc, str};
+use std::{borrow::Cow, env, iter, path::PathBuf, str};
 
-pub struct IonCompleter<'a> {
-    shell:      Rc<Shell<'a>>,
-    completion: CompletionType,
-    hinter:     HistoryHinter,
+pub struct IonCompleter<'builtins> {
+    shell:  Shell<'builtins>,
+    hinter: HistoryHinter,
 }
 
 /// Unescape filenames for the completer so that special characters will be properly shown.
@@ -89,9 +88,13 @@ enum CompletionType {
 }
 
 impl<'a> IonCompleter<'a> {
-    pub fn new(shell: Rc<Shell<'a>>) -> Self {
-        IonCompleter { shell, completion: CompletionType::Nothing, hinter: HistoryHinter {} }
+    pub fn new<'b: 'a>(shell: Shell<'b>) -> Self {
+        IonCompleter { shell, hinter: HistoryHinter {} }
     }
+
+    pub fn shell(&self) -> &Shell<'a> { &self.shell }
+
+    pub fn shell_mut(&mut self) -> &mut Shell<'a> { &mut self.shell }
 }
 
 impl<'a> Hinter for IonCompleter<'a> {
@@ -102,7 +105,7 @@ impl<'a> Hinter for IonCompleter<'a> {
 
 impl<'a> Helper for IonCompleter<'a> {}
 
-impl<'a> Highlighter for IonCompleter<'a> {
+impl<'aorrow> Highlighter for IonCompleter<'aorrow> {
     fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
         &'s self,
         prompt: &'p str,
@@ -130,7 +133,8 @@ impl<'a> Completer for IonCompleter<'a> {
         ctx: &Context,
     ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
         let (start, word_pos, completion_type) = getword(line, pos);
-        let vars = self.shell.variables();
+        let shell = &self.shell;
+        let vars = shell.variables();
         match completion_type {
             // Initialize a new completer from the definitions collected.
             // Creates a list of definitions from the shell environment that
@@ -162,8 +166,7 @@ impl<'a> Completer for IonCompleter<'a> {
                 // Creates a list of definitions from the shell environment that
                 // will be used
                 // in the creation of a custom completer.
-                let mut suggestions = self
-                    .shell
+                let mut suggestions = shell
                     .builtins()
                     .keys()
                     // Add built-in commands to the completer's definitions.
@@ -188,13 +191,12 @@ impl<'a> Completer for IonCompleter<'a> {
                         } else {
                             path
                         };
-                        suggestions.extend(
-                            IonFileCompleter::new(Some(path), &self.shell).completions(start),
-                        );
+                        suggestions
+                            .extend(IonFileCompleter::new(Some(path), &shell).completions(start));
                     }
                 } else {
                     suggestions.extend(
-                        IonFileCompleter::new(Some("/bin/".into()), &self.shell).completions(start),
+                        IonFileCompleter::new(Some("/bin/".into()), &shell).completions(start),
                     )
                 }
                 Ok((word_pos, suggestions))
@@ -270,7 +272,7 @@ fn word_divide(buf: &str) -> Vec<(usize, usize)> {
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
 /// when a special character is contained within an expanded filename.
 #[derive(Clone)]
-pub struct IonFileCompleter<'a, 'b> {
+pub struct IonFileCompleter<'a: 'b, 'b> {
     shell: &'b Shell<'a>,
     /// The directory the expansion takes place in
     path: PathBuf,
@@ -419,14 +421,13 @@ mod tests {
 
     fn assert_comp<'a, 'b>(completer: &IonFileCompleter<'a, 'b>, comp: &str, results: &[&str]) {
         let comp = completer.completions(comp);
-        assert!(comp.iter().map(|s| &s.display.as_str()).eq(results.into_iter()));
+        assert!(comp.iter().map(|s| s.display.as_str()).eq(results.into_iter().map(|s| *s)));
     }
 
     #[test]
     fn filename_completion() {
         let shell = Shell::default();
-        let mut completer = IonFileCompleter::new(None, &shell);
-        let out = completer.completions("testing");
+        let completer = IonFileCompleter::new(None, &shell);
         assert_comp(&completer, "testing", &["testing/"]);
         assert_comp(&completer, "testing/file", &["testing/file_with_text"]);
         if cfg!(not(target_os = "redox")) {

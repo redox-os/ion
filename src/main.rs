@@ -1,4 +1,4 @@
-use self::binary::{builtins, InteractiveShell, KeyBindings};
+use self::binary::{builtins, gen_context, Builtins, InteractiveShell, IonCompleter, KeyBindings};
 use atty::Stream;
 use ion_shell::{BackgroundEvent, BuiltinMap, IonError, PipelineError, Shell, Value};
 use nix::{
@@ -222,12 +222,11 @@ fn main() {
             }
         }
     } else if stdin_is_a_tty || command_line_args.interactive {
-        let interactive = InteractiveShell::new(
-            shell,
-            command_line_args.key_bindings.unwrap_or(KeyBindings::Emacs),
-        );
-        interactive.add_callbacks();
-        interactive.execute_interactive();
+        let context = gen_context(command_line_args.key_bindings.unwrap_or(KeyBindings::Emacs));
+        let (context, builtins) = Builtins::new(&shell, context);
+        let interactive = InteractiveShell::new();
+        context.borrow_mut().set_helper(Some(IonCompleter::new(shell)));
+        interactive.execute_interactive(&builtins, context);
     } else if command_line_args.fake_interactive {
         let mut reader = BufReader::new(stdin());
         loop {

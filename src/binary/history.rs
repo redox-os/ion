@@ -1,7 +1,7 @@
-use super::InteractiveShell;
-use ion_shell::{builtins::Status, Value};
-
+use super::{completer::IonCompleter, InteractiveShell};
+use ion_shell::{builtins::Status, Shell, Value};
 use regex::Regex;
+use rustyline::Editor;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Default)]
@@ -22,12 +22,11 @@ pub struct IgnoreSetting {
 }
 
 /// Contains all history-related functionality for the `Shell`.
-impl<'a> InteractiveShell<'a> {
+impl InteractiveShell {
     /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE
     /// is changed.
-    pub fn ignore_patterns(&self) -> IgnoreSetting {
-        if let Some(Value::Array(patterns)) = self.shell.borrow().variables().get("HISTORY_IGNORE")
-        {
+    pub fn ignore_patterns(&self, shell: &Shell<'_>) -> IgnoreSetting {
+        if let Some(Value::Array(patterns)) = shell.variables().get("HISTORY_IGNORE") {
             let mut settings = IgnoreSetting::default();
             // for convenience and to avoid typos
             let regex_prefix = "regex:";
@@ -61,30 +60,29 @@ impl<'a> InteractiveShell<'a> {
 
     /// Saves a command in the history, depending on @HISTORY_IGNORE. Should be called
     /// immediately after `on_command()`
-    pub fn save_command_in_history(&self, command: &str) {
-        if self.should_save_command(command) {
-            if self.shell.borrow().variables().get_str("HISTORY_TIMESTAMP").unwrap_or_default()
-                == "1"
-            {
+    pub fn save_command_in_history(&self, command: &str, context: &mut Editor<IonCompleter<'_>>) {
+        let mut shell = context.helper_mut().unwrap().shell_mut();
+        if self.should_save_command(command, &mut shell) {
+            if shell.variables().get_str("HISTORY_TIMESTAMP").unwrap_or_default() == "1" {
                 // Get current time stamp
                 let since_unix_epoch =
                     SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                 let cur_time_sys = format!("#{}", &since_unix_epoch);
 
                 // Push current time to history
-                self.context.borrow_mut().history_mut().add(cur_time_sys);
+                context.history_mut().add(cur_time_sys);
             }
 
             // Push command itself to history
-            self.context.borrow_mut().history_mut().add(command);
+            context.history_mut().add(command);
         }
     }
 
     /// Returns true if the given command with the given exit status should be saved in the
     /// history
-    fn should_save_command(&self, command: &str) -> bool {
+    fn should_save_command(&self, command: &str, shell: &Shell<'_>) -> bool {
         // just for convenience and to make the code look a bit cleaner
-        let ignore = self.ignore_patterns();
+        let ignore = self.ignore_patterns(shell);
 
         // without the second check the command which sets the local variable would
         // also be ignored. However, this behavior might not be wanted.
@@ -98,9 +96,7 @@ impl<'a> InteractiveShell<'a> {
             return false;
         }
 
-        if ignore.no_such_command
-            && self.shell.borrow().previous_status() == Status::NO_SUCH_COMMAND
-        {
+        if ignore.no_such_command && shell.previous_status() == Status::NO_SUCH_COMMAND {
             return false;
         }
 
