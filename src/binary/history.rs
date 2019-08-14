@@ -60,9 +60,13 @@ impl InteractiveShell {
 
     /// Saves a command in the history, depending on @HISTORY_IGNORE. Should be called
     /// immediately after `on_command()`
-    pub fn save_command_in_history(&self, command: &str, context: &mut Editor<IonCompleter<'_>>) {
-        let mut shell = context.helper_mut().unwrap().shell_mut();
-        if self.should_save_command(command, &mut shell) {
+    pub fn save_command_in_history(
+        &self,
+        command: &str,
+        shell: &mut Shell<'_>,
+        context: &mut Editor<IonCompleter<'_, '_>>,
+    ) {
+        if self.should_save_command(command, shell) {
             if shell.variables().get_str("HISTORY_TIMESTAMP").unwrap_or_default() == "1" {
                 // Get current time stamp
                 let since_unix_epoch =
@@ -75,6 +79,24 @@ impl InteractiveShell {
 
             // Push command itself to history
             context.history_mut().add(command);
+            let helper = context.helper_mut().unwrap();
+            if helper.should_save() {
+                println!("here");
+                if let Some(Value::Str(histfile)) = shell.variables().get("HISTFILE") {
+                    let histfile = histfile.clone();
+                    std::mem::drop(shell);
+                    if let Err(err) = context.history().save(&histfile.as_str()) {
+                        eprintln!("ion: could not save history to file: {}", err);
+                    }
+                    let helper = context.helper_mut().unwrap();
+                    if helper.load_on_flush() {
+                        println!("here");
+                        if let Err(err) = context.history_mut().load(&histfile.as_str()) {
+                            eprintln!("ion: could not save history to file: {}", err);
+                        }
+                    }
+                }
+            }
         }
     }
 

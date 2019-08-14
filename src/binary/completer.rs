@@ -7,12 +7,7 @@ use rustyline::{
     hint::{Hinter, HistoryHinter},
     Context, Helper,
 };
-use std::{borrow::Cow, env, iter, path::PathBuf, str};
-
-pub struct IonCompleter<'builtins> {
-    shell:  Shell<'builtins>,
-    hinter: HistoryHinter,
-}
+use std::{borrow::Cow, cell::RefCell, env, iter, num::NonZeroU8, path::PathBuf, str};
 
 /// Unescape filenames for the completer so that special characters will be properly shown.
 fn unescape(input: &str) -> String {
@@ -87,25 +82,53 @@ enum CompletionType {
     VariableAndFiles,
 }
 
-impl<'a> IonCompleter<'a> {
-    pub fn new<'b: 'a>(shell: Shell<'b>) -> Self {
-        IonCompleter { shell, hinter: HistoryHinter {} }
-    }
-
-    pub fn shell(&self) -> &Shell<'a> { &self.shell }
-
-    pub fn shell_mut(&mut self) -> &mut Shell<'a> { &mut self.shell }
+pub struct IonCompleter<'cell, 'builtins> {
+    shell:         &'cell RefCell<Shell<'builtins>>,
+    hinter:        HistoryHinter,
+    count:         u8,
+    load_on_flush: bool,
+    save_each:     Option<NonZeroU8>,
 }
 
-impl<'a> Hinter for IonCompleter<'a> {
+impl<'a, 'b> IonCompleter<'a, 'b> {
+    pub fn new(shell: &'a RefCell<Shell<'b>>) -> Self {
+        IonCompleter {
+            shell,
+            hinter: HistoryHinter {},
+            count: 0,
+            save_each: NonZeroU8::new(10),
+            load_on_flush: true,
+        }
+    }
+
+    pub fn shell(&self) -> &'a RefCell<Shell<'b>> { &self.shell }
+
+    pub fn should_save(&mut self) -> bool {
+        self.count += 1;
+        if self.save_each.map_or(false, |save_each| u8::from(save_each) <= self.count) {
+            self.count = 0;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn set_load_on_flush(&mut self, load_on_flush: bool) { self.load_on_flush = load_on_flush; }
+
+    pub fn load_on_flush(&self) -> bool { self.load_on_flush }
+
+    pub fn set_save_each(&mut self, save_each: u8) { self.save_each = NonZeroU8::new(save_each); }
+}
+
+impl<'a, 'b> Hinter for IonCompleter<'a, 'b> {
     fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
         self.hinter.hint(line, pos, ctx)
     }
 }
 
-impl<'a> Helper for IonCompleter<'a> {}
+impl<'a, 'b> Helper for IonCompleter<'a, 'b> {}
 
-impl<'aorrow> Highlighter for IonCompleter<'aorrow> {
+impl<'a, 'cell> Highlighter for IonCompleter<'a, 'cell> {
     fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
         &'s self,
         prompt: &'p str,
@@ -123,7 +146,7 @@ impl<'aorrow> Highlighter for IonCompleter<'aorrow> {
     fn highlight_char(&self, _line: &str, _pos: usize) -> bool { false }
 }
 
-impl<'a> Completer for IonCompleter<'a> {
+impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
     type Candidate = Pair;
 
     fn complete(
@@ -133,7 +156,7 @@ impl<'a> Completer for IonCompleter<'a> {
         ctx: &Context,
     ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
         let (start, word_pos, completion_type) = getword(line, pos);
-        let shell = &self.shell;
+        let shell = &self.shell.borrow();
         let vars = shell.variables();
         match completion_type {
             // Initialize a new completer from the definitions collected.

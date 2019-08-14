@@ -6,6 +6,7 @@ use nix::{
     unistd,
 };
 use std::{
+    cell::RefCell,
     fs,
     io::{stdin, BufReader},
     process,
@@ -223,10 +224,11 @@ fn main() {
         }
     } else if stdin_is_a_tty || command_line_args.interactive {
         let context = gen_context(command_line_args.key_bindings.unwrap_or(KeyBindings::Emacs));
-        let (context, builtins) = Builtins::new(&shell, context);
+        let shell = RefCell::new(shell);
+        let builtins = Builtins::new(&shell.borrow(), &context);
         let interactive = InteractiveShell::new();
-        context.borrow_mut().set_helper(Some(IonCompleter::new(shell)));
-        interactive.execute_interactive(&builtins, context);
+        context.borrow_mut().set_helper(Some(IonCompleter::new(&shell)));
+        interactive.execute_interactive(&builtins, &shell, &context);
     } else if command_line_args.fake_interactive {
         let mut reader = BufReader::new(stdin());
         loop {

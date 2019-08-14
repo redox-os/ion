@@ -16,7 +16,7 @@ use ion_shell::{
     IonError, PipelineError, Shell, Signal, Value,
 };
 use itertools::Itertools;
-use rustyline::Editor;
+use rustyline::{config::Configurer, EditMode, Editor};
 use std::{
     cell::{Cell, RefCell},
     fs::{self, OpenOptions},
@@ -87,14 +87,13 @@ pub struct InteractiveShell {
 }
 
 impl<'shell, 'context> Builtins<'shell, 'context> {
-    pub fn new<'s, 'c>(
+    pub fn new<'s>(
         shell: &Shell<'s>,
-        context: Editor<IonCompleter<'c>>,
-    ) -> (Rc<RefCell<Editor<IonCompleter<'context>>>>, Self)
+        context: &'context RefCell<Editor<IonCompleter<'_, '_>>>,
+    ) -> Self
     where
         's: 'shell,
-        'c: 'context,
-        'context: 'shell,
+        'shell: 'static,
     {
         let huponexit = Rc::new(Cell::new(false));
         let huponexit_bis = huponexit.clone();
@@ -121,34 +120,32 @@ impl<'shell, 'context> Builtins<'shell, 'context> {
             exec(args, shell)
         });
 
-        let context = Rc::new(RefCell::new(context));
-        let context_bis = Rc::downgrade(&context);
         let history = Box::new(move |args: &[types::Str], _shell: &mut Shell<'_>| -> Status {
             if man_pages::check_help(args, MAN_HISTORY) {
                 return Status::SUCCESS;
             }
 
             match args.get(1).map(|s| s.as_str()) {
-                // Some("+inc_append") => {
-                // context_bis.borrow_mut().history.inc_append = true;
-                // }
-                // Some("-inc_append") => {
-                // context_bis.borrow_mut().history.inc_append = false;
-                // }
-                // Some("+share") => {
-                // context_bis.borrow_mut().history.inc_append = true;
-                // context_bis.borrow_mut().history.share = true;
-                // }
-                // Some("-share") => {
-                // context_bis.borrow_mut().history.inc_append = false;
-                // context_bis.borrow_mut().history.share = false;
-                // }
-                // Some("+duplicates") => {
-                // context_bis.borrow_mut().history.load_duplicates = true;
-                // }
-                // Some("-duplicates") => {
-                // context_bis.borrow_mut().history.load_duplicates = false;
-                // }
+                Some("+inc_append") => {
+                    context.borrow_mut().helper_mut().unwrap().set_save_each(1);
+                }
+                Some("-inc_append") => {
+                    context.borrow_mut().helper_mut().unwrap().set_save_each(0);
+                }
+                Some("+share") => {
+                    context.borrow_mut().helper_mut().unwrap().set_save_each(1);
+                    context.borrow_mut().helper_mut().unwrap().set_load_on_flush(true);
+                }
+                Some("-share") => {
+                    context.borrow_mut().helper_mut().unwrap().set_save_each(0);
+                    context.borrow_mut().helper_mut().unwrap().set_load_on_flush(false);
+                }
+                Some("+duplicates") => {
+                    context.borrow_mut().set_history_ignore_dups(true);
+                }
+                Some("-duplicates") => {
+                    context.borrow_mut().set_history_ignore_dups(false);
+                }
                 Some(_) => {
                     Status::error(
                         "Invalid history option. Choices are [+|-] inc_append, duplicates and \
@@ -156,10 +153,7 @@ impl<'shell, 'context> Builtins<'shell, 'context> {
                     );
                 }
                 None => {
-                    print!(
-                        "{}",
-                        context_bis.upgrade().unwrap().borrow().history().iter().format("\n")
-                    );
+                    print!("{}", context.borrow().history().iter().format("\n"));
                 }
             }
             Status::SUCCESS
@@ -177,24 +171,26 @@ impl<'shell, 'context> Builtins<'shell, 'context> {
         // let context_bis = context.clone();
         let keybindings = Box::new(move |args: &[types::Str], _shell: &mut Shell<'_>| -> Status {
             match args.get(1).map(|s| s.as_str()) {
-                // Some("vi") => {
-                // context_bis.borrow_mut().key_bindings = KeyBindings::Vi;
-                // Status::SUCCESS
-                // }
-                // Some("emacs") => {
-                // context_bis.borrow_mut().key_bindings = KeyBindings::Emacs;
-                // Status::SUCCESS
-                // }
+                Some("vi") => {
+                    context.borrow_mut().set_edit_mode(EditMode::Vi);
+                    Status::SUCCESS
+                }
+                Some("emacs") => {
+                    context.borrow_mut().set_edit_mode(EditMode::Emacs);
+                    Status::SUCCESS
+                }
                 Some(_) => Status::error("Invalid keybindings. Choices are vi and emacs"),
                 None => Status::error("keybindings need an argument"),
             }
         });
 
-        (context, Builtins { exec, exit, history, keybindings, set_huponexit })
+        Builtins { exec, exit, history, keybindings, set_huponexit }
     }
 }
 
-pub fn gen_context<'a>(_keybindings: KeyBindings) -> Editor<IonCompleter<'a>> { Editor::new() }
+pub fn gen_context<'a, 'b>(_keybindings: KeyBindings) -> RefCell<Editor<IonCompleter<'a, 'b>>> {
+    RefCell::new(Editor::new())
+}
 
 impl InteractiveShell {
     const CONFIG_FILE_NAME: &'static str = "initrc";
@@ -202,21 +198,21 @@ impl InteractiveShell {
     pub fn new() -> Self { InteractiveShell { terminated: Cell::new(true) } }
 
     /// Handles commands given by the REPL, and saves them to history.
-    pub fn save_command(&self, cmd: &str, context: &mut Editor<IonCompleter<'_>>) {
-        let shell = context.helper_mut().unwrap().shell_mut();
+    pub fn save_command(
+        &self,
+        cmd: &str,
+        shell: &mut Shell<'_>,
+        context: &mut Editor<IonCompleter<'_, '_>>,
+    ) {
         let tilde = shell.tilde(cmd).ok().map_or(false, |path| Path::new(&path.as_str()).is_dir());
         if !cmd.ends_with('/') && tilde {
-            self.save_command_in_history(&[cmd, "/"].concat(), context);
+            self.save_command_in_history(&[cmd, "/"].concat(), shell, context);
         } else {
-            self.save_command_in_history(cmd, context);
+            self.save_command_in_history(cmd, shell, context);
         }
     }
 
-    pub fn add_callbacks<'b>(&self, context: &Rc<RefCell<Editor<IonCompleter<'b>>>>) {
-        let mut ctx = context.borrow_mut();
-        let shell = ctx.helper_mut().unwrap().shell_mut();
-
-        let context = Rc::downgrade(&context);
+    pub fn add_callbacks<'a: 'b, 'b>(&self, shell: &mut Shell<'_>) {
         shell.set_on_command(Some(Box::new(move |shell, elapsed| {
             // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the
             // pipline just executed to the the file and context histories. At the
@@ -228,7 +224,6 @@ impl InteractiveShell {
                     elapsed.subsec_nanos()
                 );
                 println!("{}", summary);
-                context.upgrade().unwrap().borrow_mut().history_mut().add(summary);
             }
         })));
     }
@@ -238,8 +233,11 @@ impl InteractiveShell {
         OpenOptions::new().write(true).create_new(true).open(path).map(|_| ())
     }
 
-    fn add_fns<'a, 'b>(context: &mut Editor<IonCompleter<'b>>, builtins: &'b Builtins<'a, 'b>) {
-        let shell = context.helper_mut().unwrap().shell_mut();
+    fn add_fns<'a, 'b, 'c: 'b, 'd: 'b>(
+        context: &mut Editor<IonCompleter<'_, 'b>>,
+        builtins: &'d Builtins<'_, 'b>,
+    ) {
+        let mut shell = context.helper_mut().unwrap().shell().borrow_mut();
         shell
             .builtins_mut()
             .add("history", &builtins.history, "Display a log of all commands previously executed")
@@ -255,38 +253,36 @@ impl InteractiveShell {
 
     /// Creates an interactive session that reads from a prompt provided by
     /// Liner.
-    pub fn execute_interactive<'a, 'b, 'c, 'd>(
+    pub fn execute_interactive<'d: 'b, 'b: 'c, 'c, 'e: 'b>(
         &'c self,
-        builtins: &'c Builtins<'d, 'b>,
-        context: Rc<RefCell<Editor<IonCompleter<'b>>>>,
-    ) -> !
-    where
-        'd: 'b,
-    {
+        builtins: &'c Builtins<'b, 'd>,
+        shell: &RefCell<Shell<'_>>,
+        context: &RefCell<Editor<IonCompleter<'_, '_>>>,
+    ) -> ! {
         // Downgrading the lifetime should be fine, as all the references to it are contained
         // within the context, which dies in this scope.
         let context =
-            unsafe { std::mem::transmute::<_, Rc<RefCell<Editor<IonCompleter<'c>>>>>(context) };
+            unsafe { std::mem::transmute::<_, &RefCell<Editor<IonCompleter<'c, 'c>>>>(context) };
         Self::add_fns(&mut context.borrow_mut(), builtins);
-        self.add_callbacks(&context);
+        self.add_callbacks(&mut shell.borrow_mut());
 
-        let mut ctx = context.borrow_mut();
-        let shell = ctx.helper_mut().unwrap().shell_mut();
         match BaseDirectories::with_prefix("ion") {
             Ok(project_dir) => {
-                Self::exec_init_file(&project_dir, shell);
-                Self::load_history(&project_dir, &mut ctx);
+                let mut shell = shell.borrow_mut();
+                Self::exec_init_file(&project_dir, &mut shell);
+                Self::load_history(&project_dir, &mut shell, &mut context.borrow_mut());
             }
             Err(err) => eprintln!("ion: unable to get xdg base directory: {}", err),
         }
 
-        std::mem::drop(ctx);
-        self.exec(context);
+        self.exec(shell, &context);
     }
 
-    fn load_history(project_dir: &BaseDirectories, editor: &mut Editor<IonCompleter<'_>>) {
-        let shell = editor.helper_mut().unwrap().shell_mut();
-
+    fn load_history(
+        project_dir: &BaseDirectories,
+        shell: &mut Shell<'_>,
+        editor: &mut Editor<IonCompleter<'_, '_>>,
+    ) {
         shell.variables_mut().set("HISTFILE_ENABLED", "1");
 
         // History Timestamps enabled variable, disabled by default
@@ -326,7 +322,11 @@ impl InteractiveShell {
         }
     }
 
-    fn exec<'b, 'c, 'd>(&'c self, context: Rc<RefCell<Editor<IonCompleter<'b>>>>) -> ! {
+    fn exec(
+        &self,
+        shell: &RefCell<Shell<'_>>,
+        context: &RefCell<Editor<IonCompleter<'_, '_>>>,
+    ) -> ! {
         // A reference would be enough for the completer, I however did not find a way to prove it
         // to the compiler with lifetimes, as the context itself exists for longer that the actual
         // completer
@@ -347,9 +347,7 @@ impl InteractiveShell {
                     );
                     self.terminated.set(true);
                     {
-                        let mut context = context.borrow_mut();
-                        let helper = context.helper_mut().unwrap();
-                        let shell = helper.shell_mut();
+                        let mut shell = shell.borrow_mut();
                         match shell.on_command(&cmd) {
                             Ok(_) => (),
                             Err(IonError::PipelineExecutionError(
@@ -373,7 +371,7 @@ impl InteractiveShell {
                                 shell.reset_flow();
                             }
                         }
-                        self.save_command(&cmd, &mut context);
+                        self.save_command(&cmd, &mut shell, &mut context.borrow_mut());
                     }
                 }
                 None => self.terminated.set(true),
