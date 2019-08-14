@@ -16,7 +16,10 @@ use ion_shell::{
     IonError, PipelineError, Shell, Signal, Value,
 };
 use itertools::Itertools;
-use rustyline::{config::Configurer, EditMode, Editor};
+use rustyline::{
+    config::{self, CompletionType, Configurer},
+    EditMode, Editor,
+};
 use std::{
     cell::{Cell, RefCell},
     fs::{self, OpenOptions},
@@ -189,7 +192,15 @@ impl<'shell, 'context> Builtins<'shell, 'context> {
 }
 
 pub fn gen_context<'a, 'b>(_keybindings: KeyBindings) -> RefCell<Editor<IonCompleter<'a, 'b>>> {
-    RefCell::new(Editor::new())
+    RefCell::new(Editor::with_config(
+        config::Builder::new()
+            .max_history_size(10_000)
+            .history_ignore_space(true)
+            .completion_type(CompletionType::List)
+            .completion_prompt_limit(10)
+            .tab_stop(4)
+            .build(),
+    ))
 }
 
 impl InteractiveShell {
