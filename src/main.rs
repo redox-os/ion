@@ -203,7 +203,14 @@ fn main() {
     shell.variables_mut().set(
         "args",
         Value::Array(
-            command_line_args.args.into_iter().map(|arg| Value::Str(arg.into())).collect(),
+            if script_path.is_some() {
+                command_line_args.args
+            } else {
+                vec![std::env::args().next().unwrap()]
+            }
+            .into_iter()
+            .map(|arg| Value::Str(arg.into()))
+            .collect(),
         ),
     );
 
