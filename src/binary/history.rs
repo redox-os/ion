@@ -81,19 +81,17 @@ impl InteractiveShell {
             context.history_mut().add(command);
             let helper = context.helper_mut().unwrap();
             if helper.should_save() {
-                println!("here");
                 if let Some(Value::Str(histfile)) = shell.variables().get("HISTFILE") {
                     let histfile = histfile.clone();
                     std::mem::drop(shell);
-                    if let Err(err) = context.history().save(&histfile.as_str()) {
-                        eprintln!("ion: could not save history to file: {}", err);
-                    }
                     let helper = context.helper_mut().unwrap();
                     if helper.load_on_flush() {
-                        println!("here");
                         if let Err(err) = context.history_mut().load(&histfile.as_str()) {
                             eprintln!("ion: could not save history to file: {}", err);
                         }
+                    }
+                    if let Err(err) = context.history().save(&histfile.as_str()) {
+                        eprintln!("ion: could not save history to file: {}", err);
                     }
                 }
             }
