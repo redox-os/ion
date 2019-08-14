@@ -54,7 +54,7 @@ As another example:
 
 ```
 fn hello name age:int hobbies:[str]
-    echo $name ($age) has the following hobbies:
+    echo "$name ($age) has the following hobbies:"
     for hobby in @hobbies
         echo "  $hobby"
     end
@@ -71,7 +71,7 @@ As with any other statement, you can pipe functions using `read`.
 ```sh
 fn format_with pat
     read input
-    echo $join(@split(input), $pat)
+    echo $join(@split($input) $pat)
 end
 
 echo one two three four five | format_with "-"

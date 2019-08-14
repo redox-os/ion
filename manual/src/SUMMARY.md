@@ -2,7 +2,7 @@
 
 - [Introduction](introduction.md)
 
-- [Migrating from POSIX shells](migration.md)
+- [Migrating from POSIX shells](migrating.md)
 
 - [Miscellaneous](misc/index.md)
 

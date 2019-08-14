@@ -7,7 +7,7 @@ Redirection will write the output of a command to a file.
 ### Redirect Stdout
 
 ```sh
-command > stderr
+command > stdout
 ```
 
 ### Redirect Stderr

@@ -35,7 +35,7 @@ See the [examples folder](https://gitlab.redox-os.org/redox-os/ion/tree/master/e
 
 ## Pop!\_OS / Ubuntu
 
-The following PPA supports the 18.04 (bionic) and 18.10 (cosmic) releases. Bionic builds were made using the Pop\_OS PPA's rustc 1.35.0 package.
+The following PPA supports the 18.04 (bionic) and 19.04 (disco) releases. Bionic builds were made using the Pop\_OS PPA's rustc 1.35.0 package.
 
 ```
 sudo add-apt-repository ppa:mmstick76/ion-shell
