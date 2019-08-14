@@ -52,7 +52,7 @@ let other_array = [ this is the ion ]
 let array = [ @array @other_array shell ]
 let as_string = @array
 echo @array
-echo $array
+echo $as_string
 ```
 
 ```
