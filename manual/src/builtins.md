@@ -78,11 +78,11 @@ DESCRIPTION
     Returns 0 if any given argument contains the first argument, else returns 1
 ```
 
-## dir_depth - set the dir stack depth
+## dir-depth - set the dir stack depth
 
 ```txt
 SYNOPSYS
-    dir_depth [DEPTH]
+    dir-depth [DEPTH]
 
 DESCRIPTION
     If DEPTH is given, set the dir stack max depth to DEPTH, else remove the limit
@@ -428,11 +428,11 @@ DESCRIPTION
     variables will affect the current shell because of this.
 ```
 
-## starts_with - check if a given string starts with another one
+## starts-with - check if a given string starts with another one
 
 ```txt
 SYNOPSIS
-    starts_with <PATTERN> tests...
+    starts-with <PATTERN> tests...
 
 DESCRIPTION
     Returns 0 if any given argument starts with the first argument, else returns 1
