@@ -54,7 +54,7 @@ As another example:
 
 ```
 fn hello name age:int hobbies:[str]
-    echo $name ($age) has the following hobbies:
+    echo "$name ($age) has the following hobbies:""
     for hobby in @hobbies
         echo "  $hobby"
     end
