@@ -751,7 +751,7 @@ pub fn help(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             println!("Command helper not found [run 'help']...");
         }
     } else {
-        println!("{}", shell.builtins().keys().format("\n"));
+        println!("{}", shell.builtins().keys().sorted().format("\n"));
     }
     Status::SUCCESS
 }
