@@ -2,7 +2,7 @@
 
 The `history` builtin command can be used to display the command history:
 - to display the entire command history, type `history` ;
-- if you're only interested in the last N entries, use `type history | tail -n N`.
+- if you're only interested in the last N entries, type `history | tail -N`.
 
 Its behavior can be changed via various local variables (see [Variables](#Variables) below).
 
@@ -29,15 +29,15 @@ The following local variables can be used to modify Ion's history behavior:
 
 The maximum number of lines contained in the history file.  **FIXME**
 
-Ideally, this value should be the same as `HISTFILE_SIZE`
-
 **Default value:** `1000`
+
+Ideally, this value should be the same as `HISTFILE_SIZE`
 
 ### HISTORY_IGNORE
 
-Which commands should **NOT** be saved in the history.
+Which commands should *not* be saved in the history.
 
-This is an array and defaults to an **empty array**, meaning that all commands will be saved.
+**Default value:** `[ no_such_command whitespace duplicates ]`
 
 Each element of the array can take one of the following options:
 - `all` <br/>
@@ -53,7 +53,7 @@ Each element of the array can take one of the following options:
 - `duplicates`  <br/>
   All preceding duplicate commands are removed/ignored from the history after a matching command is entered.
 
-**Default value:** `[ no_such_command whitespace duplicates ]`
+Specifying an empty array, means that all commands will be saved.
 
 **Notes**
 - You can specify as many elements as you want.
@@ -109,9 +109,9 @@ end of the line.
 
 Whether the history should be read from/written into the file specified by `HISTFILE`.
 
-A value of **1** means yes, everything else means no.
-
 **Default value:** `1`
+
+A value of **1** means yes, everything else means no.
 
 ### HISTFILE
 
@@ -124,9 +124,9 @@ from this file, and when it exits, the session's history will be appended to thi
 
 The maximum number of lines contained in the history file. **FIXME**
 
-Ideally, this value should have the same value as `HISTORY_SIZE`.
-
 **Default value:** `100000`
+
+Ideally, this value should have the same value as `HISTORY_SIZE`.
 
 ### HISTORY_TIMESTAMP
 
@@ -134,6 +134,6 @@ Whether a corresponding timestamp should be recorded along with each command.
 
 The timestamp is indicated with a `#` and is unformatted as the seconds since the unix epoch.
 
-Possible values are `0` (disabled) and `1` (enabled).
-
 **Default value:** `0`
+
+Possible values are `0` (disabled) and `1` (enabled).
