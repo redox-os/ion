@@ -1,0 +1,21 @@
+[book]
+title = "Ion Documentation"
+description = "A modern system shell that features a simple, yet powerful, syntax. Written entirely in Rust."
+authors = ["Michael Murphy", "Xavier L'Heureux", "Jeremy Soller"]
+language = "en"
+
+[build]
+create-missing = false
+
+[output.html]
+git-repository-url = "https://gitlab.redox-os.org/redox-os/ion"
+git-repository-icon = "fa-github"
+
+[output.linkcheck]
+# Should we check links on the internet? Enabling this option adds a
+# non-negligible performance impact
+follow-web-links = false
+
+# Are we allowed to link to files outside of the book's root directory? This
+# may help prevent linking to sensitive files (e.g. "../../../../etc/shadow")
+traverse-parent-directories = false

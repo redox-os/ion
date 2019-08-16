@@ -46,6 +46,8 @@ redox:
     - redoxer test
 
 pages:
+  before_script:
+    - (test -x $HOME/.cargo/bin/mdbook-linkcheck || cargo install mdbook-linkcheck)
   image: hrektts/mdbook
   stage: deploy
   script:

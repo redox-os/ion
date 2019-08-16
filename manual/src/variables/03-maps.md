@@ -18,7 +18,7 @@ let hashmap:hmap[str] = [ foo=hello bar=world fizz=I buzz=was bazz=here ]
 let btreemap:bmap[str] = [ foo=hello bar=world fizz=I buzz=was bazz=here ]
 ```
 
-## Fetch a variables by key
+## Fetch a variable by key
 
 ```
 let x = bazz
