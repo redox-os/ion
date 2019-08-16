@@ -1,12 +1,14 @@
 # Command history
 
-## General
-- Ions history can be found at **$HOME/.local/share/ion/history**
-- The `history` builtin can be used to display the entire command history
-  - If you're only interested in the last X entries, use `history | tail -n X`
-- The histories\' behavior can be changed via various local variables (see section
-  **Variables**)
-- Unlike other shells, `ion` saves repeated commands only once:
+The `history` builtin command can be used to display the command history:
+- to display the entire command history, type `history` ;
+- if you're only interested in the last N entries, use `type history | tail -n N`.
+
+Its behavior can be changed via various local variables (see [Variables](#Variables) below).
+
+Ion's history file is located by default in `$HOME/.local/share/ion/history`.
+
+Unlike other shells, Ion by default saves repeated commands only once:
 ```sh
 # echo "Hello, world!"
 Hello, world!
@@ -20,17 +22,20 @@ false
 ```
 
 ## Variables
-The following local variables can be used to modify Ions history behavior:
+
+The following local variables can be used to modify Ion's history behavior:
 
 ### HISTORY_SIZE
-Determines how many entries of the history are kept in memory.
+
+The maximum number of lines contained in the history file.  **FIXME**
 
 Ideally, this value should be the same as `HISTFILE_SIZE`
 
 **Default value:** `1000`
 
 ### HISTORY_IGNORE
-Specifies which commands should **NOT** be saved in the history.
+
+Which commands should **NOT** be saved in the history.
 
 This is an array and defaults to an **empty array**, meaning that all commands will be saved.
 
@@ -94,34 +99,38 @@ let HISTORY_IGNORE = [ whitespace ] # saved
 # trulse # ignored
 ```
 
-**Tips**
+**Tip**
 
 I like to add `regex:#ignore$` to my `HISTORY_IGNORE`.
 That way, whenever I want to ignore a command on the fly, I just need to add `#ignore` to the
 end of the line.
 
 ### HISTFILE_ENABLED
-Specifies whether the history should be read from/written into the file specified by `HISTFILE`.
+
+Whether the history should be read from/written into the file specified by `HISTFILE`.
 
 A value of **1** means yes, everything else means no.
 
 **Default value:** `1`
 
 ### HISTFILE
-The file into which the history should be saved. At the launch of ion the history will be read
-from this file and when ion exits, the history of the session will be appended into the file.
+
+The file into which the history should be saved. At Ion' startup, the history will be read
+from this file, and when it exits, the session's history will be appended to this file.
 
 **Default value:** `$HOME/.local/share/ion/history`
 
 ### HISTFILE_SIZE
-Specifies how many commands should be saved in `HISTFILE` at most.
+
+The maximum number of lines contained in the history file. **FIXME**
 
 Ideally, this value should have the same value as `HISTORY_SIZE`.
 
 **Default value:** `100000`
 
 ### HISTORY_TIMESTAMP
-Specifies whether a corresponding timestamp should be recorded along with each command.
+
+Whether a corresponding timestamp should be recorded along with each command.
 
 The timestamp is indicated with a `#` and is unformatted as the seconds since the unix epoch.
 
