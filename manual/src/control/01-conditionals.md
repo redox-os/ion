@@ -17,11 +17,11 @@ that `1` should indicate success, and `0` should indicate a general error, so th
 found in POSIX shells will be preserved.
 
 We supply a number of builtin commands that are utilized for the purpose of evaluating
-expressions and values that we create within our shell. One of these commands is the `test`
-builtin, which is commonly found in other POSIX shells, and whose flags and operation should
-be identical. **TODO: Insert Manual Page Link To Our Implementation** We also supply a `not`
-builtin, which may be convenient to use in conjuction with other commands in order to flip
-the exit status; and a `matches` builtin that performs a regex-based boolean match.
+expressions and values that we create within our shell. One of these commands is the [`test`
+builtin](../builtins.md#test---perform-tests-on-files-and-text), which is commonly found
+in other POSIX shells, and whose flags and operation should be identical.
+We also supply a `not` builtin, which may be convenient to use in conjuction with other commands
+in order to flip the exit status; and a `matches` builtin that performs a regex-based boolean match.
 
 ```sh
 if test "foo" = $foo
