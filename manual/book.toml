@@ -1,0 +1,13 @@
+[book]
+title = "Ion Documentation"
+description = "A modern system shell that features a simple, yet powerful, syntax. Written entirely in Rust."
+authors = ["Michael Murphy", "Xavier L'Heureux", "Jeremy Soller"]
+language = "en"
+
+[build]
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/rust-lang-nursery/mdBook"
+git-repository-icon = "fa-github"
+
