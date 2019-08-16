@@ -82,22 +82,23 @@ Specifying an empty array, means that all commands will be saved.
 - As all variables, `HISTORY_IGNORE` is not saved between sessions. It is suggested to set it via
 ions init file.
 - The `let HISTORY_IGNORE = [ .. ]` command itself is **not effected** except if the assignment
-command starts with a whitespace and the **whitespace** element is specified in this assignment.
-See the following example:
-```sh
-# echo @HISTORY_IGNORE
+  command starts with a whitespace and the **whitespace** element is specified in this assignment.
+  
+  See the following example:
+  ```sh
+  # echo @HISTORY_IGNORE
 
-# let HISTORY_IGNORE = [ all ] # saved
-# let HISTORY_IGNORE = [ whitespace ] # saved
-#  true # ignored
-#  let HISTORY_IGNORE = [  ] # saved
-#  let HISTORY_IGNORE = [ whitespace ] # ignored
-# history
-echo @HISTORY_IGNORE
-let HISTORY_IGNORE = [ all ] # saved
-let HISTORY_IGNORE = [ whitespace ] # saved
- let HISTORY_IGNORE = [  ] # saved
-```
+  # let HISTORY_IGNORE = [ all ] # saved
+  # let HISTORY_IGNORE = [ whitespace ] # saved
+  #  true # ignored
+  #  let HISTORY_IGNORE = [  ] # saved
+  #  let HISTORY_IGNORE = [ whitespace ] # ignored
+  # history
+  echo @HISTORY_IGNORE
+  let HISTORY_IGNORE = [ all ] # saved
+  let HISTORY_IGNORE = [ whitespace ] # saved
+  let HISTORY_IGNORE = [  ] # saved
+  ```
 
 **Examples**
 ```sh
