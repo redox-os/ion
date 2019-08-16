@@ -25,13 +25,28 @@ false
 
 The following local variables can be used to modify Ion's history behavior:
 
-### HISTORY_SIZE
+### HISTFILE
 
-The maximum number of lines contained in the command history in-memory.
+The file into which the history should be saved. At Ion' startup, the history will be read
+from this file, and when it exits, the session's history will be appended to this file.
 
-**Default value:** `1000`
+**Default value:** `$HOME/.local/share/ion/history`
 
-Ideally, this value should be the same as `HISTFILE_SIZE`. **FIXME:** why ?
+### HISTFILE_ENABLED
+
+Whether the history should be read from/written into the file specified by `HISTFILE`.
+
+**Default value:** `1`
+
+A value of `1` means yes, everything else means no.
+
+### HISTFILE_SIZE
+
+The maximum number of lines kept in the history file when flushed from memory.
+
+**Default value:** `100000`
+
+Ideally, this value should have the same value as `HISTORY_SIZE`. **FIXME:** why ?
 
 ### HISTORY_IGNORE
 
@@ -105,28 +120,13 @@ I like to add `regex:#ignore$` to my `HISTORY_IGNORE`.
 That way, whenever I want to ignore a command on the fly, I just need to add `#ignore` to the
 end of the line.
 
-### HISTFILE_ENABLED
+### HISTORY_SIZE
 
-Whether the history should be read from/written into the file specified by `HISTFILE`.
+The maximum number of lines contained in the command history in-memory.
 
-**Default value:** `1`
+**Default value:** `1000`
 
-A value of **1** means yes, everything else means no.
-
-### HISTFILE
-
-The file into which the history should be saved. At Ion' startup, the history will be read
-from this file, and when it exits, the session's history will be appended to this file.
-
-**Default value:** `$HOME/.local/share/ion/history`
-
-### HISTFILE_SIZE
-
-The maximum number of lines kept in the history file when flushed from memory.
-
-**Default value:** `100000`
-
-Ideally, this value should have the same value as `HISTORY_SIZE`. **FIXME:** why ?
+Ideally, this value should be the same as `HISTFILE_SIZE`. **FIXME:** why ?
 
 ### HISTORY_TIMESTAMP
 
