@@ -1,12 +1,14 @@
 # Command history
 
-## General
-- Ions history can be found at **$HOME/.local/share/ion/history**
-- The `history` builtin can be used to display the entire command history
-  - If you're only interested in the last X entries, use `history | tail -n X`
-- The histories\' behavior can be changed via various local variables (see section
-  **Variables**)
-- Unlike other shells, `ion` saves repeated commands only once:
+The `history` builtin command can be used to display the command history:
+- to display the entire command history, type `history` ;
+- if you're only interested in the last N entries, type `history | tail -N`.
+
+Its behavior can be changed via various local variables (see [Variables](#Variables) below).
+
+Ion's history file is located by default in `$HOME/.local/share/ion/history`.
+
+Unlike other shells, Ion by default saves repeated commands only once:
 ```sh
 # echo "Hello, world!"
 Hello, world!
@@ -20,24 +22,55 @@ false
 ```
 
 ## Variables
-The following local variables can be used to modify Ions history behavior:
 
-### HISTORY_SIZE
-Determines how many entries of the history are kept in memory.
-Default value is **1000**.
-Ideally, this value should be the same as `HISTFILE_SIZE`
+The following local variables can be used to modify Ion's history behavior:
+
+### HISTFILE
+
+The file into which the history should be saved. At Ion' startup, the history will be read
+from this file, and when it exits, the session's history will be appended to this file.
+
+**Default value:** `$HOME/.local/share/ion/history`
+
+### HISTFILE_ENABLED
+
+Whether the history should be read from/written into the file specified by `HISTFILE`.
+
+**Default value:** `1`
+
+A value of `1` means yes, everything else means no.
+
+### HISTFILE_SIZE
+
+The maximum number of lines kept in the history file when flushed from memory.
+
+**Default value:** `100000`
+
+Ideally, this value should have the same value as `HISTORY_SIZE`. **FIXME:** why ?
+
+**(Currently ignored)**
 
 ### HISTORY_IGNORE
-Specifies which commands should **NOT** be saved in the history.
-This is an array and defaults to an **empty array**, meaning that all commands will be saved.
+
+Which commands should *not* be saved in the history.
+
+**Default value:** `[ no_such_command whitespace duplicates ]`
+
 Each element of the array can take one of the following options:
-- **all** -> All commands are ignored, nothing will be saved in the history.
-- **no_such_command** -> Commands which return `NO_SUCH_COMMAND` will not be saved in the history.
-- **whitespace** -> Commands which start with a [whitespace character](https://doc.rust-lang.org/stable/reference/whitespace.html) will not be saved in the
-history.
-- **regex:xxx** -> Where xxx is treated as a [regular expression](https://doc.rust-lang.org/regex/regex/index.html).
-Commands which match this regular expression will not be saved in the history.
-- **duplicates** -> All preceding duplicate commands are removed/ignored from the history after a matching command is entered.
+- `all` <br/>
+  All commands are ignored, nothing will be saved in the history.
+- `no_such_command` <br/>
+  Commands which return `NO_SUCH_COMMAND` will not be saved in the history.
+- `whitespace` <br/>
+  Commands which start with a [whitespace character](https://doc.rust-lang.org/stable/reference/whitespace.html) will not be saved in the
+  history.
+- `regex:xxx`  <br/>
+  Where xxx is treated as a [regular expression](https://doc.rust-lang.org/regex/regex/index.html).
+  Commands which match this regular expression will not be saved in the history.
+- `duplicates`  <br/>
+  All preceding duplicate commands are removed/ignored from the history after a matching command is entered.
+
+Specifying an empty array, means that all commands will be saved.
 
 **Notes**
 - You can specify as many elements as you want.
@@ -49,22 +82,23 @@ Commands which match this regular expression will not be saved in the history.
 - As all variables, `HISTORY_IGNORE` is not saved between sessions. It is suggested to set it via
 ions init file.
 - The `let HISTORY_IGNORE = [ .. ]` command itself is **not effected** except if the assignment
-command starts with a whitespace and the **whitespace** element is specified in this assignment.
-See the following example:
-```sh
-# echo @HISTORY_IGNORE
+  command starts with a whitespace and the **whitespace** element is specified in this assignment.
+  
+  See the following example:
+  ```sh
+  # echo @HISTORY_IGNORE
 
-# let HISTORY_IGNORE = [ all ] # saved
-# let HISTORY_IGNORE = [ whitespace ] # saved
-#  true # ignored
-#  let HISTORY_IGNORE = [  ] # saved
-#  let HISTORY_IGNORE = [ whitespace ] # ignored
-# history
-echo @HISTORY_IGNORE
-let HISTORY_IGNORE = [ all ] # saved
-let HISTORY_IGNORE = [ whitespace ] # saved
- let HISTORY_IGNORE = [  ] # saved
-```
+  # let HISTORY_IGNORE = [ all ] # saved
+  # let HISTORY_IGNORE = [ whitespace ] # saved
+  #  true # ignored
+  #  let HISTORY_IGNORE = [  ] # saved
+  #  let HISTORY_IGNORE = [ whitespace ] # ignored
+  # history
+  echo @HISTORY_IGNORE
+  let HISTORY_IGNORE = [ all ] # saved
+  let HISTORY_IGNORE = [ whitespace ] # saved
+  let HISTORY_IGNORE = [  ] # saved
+  ```
 
 **Examples**
 ```sh
@@ -83,27 +117,28 @@ let HISTORY_IGNORE = [ whitespace ] # saved
 # trulse # ignored
 ```
 
-**Tips**
+**Tip**
 
 I like to add `regex:#ignore$` to my `HISTORY_IGNORE`.
 That way, whenever I want to ignore a command on the fly, I just need to add `#ignore` to the
 end of the line.
 
-### HISTFILE_ENABLED
-Specifies whether the history should be read from/written into the file specified by `HISTFILE`.
-A value of **1** means yes, everything else means no. Defaults to **1**.
+### HISTORY_SIZE
 
-### HISTFILE
-The file into which the history should be saved. At the launch of ion the history will be read
-from this file and when ion exits, the history of the session will be appended into the file.
-Defaults to **$HOME/.local/share/ion/history**
+The maximum number of lines contained in the command history in-memory.
 
-### HISTFILE_SIZE
-Specifies how many commands should be saved in `HISTFILE` at most.
-Ideally, this should have the same value as `HISTORY_SIZE`.
-Defaults to **100000**.
+**Default value:** `1000`
+
+Ideally, this value should be the same as `HISTFILE_SIZE`. **FIXME:** why ?
+
+**(Currently ignored)**
 
 ### HISTORY_TIMESTAMP
-Specifies whether a corresponding timestamp should be recorded along with each command.
+
+Whether a corresponding timestamp should be recorded along with each command.
+
 The timestamp is indicated with a `#` and is unformatted as the seconds since the unix epoch.
-This feature is disabled by default and can be enabled by executing the following command: `let HISTORY_TIMESTAMP = 1`.
+
+**Default value:** `0`
+
+Possible values are `0` (disabled) and `1` (enabled).
