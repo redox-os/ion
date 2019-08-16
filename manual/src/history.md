@@ -24,25 +24,31 @@ The following local variables can be used to modify Ions history behavior:
 
 ### HISTORY_SIZE
 Determines how many entries of the history are kept in memory.
-Default value is **1000**.
+
 Ideally, this value should be the same as `HISTFILE_SIZE`
+
+**Default value:** `1000`
 
 ### HISTORY_IGNORE
 Specifies which commands should **NOT** be saved in the history.
+
 This is an array and defaults to an **empty array**, meaning that all commands will be saved.
+
 Each element of the array can take one of the following options:
-- **all** <br/>
+- `all` <br/>
   All commands are ignored, nothing will be saved in the history.
-- **no_such_command** <br/>
+- `no_such_command` <br/>
   Commands which return `NO_SUCH_COMMAND` will not be saved in the history.
-- **whitespace** <br/>
+- `whitespace` <br/>
   Commands which start with a [whitespace character](https://doc.rust-lang.org/stable/reference/whitespace.html) will not be saved in the
   history.
-- **regex:xxx**  <br/>
+- `regex:xxx`  <br/>
   Where xxx is treated as a [regular expression](https://doc.rust-lang.org/regex/regex/index.html).
   Commands which match this regular expression will not be saved in the history.
-- **duplicates**  <br/>
+- `duplicates`  <br/>
   All preceding duplicate commands are removed/ignored from the history after a matching command is entered.
+
+**Default value:** `[ no_such_command whitespace duplicates ]`
 
 **Notes**
 - You can specify as many elements as you want.
@@ -96,19 +102,29 @@ end of the line.
 
 ### HISTFILE_ENABLED
 Specifies whether the history should be read from/written into the file specified by `HISTFILE`.
-A value of **1** means yes, everything else means no. Defaults to **1**.
+
+A value of **1** means yes, everything else means no.
+
+**Default value:** `1`
 
 ### HISTFILE
 The file into which the history should be saved. At the launch of ion the history will be read
 from this file and when ion exits, the history of the session will be appended into the file.
-Defaults to **$HOME/.local/share/ion/history**
+
+**Default value:** `$HOME/.local/share/ion/history`
 
 ### HISTFILE_SIZE
 Specifies how many commands should be saved in `HISTFILE` at most.
-Ideally, this should have the same value as `HISTORY_SIZE`.
-Defaults to **100000**.
+
+Ideally, this value should have the same value as `HISTORY_SIZE`.
+
+**Default value:** `100000`
 
 ### HISTORY_TIMESTAMP
 Specifies whether a corresponding timestamp should be recorded along with each command.
+
 The timestamp is indicated with a `#` and is unformatted as the seconds since the unix epoch.
-This feature is disabled by default and can be enabled by executing the following command: `let HISTORY_TIMESTAMP = 1`.
+
+Possible values are `0` (disabled) and `1` (enabled).
+
+**Default value:** `0`
