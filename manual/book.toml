@@ -8,7 +8,7 @@ language = "en"
 create-missing = false
 
 [output.html]
-git-repository-url = "https://github.com/rust-lang-nursery/mdBook"
+git-repository-url = "https://gitlab.redox-os.org/redox-os/ion"
 git-repository-icon = "fa-github"
 
 [output.linkcheck]
