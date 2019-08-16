@@ -72,17 +72,17 @@ DESCRIPTION
 
 ```txt
 SYNOPSIS
-    starts_with <PATTERN> tests...
+    contains <PATTERN> tests...
 
 DESCRIPTION
-    Returns 0 if any argument starts_with contains the first argument, else returns 0
+    Returns 0 if any given argument contains the first argument, else returns 1
 ```
 
-## dir_depth - set the dir stack depth
+## dir-depth - set the dir stack depth
 
 ```txt
 SYNOPSYS
-    dir_depth [DEPTH]
+    dir-depth [DEPTH]
 
 DESCRIPTION
     If DEPTH is given, set the dir stack max depth to DEPTH, else remove the limit
@@ -155,14 +155,14 @@ OPTIONS
         \v  vertical tab (VT)
 ```
 
-## ends_with - check if a given string starts with another one
+## ends-with - check if a given string starts with another one
 
 ```txt
 SYNOPSIS
-    starts_with <PATTERN> tests...
+    ends-with <PATTERN> tests...
 
 DESCRIPTION
-    Returns 0 if any argument starts_with contains the first argument, else returns 0
+    Returns 0 if any argument ends with the first argument, else returns 1
 ```
 
 ## eval - evaluates the specified commands
@@ -305,7 +305,7 @@ SYNOPSIS
     is [ -h | --help ] [not]
 
 DESCRIPTION
-    Returns 0 if the two arguments are equal
+    Returns 0 if the two arguments are equal, and 1 otherwise.
 
 OPTIONS
     not
@@ -319,7 +319,7 @@ SYNOPSIS
     isatty [FD]
 
 DESCRIPTION
-    Returns 0 exit status if the supplied file descriptor is a tty.
+    Returns 0 if the supplied file descriptor is a tty, and 1 otherwise.
 ```
 
 ## jobs - list all jobs running in the background
@@ -428,14 +428,14 @@ DESCRIPTION
     variables will affect the current shell because of this.
 ```
 
-## starts_with - check if a given string starts with another one
+## starts-with - check if a given string starts with another one
 
 ```txt
 SYNOPSIS
-    starts_with <PATTERN> tests...
+    starts-with <PATTERN> tests...
 
 DESCRIPTION
-    Returns 0 if any argument starts_with contains the first argument, else returns 0
+    Returns 0 if any given argument starts with the first argument, else returns 1
 ```
 
 ## status - Evaluates the current runtime status
