@@ -46,7 +46,9 @@ The maximum number of lines kept in the history file when flushed from memory.
 
 **Default value:** `100000`
 
-Ideally, this value should have the same value as `HISTORY_SIZE`. **FIXME:** why ?
+It is useless to set this to a higher value than `HISTORY_SIZE`. Ideally, those variables
+would have the same value, since this would otherwise result in loss of information on history
+write to disk, which might not be worth it given the nowadays cheap hardware space.
 
 **(Currently ignored)**
 
@@ -129,7 +131,7 @@ The maximum number of lines contained in the command history in-memory.
 
 **Default value:** `1000`
 
-Ideally, this value should be the same as `HISTFILE_SIZE`. **FIXME:** why ?
+Ideally, this value should be the same as `HISTFILE_SIZE` (see `HISTFILE_SIZE` for details).
 
 **(Currently ignored)**
 
