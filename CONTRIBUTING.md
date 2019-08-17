@@ -34,7 +34,7 @@ integration tests.
 
 ## Test your code
 
-Before submitting a PR, ensure that you've run your tests locally and that they
+Before submitting a merge request (MR) on GitLab, ensure that you've run your tests locally and that they
 pass. This can be done by running the following two commands:
 
 ```sh
@@ -43,7 +43,7 @@ cargo +nightly test --lib && bash examples/run_examples.sh
 
 ## Format your code
 
-In addition, format your code before submitting a PR. This will require that
+In addition, format your code before submitting a MR. This will require that
 you've installed the `rustfmt` Cargo component.
 
 ```sh
