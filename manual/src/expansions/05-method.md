@@ -62,9 +62,6 @@ for elem in @split("some, comma-separated, values" ", "); echo $elem; end
 
 The following are the currently-supported string methods:
 
-- [ends_with](#ends_with)
-- [contains](#contains)
-- [starts_with](#starts_with)
 - [basename](#basename)
 - [extension](#extension)
 - [filename](#filename)
@@ -83,63 +80,6 @@ The following are the currently-supported string methods:
 - [escape](#escape)
 - [unescape](#unescape)
 - [or](#or)
-
-### ends_with
-
-Defaults to string variables. When supplied with a pattern, it will return one if the string
-ends with it. Zero otherwise.
-
-#### Examples
-
-```sh
-echo $ends_with("FOOBAR" "BAR")
-echo $ends_with("FOOBAR" "FOO")
-```
-
-#### Output
-
-```
-1
-0
-```
-
-### contains
-
-Defaults to string variables. When supplied with a pattern, it will return one if the string
-contains with it. Zero otherwise.
-
-#### Examples
-
-```sh
-echo $contains("FOOBAR" "OOB")
-echo $contains("FOOBAR" "foo")
-```
-
-#### Output
-
-```
-1
-0
-```
-
-### starts_with
-
-Defaults to string variables. When supplied with a pattern, it will return one if the string
-starts with it. Zero otherwise.
-
-#### Examples
-
-```sh
-echo $starts_with("FOOBAR" "FOO")
-echo $starts_with("FOOBAR" "BAR")
-```
-
-#### Output
-
-```
-1
-0
-```
 
 ### basename
 
