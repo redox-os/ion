@@ -52,6 +52,12 @@ cargo +nightly fmt
 
 Now you're ready to submit your work for review!
 
+## Sumbitting your work for review
+
+Submitting your work on the Redox OS GitLab server can be done by creating a [merge request (MR)](https://gitlab.redox-os.org/help/user/project/merge_requests/index.md).
+
+**Important** Make sure you [enable commit edits from upstream members](https://gitlab.redox-os.org/help/user/project/merge_requests/allow_collaboration.md#enabling-commit-edits-from-upstream-members) by clicking the *"Allow commits from members who can merge to the target branch"* checkbox.
+
 ## Chatroom
 
 Send an email to [info@redox-os.org](mailto:info@redox-os.org) to request invitation for joining
