@@ -116,7 +116,7 @@ impl<'a> InteractiveShell<'a> {
                     elapsed.as_secs(),
                     elapsed.subsec_nanos()
                 );
-                println!("{:?}", summary);
+                println!("{}", summary);
                 context.borrow_mut().history.push(summary.into()).unwrap_or_else(|err| {
                     eprintln!("ion: history append: {}", err);
                 });
