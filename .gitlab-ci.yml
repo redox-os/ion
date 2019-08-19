@@ -45,17 +45,23 @@ redox:
   script:
     - redoxer test
 
-pages:
+link-check:
+  image: hrektts/mdbook
   before_script:
     - apt-get update -qq
     - apt-get install -qq libssl-dev pkg-config build-essential curl git
     - (test -x $HOME/.cargo/bin/mdbook-linkcheck || cargo install mdbook-linkcheck)
+  script:
+  - make manual
+  - mdbook build manual
+
+pages:
   image: hrektts/mdbook
   stage: deploy
   script:
   - make manual
   - mdbook build manual
-  - mv book/html public
+  - mv manual/book/html public
   artifacts:
     paths:
     - public
