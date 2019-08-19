@@ -54,7 +54,8 @@ pages:
   stage: deploy
   script:
   - make manual
-  - mdbook build -d ../public manual
+  - mdbook build manual
+  - mv book/html public
   artifacts:
     paths:
     - public
