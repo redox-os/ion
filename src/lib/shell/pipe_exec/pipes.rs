@@ -3,12 +3,22 @@ use super::{
     PipelineError,
 };
 
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+use nix::fcntl::{fcntl, FcntlArg};
 use nix::{fcntl::OFlag, unistd};
 use std::{fs::File, os::unix::io::FromRawFd};
 
+#[cfg(not(any(target_os = "ios", target_os = "macos")))]
 pub fn create_pipe() -> Result<(File, File), PipelineError> {
     let (reader, writer) =
         unistd::pipe2(OFlag::O_CLOEXEC).map_err(PipelineError::CreatePipeError)?;
+    Ok(unsafe { (File::from_raw_fd(reader), File::from_raw_fd(writer)) })
+}
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+pub fn create_pipe() -> Result<(File, File), PipelineError> {
+    let (reader, writer) = unistd::pipe().map_err(PipelineError::CreatePipeError)?;
+    fcntl(reader, FcntlArg::F_SETFL(OFlag::O_CLOEXEC)).map_err(PipelineError::CreatePipeError)?;
+    fcntl(writer, FcntlArg::F_SETFL(OFlag::O_CLOEXEC)).map_err(PipelineError::CreatePipeError)?;
     Ok(unsafe { (File::from_raw_fd(reader), File::from_raw_fd(writer)) })
 }
 
