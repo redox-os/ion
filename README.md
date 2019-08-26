@@ -9,6 +9,7 @@ is developed alongside, and primarily for, RedoxOS, it is a fully capable on oth
 
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![crates.io](https://meritbadge.herokuapp.com/ion-shell)](https://crates.io/crates/ion-shell)
+[![Documentation](https://img.shields.io/badge/documentation-blue)](https://doc.redox-os.org/ion-manual/html)
 
 > Ion is still a WIP, and both its syntax and rules are subject to change over time. It is
 > still quite a ways from becoming stabilized, but we are getting very close. Changes to the
