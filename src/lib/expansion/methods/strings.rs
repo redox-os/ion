@@ -98,20 +98,6 @@ impl<'a> StringMethod<'a> {
     ) -> Result<(), E::Error> {
         let variable = self.variable;
 
-        macro_rules! string_eval {
-            ($variable:ident $method:tt) => {{
-                let pattern = MethodArgs::new(self.pattern, expand).join(" ")?;
-                let is_true = match expand.string($variable) {
-                    Ok(value) => value.$method(pattern.as_str()),
-                    Err(Error::VarNotFound) if is_expression($variable) => {
-                        expand.expand_string($variable)?.join(" ").$method(pattern.as_str())
-                    }
-                    Err(why) => return Err(why),
-                };
-                output.push_str(if is_true { "1" } else { "0" });
-            }};
-        }
-
         macro_rules! path_eval {
             ($method:tt) => {{
                 match expand.string(variable) {
@@ -162,9 +148,6 @@ impl<'a> StringMethod<'a> {
         }
 
         match self.method {
-            "ends_with" => string_eval!(variable ends_with),
-            "contains" => string_eval!(variable contains),
-            "starts_with" => string_eval!(variable starts_with),
             "basename" => path_eval!(file_name),
             "extension" => path_eval!(extension),
             "filename" => path_eval!(file_stem),
@@ -366,84 +349,6 @@ mod test {
         let line = " Mary   had\ta little  \n\t lamb\tツ";
         let output = unescape(line);
         assert_eq!(output, line);
-    }
-
-    #[test]
-    fn test_ends_with_succeeding() {
-        let mut output = types::Str::new();
-        let method = StringMethod {
-            method:    "ends_with",
-            variable:  "$FOO",
-            pattern:   "\"BAR\"",
-            selection: None,
-        };
-        method.handle(&mut output, &mut DummyExpander).unwrap();
-        assert_eq!(&*output, "1");
-    }
-
-    #[test]
-    fn test_ends_with_failing() {
-        let mut output = types::Str::new();
-        let method = StringMethod {
-            method:    "ends_with",
-            variable:  "$FOO",
-            pattern:   "\"BA\"",
-            selection: None,
-        };
-        method.handle(&mut output, &mut DummyExpander).unwrap();
-        assert_eq!(&*output, "0");
-    }
-
-    #[test]
-    fn test_contains_succeeding() {
-        let mut output = types::Str::new();
-        let method = StringMethod {
-            method:    "contains",
-            variable:  "$FOO",
-            pattern:   "\"OBA\"",
-            selection: None,
-        };
-        method.handle(&mut output, &mut DummyExpander).unwrap();
-        assert_eq!(&*output, "1");
-    }
-
-    #[test]
-    fn test_contains_failing() {
-        let mut output = types::Str::new();
-        let method = StringMethod {
-            method:    "contains",
-            variable:  "$FOO",
-            pattern:   "\"OBI\"",
-            selection: None,
-        };
-        method.handle(&mut output, &mut DummyExpander).unwrap();
-        assert_eq!(&*output, "0");
-    }
-
-    #[test]
-    fn test_starts_with_succeeding() {
-        let mut output = types::Str::new();
-        let method = StringMethod {
-            method:    "starts_with",
-            variable:  "$FOO",
-            pattern:   "\"FOO\"",
-            selection: None,
-        };
-        method.handle(&mut output, &mut DummyExpander).unwrap();
-        assert_eq!(&*output, "1");
-    }
-
-    #[test]
-    fn test_starts_with_failing() {
-        let mut output = types::Str::new();
-        let method = StringMethod {
-            method:    "starts_with",
-            variable:  "$FOO",
-            pattern:   "\"OO\"",
-            selection: None,
-        };
-        method.handle(&mut output, &mut DummyExpander).unwrap();
-        assert_eq!(&*output, "0");
     }
 
     #[test]

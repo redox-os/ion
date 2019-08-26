@@ -20,12 +20,6 @@ end
 
 echo $replace("one two one two" one 1)
 echo $replacen("one one one one" one 1 3)
-echo $starts_with("one two" one)
-echo $starts_with("one two" two)
-echo $ends_with("one two" one)
-echo $ends_with("one two" two)
-echo $contains("one two three" two)
-echo $contains("one two three" four)
 echo $repeat("one " 5)
 
 echo $join([one two three] "\n")
