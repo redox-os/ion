@@ -23,10 +23,19 @@ yet to be written into the specification.
 
 # Ion Manual
 
-The Ion manual is generated automatically on each commit via [mdBook](https://github.com/azerupi/mdBook).
-The manual is located [here](https://doc.redox-os.org/ion-manual/) on Redox OS's website. It is
-also included in the source code for Ion, within the **manual** directory, which you may build
-with **mdbook**.
+
+[The Ion manual online](https://doc.redox-os.org/ion-manual/html) 
+is generated automatically on each commit via [mdBook](https://github.com/azerupi/mdBook) and hosted on Redox OS's website.
+
+**Building the manual**
+
+Sources for the manual are located in the `manual` directory.
+
+You can build the manual using
+```sh
+make manual
+mdbook build -d ../public manual
+```
 
 # Ion library example
 See the [examples folder](https://gitlab.redox-os.org/redox-os/ion/tree/master/examples) and the [Parallelion project](https://gitlab.redox-os.org/AdminXVII/parallelion)
