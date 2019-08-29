@@ -10,4 +10,7 @@
 
 ## Customizing your prompt
  - Define the PROMPT function to be called whenever the prompt needs to be drawn. Simply print the prompt to stdout in the function (printf or git branch directly)
- - Variables are defined with all the colors (see the namespaces manual page for all details). This means you don't have to deal with all the escape codes directly. No more `\x033[33;m`, instead it's `${color::yellow}`.
+ - Variables are defined with all the colors (see the namespaces manual page for all details). This means you don't have to deal with all the escape codes directly. No more `\x1B[33m`, instead it's `${color::yellow}`.
+
+## Customizing the autocompletion
+ - Define the $SUGGESTION\_PROMPT variable to define a custom color/style for suggestions. The style is reset after the suggestion.
