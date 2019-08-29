@@ -248,6 +248,8 @@ impl<'a> Default for Variables<'a> {
 
         map.set("CDPATH", Array::new());
 
+        map.set("SUGGESTION_PROMPT", "\x1B[37m");
+
         // Initialize the HOST variable
         let mut host_name = [0_u8; 512];
         env::set_var(

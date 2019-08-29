@@ -138,7 +138,16 @@ impl<'a, 'cell> Highlighter for IonCompleter<'a, 'cell> {
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
-        Cow::Owned("\x1b[37m".to_owned() + hint + "\x1b[m")
+        Cow::Owned(
+            self.shell
+                .borrow()
+                .variables()
+                .get_str("SUGGESTION_PROMPT")
+                .ok()
+                .map_or_else(|| "\x1B[37m".to_owned(), |s| s.as_str().to_owned())
+                + hint
+                + "\x1b[m",
+        )
     }
 
     fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> { Cow::Borrowed(line) }
