@@ -31,14 +31,14 @@ macro_rules! math {
             fn $fn(self, rhs: Self) -> Self::Output {
                 if let Value::Str(rhs) = rhs {
                     if $allfloat {
-                        lexical::try_parse::<f64, _>(rhs)
+                        lexical::parse::<f64, _>(rhs)
                             .map_err(OpError::ParseError)
                             .and_then(|rhs| self.$fn(rhs))
                     } else {
-                        if let Ok(rhs) = lexical::try_parse::<i128, _>(rhs) {
+                        if let Ok(rhs) = lexical::parse::<i128, _>(rhs) {
                             self.$fn(rhs)
                         } else {
-                            lexical::try_parse::<f64, _>(rhs)
+                            lexical::parse::<f64, _>(rhs)
                                 .map_err(OpError::ParseError)
                                 .and_then(|rhs| self.$fn(rhs))
                         }
@@ -61,16 +61,16 @@ macro_rules! math {
             fn $fn(self, rhs: i128) -> Self::Output {
                 match self {
                     Value::Str(lhs) => if $allfloat {
-                        lexical::try_parse::<f64, _>(lhs)
+                        lexical::parse::<f64, _>(lhs)
                             .map_err(OpError::ParseError)
                             .map(|lhs| lexical::to_string($op_f_f(lhs, rhs as f64)))
                     } else {
-                        if let Ok(lhs) = lexical::try_parse::<i128, _>(lhs) {
+                        if let Ok(lhs) = lexical::parse::<i128, _>(lhs) {
                             $op_i_i(lhs, rhs)
                                 .ok_or(OpError::CalculationError)
                                 .map(lexical::to_string)
                         } else {
-                            lexical::try_parse::<f64, _>(lhs)
+                            lexical::parse::<f64, _>(lhs)
                                 .map_err(OpError::ParseError)
                                 .map(|lhs| lexical::to_string($op_f_f(lhs, rhs as f64)))
                         }
@@ -89,7 +89,7 @@ macro_rules! math {
 
             fn $fn(self, rhs: f64) -> Self::Output {
                 match self {
-                    Value::Str(lhs) => lexical::try_parse::<f64, _>(lhs)
+                    Value::Str(lhs) => lexical::parse::<f64, _>(lhs)
                         .map_err(OpError::ParseError)
                         .map(|lhs| lexical::to_string($op_f_f(lhs, rhs)))
                         .map(Value::from),

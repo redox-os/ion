@@ -5,9 +5,9 @@ authors = ["Xavier L'Heureux <xavier.lheureux@icloud.com>"]
 edition = "2018"
 
 [dependencies]
-quote = "0.6"
-syn = { version = "0.15", features = ["full"] }
-darling = "0.9"
+quote = "1.0"
+syn = { version = "1.0", features = ["full"] }
+darling = "0.10"
 
 [dev-dependencies]
 ion-shell = { path = "../.." }

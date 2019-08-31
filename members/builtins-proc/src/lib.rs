@@ -22,15 +22,15 @@ struct MacroArgs {
 pub fn builtin(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
     let attrs = syn::parse_macro_input!(attr as syn::AttributeArgs);
-    let syn::ItemFn { vis, decl, block, ident, .. } = &input;
-    let syn::FnDecl { ref fn_token, ref inputs, ref output, .. } = **decl;
+    let syn::ItemFn { vis, sig, block, .. } = &input;
+    let syn::Signature { ident, fn_token, inputs, output, .. } = sig;
 
     let args = match MacroArgs::from_list(&attrs) {
         Ok(v) => v,
         Err(e) => return e.write_errors().into(),
     };
 
-    let name = syn::Ident::new(&format!("builtin_{}", &ident), input.ident.span());
+    let name = quote::format_ident!("builtin_{}", &ident, span = ident.span());
 
     let help = args.help.trim();
     let names = args.names.unwrap_or_else(|| ident.to_string());
