@@ -1,4 +1,31 @@
-## Find an issue
+# Contributor Guidelines
+
+## Merge Requests
+
+Contributors MUST:
+
+- Discuss a feature before implementing it
+- Include unit and integration tests applicable to the changes and fixes you made
+- Format your code with `cargo +nightly fmt` before creating a commit
+- Follow [Conventional Commit] guidelines, so that our changelogs are useful
+- Squash commits, such that each commit clearly does a specific thing, either locally or using gitlab's custom checkbox.
+- [Adhere to a git workflow using rebase](https://medium.com/singlestone/a-git-workflow-using-rebase-1b1210de83e5)
+- Rebase upon the master branch, rather than merging it
+- [Allow us to make commits on your merge request](https://docs.gitlab.com/ee/user/project/merge_requests/allow_collaboration.html)
+
+Contributors MUST NOT:
+
+- Have merge commits in their merge requests
+- Make breaking changes without clearly documenting them in the commit
+- Have commits which do not adhere to [Conventional Commit] guidelines
+
+Contributors SHOULD NOT:
+
+- Worry about code style, because `cargo fmt` renders this a non-issue
+
+[conventional commit]: https://www.conventionalcommits.org/en/v1.0.0-beta.4/
+
+## Finding an issue
 
 First, find an area to work on within the shell or one of it's related projects.
 This may be:
