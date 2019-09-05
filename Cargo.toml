@@ -31,12 +31,13 @@ maintenance = { status = "experimental" }
 advanced_arg_parsing = []
 man = ["builtins-proc/man"]
 piston = ["piston-ai_behavior", "piston_window", "piston2d-sprite"]
+unicode = ["regex/unicode"]
 
 [workspace]
 members = [ "members/builtins-proc", "members/ranges", "members/scopes-rs", "members/types-rs" ]
 
 [dev-dependencies]
-criterion = "0.2"
+criterion = "0.3"
 serial_test = "*"
 serial_test_derive = "*"
 
@@ -66,7 +67,7 @@ err-derive = "0.1"
 glob = "0.3"
 liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }
 rand = "0.7"
-regex = "1.2"
+regex = { version = "1.3", default-features = false, features = ["std", "perf"] }
 small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"] }
 smallvec = "0.6"
 unicode-segmentation = "1.3"
@@ -79,7 +80,7 @@ itertools = "0.8"
 lexical = "3.0"
 object-pool = "0.3.1"
 auto_enums = "0.5.5"
-structopt = "0.2"
+structopt = "0.3"
 atty = "0.2"
 permutate = "0.3"
 xdg = "2.1"

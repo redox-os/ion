@@ -287,10 +287,12 @@ three two one two
 one three one three
 ```
 
-### regex_replace
+### regex\_replace
 
 Defaults to string variables. Equivalent to `replace`, but the first argument will be treated
 as a regex.
+
+**PS:** By default, unicode support will be disabled to trim the size of Ion. Add the "unicode" flag to enable it.
 
 #### Examples
 

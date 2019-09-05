@@ -5,10 +5,13 @@ const TEXT: &str = include_str!("test.ion");
 const EOF: &str = include_str!("herestring.ion");
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench(
-        "terminator-throughput",
-        ParameterizedBenchmark::new(
-            "terminator",
+    let mut group = c.benchmark_group("terminator-Throughput");
+    for script in &[TEXT, EOF] {
+        group.throughput(Throughput::Bytes(script.len() as u64));
+
+        group.bench_with_input(
+            BenchmarkId::new("terminator", script.len()),
+            &script,
             |b, script| {
                 b.iter(|| {
                     let mut bytes = script.bytes().peekable();
@@ -17,10 +20,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                     }
                 })
             },
-            vec![TEXT, EOF],
-        )
-        .throughput(|script| Throughput::Bytes(script.len() as u32)),
-    );
+        );
+    }
 }
 
 criterion_group!(benches, criterion_benchmark);
