@@ -39,11 +39,11 @@ use crate::{
     types,
 };
 use builtins_proc::builtin;
-use hashbrown::HashMap;
 use itertools::Itertools;
 use liner::{Completer, Context};
 use std::{
     borrow::Cow,
+    collections::HashMap,
     io::{self, BufRead},
     path::{Path, PathBuf},
 };
@@ -134,10 +134,10 @@ impl<'a> BuiltinMap<'a> {
     pub fn contains(&self, func: &str) -> bool { self.fcts.get(&func).is_some() }
 
     /// Get the list of builtins included
-    pub fn keys(&self) -> impl Iterator<Item = &str> { self.fcts.keys().cloned() }
+    pub fn keys(&self) -> impl Iterator<Item = &str> { self.fcts.keys().copied() }
 
     /// Get the provided help for a given builtin
-    pub fn get_help(&self, func: &str) -> Option<&str> { self.help.get(func).cloned() }
+    pub fn get_help(&self, func: &str) -> Option<&str> { self.help.get(func).copied() }
 
     /// Get the function of a given builtin
     pub fn get(&self, func: &str) -> Option<BuiltinFunction<'a>> { self.fcts.get(func).cloned() }

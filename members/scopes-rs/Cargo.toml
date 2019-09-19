@@ -11,4 +11,3 @@ keywords = ["scopes", "variables"]
 categories = ["data-structures", "memory-management"]
 
 [dependencies]
-hashbrown = "0.6"

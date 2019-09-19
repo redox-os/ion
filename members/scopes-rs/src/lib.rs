@@ -1,6 +1,6 @@
-use hashbrown::HashMap;
 use std::{
     borrow::Borrow,
+    collections::HashMap,
     hash::Hash,
     ops::{Deref, DerefMut},
 };

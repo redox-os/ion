@@ -110,7 +110,7 @@ impl fmt::Display for Colors {
             "\x1b[{}m",
             self.attributes
                 .iter()
-                .cloned()
+                .copied()
                 .chain(foreground.as_ref().map(AsRef::as_ref))
                 .chain(background.as_ref().map(AsRef::as_ref))
                 .format(";")

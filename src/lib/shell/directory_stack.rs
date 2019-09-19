@@ -83,17 +83,13 @@ impl DirectoryStack {
 
     // pushd -<num>
     pub fn rotate_right(&mut self, num: usize) -> Result<(), DirStackError> {
-        let len = self.dirs.len();
-        self.rotate_left(len - (num % len))
+        self.dirs.rotate_right(num);
+        self.set_current_dir_by_index(0)
     }
 
     // pushd +<num>
     pub fn rotate_left(&mut self, num: usize) -> Result<(), DirStackError> {
-        for _ in 0..num {
-            if let Some(popped_front) = self.dirs.pop_front() {
-                self.dirs.push_back(popped_front);
-            }
-        }
+        self.dirs.rotate_left(num);
         self.set_current_dir_by_index(0)
     }
 

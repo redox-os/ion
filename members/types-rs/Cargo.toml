@@ -11,7 +11,6 @@ readme = "README.md"
 categories = ["parsing"]
 
 [dependencies]
-lexical = "3.0"
-hashbrown = "0.6"
+lexical = "4.0"
 small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"] }
 itertools = "0.8"

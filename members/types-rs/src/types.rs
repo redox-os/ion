@@ -1,14 +1,13 @@
 use super::Value;
-use hashbrown::HashMap as HashbrownMap;
 use small;
 use std::{
-    collections::BTreeMap as StdBTreeMap,
+    collections::{BTreeMap as StdBTreeMap, HashMap as StdHashMap},
     iter::FromIterator,
     ops::{Deref, DerefMut},
 };
 
 pub type Array<T> = Vec<Value<T>>;
-pub type HashMap<T> = HashbrownMap<Str, Value<T>>;
+pub type HashMap<T> = StdHashMap<Str, Value<T>>;
 pub type BTreeMap<T> = StdBTreeMap<Str, Value<T>>;
 pub type Str = small::String;
 

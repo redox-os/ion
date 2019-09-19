@@ -49,10 +49,6 @@ harness = false
 name = "statement"
 harness = false
 
-[[bench]]
-name = "builtins"
-harness = false
-
 [[example]]
 name = "window"
 required-features = ["piston"]
@@ -75,21 +71,20 @@ ion-ranges = { version = "0.1", path = "members/ranges" }
 scopes = { version = "0.1", path = "members/scopes-rs" }
 types-rs = { version = "0.1", path = "members/types-rs" }
 builtins-proc = { version = "0.1", path = "members/builtins-proc" }
-hashbrown = "0.6"
 itertools = "0.8"
-lexical = "3.0"
+lexical = "4.0"
 object-pool = "0.3.1"
-auto_enums = "0.5.5"
+auto_enums = "0.6"
 structopt = "0.3"
 atty = "0.2"
 permutate = "0.3"
 xdg = "2.1"
-nix = "0.15"
+nix = { git = "https://github.com/AdminXVII/nix", branch = "add-redox-support" }
 
 # window example
 piston-ai_behavior = { version = "0.31", optional = true }
-piston_window = { version = "0.103", optional = true }
-piston2d-sprite = { version = "0.57", optional = true }
+piston_window = { version = "0.105", optional = true }
+piston2d-sprite = { version = "0.58", optional = true }
 
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
 users = "0.9"

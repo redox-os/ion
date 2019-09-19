@@ -47,6 +47,7 @@ use nix::{
     unistd::Pid,
 };
 use std::{
+    convert::TryFrom,
     fs::File,
     mem,
     ops::{Deref, DerefMut},
@@ -166,7 +167,7 @@ impl<'a> Shell<'a> {
     /// Install signal handlers necessary for the shell to work
     fn install_signal_handler() {
         extern "C" fn handler(signal: i32) {
-            let signal = signal::Signal::from_c_int(signal).unwrap();
+            let signal = signal::Signal::try_from(signal).unwrap();
             let signal = match signal {
                 signal::Signal::SIGINT => signals::SIGINT,
                 signal::Signal::SIGHUP => signals::SIGHUP,

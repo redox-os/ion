@@ -17,7 +17,7 @@ pub fn expand<'a>(
     #[auto_enum(Iterator)]
     match expanders.len() {
         0 => ::std::iter::empty(),
-        1 => SingleBraceExpand { elements: expanders[0].iter().cloned(), tokens, loop_count: 0 },
+        1 => SingleBraceExpand { elements: expanders[0].iter().copied(), tokens, loop_count: 0 },
         _ => MultipleBraceExpand::new(tokens, expanders),
     }
 }
