@@ -865,7 +865,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "libc"
 version = "0.2.64"
-source = "git+https://github.com/rust-lang/libc#56850068dcb7851213bf233ceae159a0229d533d"
+source = "git+https://github.com/rust-lang/libc#ff63cb517872d95bdba9960d4d200d024c1805a0"
 
 [[package]]
 name = "libloading"
@@ -988,7 +988,7 @@ dependencies = [
 [[package]]
 name = "nix"
 version = "0.15.0"
-source = "git+https://github.com/AdminXVII/nix?branch=add-redox-support#65a419c85be86b00ab9b694f81eeb43116620f2b"
+source = "git+https://github.com/AdminXVII/nix?branch=add-redox-support#491397e20779381fe3366adeeec2a5540e00b926"
 dependencies = [
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.45 (registry+https://github.com/rust-lang/crates.io-index)",
