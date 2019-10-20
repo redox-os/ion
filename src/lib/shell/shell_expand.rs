@@ -6,6 +6,8 @@ use crate::{
     types,
 };
 use nix::unistd::{tcsetpgrp, Pid};
+#[cfg(target_os = "redox")]
+use redox_users::All;
 use std::{env, fs::File, io::Read, iter::FromIterator};
 #[cfg(not(target_os = "redox"))]
 use users::os::unix::UserExt;
@@ -242,7 +244,23 @@ impl<'a, 'b> Expander for Shell<'b> {
                         }
                     }
                     #[cfg(target_os = "redox")]
-                    Err(Error::HomeNotFound)
+                    {
+                        if let Ok(users) =
+                            redox_users::AllUsers::new(redox_users::Config::default())
+                        {
+                            let user = if tilde_prefix.is_empty() {
+                                redox_users::get_uid().ok().and_then(|id| users.get_by_id(id))
+                            } else {
+                                users.get_by_name(tilde_prefix)
+                            };
+                            match user {
+                                Some(user) => Ok(user.home.as_str().into()),
+                                None => Err(Error::HomeNotFound),
+                            }
+                        } else {
+                            Err(Error::HomeNotFound)
+                        }
+                    }
                 }
             }
         }

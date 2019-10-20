@@ -1,4 +1,6 @@
 use err_derive::Error;
+#[cfg(target_os = "redox")]
+use redox_users::All;
 use std::{
     collections::VecDeque,
     env::{self, set_current_dir},
@@ -152,7 +154,18 @@ impl DirectoryStack {
                     self.change_and_push_dir(user.home_dir())
                 }),
             #[cfg(target_os = "redox")]
-            None => Err(DirStackError::FailedFetchHome),
+            None => {
+                if let Ok(users) = redox_users::AllUsers::new(redox_users::Config::default()) {
+                    redox_users::get_uid()
+                        .ok()
+                        .and_then(|id| users.get_by_id(id))
+                        .map_or(Err(DirStackError::FailedFetchHome), |user| {
+                            self.change_and_push_dir(Path::new(&user.home))
+                        })
+                } else {
+                    Err(DirStackError::FailedFetchHome)
+                }
+            }
         }
     }
 
