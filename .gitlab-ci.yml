@@ -16,7 +16,7 @@ format:
     - cargo +nightly fmt --all -- --check
 
 linux:
-  image: 'rust:1.35.0'
+  image: 'rust:1.36.0'
   cache:
     paths:
       - cargo/
