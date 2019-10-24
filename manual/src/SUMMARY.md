@@ -10,7 +10,7 @@
     - [XDG App Directories](misc/02-xdg.md)
     - [Quoting Rules](misc/03-quotation.md)
     - [Multi-line Arguments](misc/04-multiargs.md)
-    - [Multi-line Comments](misc/05-multicomments.md)
+    - [Multi-line Strings](misc/05-multiline-strings.md)
     - [Prompt Function](misc/06-prompt_fn.md)
     - [General Tips](misc/07-general.md)
 
