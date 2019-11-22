@@ -46,7 +46,7 @@ You'd get as output of that script:
 ion: function argument has invalid type: expected int, found value 'a'
 ```
 
-You can use any of the [supported types](ch04-00-variables.md#Supported Types).
+You can use any of the [supported types](variables/00-variables.md#supported-primitive-types).
 
 ## Multiple arguments
 
