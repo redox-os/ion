@@ -2,7 +2,7 @@ use super::{EmptyCompleter, Status};
 use crate as ion_shell;
 use builtins_proc::builtin;
 use calc::{eval_polish_with_env, eval_with_env, CalcError, Value};
-use liner::Context;
+use liner::{Context, Prompt};
 use std::io::{self, Read};
 
 const REPL_GUIDE: &str = r#"Ion's integrated calculator
@@ -89,7 +89,7 @@ pub fn math(args: &[crate::types::Str], _: &mut crate::Shell<'_>) -> Status {
         let mut ans = None;
         loop {
             match context
-                .read_line("ion-math: ", None, &mut EmptyCompleter)
+                .read_line(Prompt::from("ion-math: "), None, &mut EmptyCompleter)
                 .as_ref()
                 .map(AsRef::as_ref)
             {

@@ -40,7 +40,7 @@ use crate::{
 };
 use builtins_proc::builtin;
 use itertools::Itertools;
-use liner::{Completer, Context};
+use liner::{Completer, Context, Prompt};
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -575,7 +575,8 @@ pub fn read(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if atty::is(atty::Stream::Stdin) {
         let mut con = Context::new();
         for arg in args.iter().skip(1) {
-            match con.read_line(format!("{}=", arg.trim()), None, &mut EmptyCompleter) {
+            match con.read_line(Prompt::from(format!("{}=", arg.trim())), None, &mut EmptyCompleter)
+            {
                 Ok(buffer) => {
                     shell.variables_mut().set(arg.as_ref(), buffer.trim());
                 }

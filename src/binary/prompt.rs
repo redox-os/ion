@@ -3,10 +3,11 @@ use ion_shell::{
     expansion::{self, Expander},
     IonError, PipelineError,
 };
+use liner::Prompt;
 
 impl<'a> InteractiveShell<'a> {
     /// Generates the prompt that will be used by Liner.
-    pub fn prompt(&self) -> String {
+    pub fn prompt(&self) -> Prompt {
         let mut shell = self.shell.borrow_mut();
         let previous_status = shell.previous_status();
         let blocks = if self.terminated.get() { shell.block_len() } else { shell.block_len() + 1 };
@@ -37,9 +38,9 @@ impl<'a> InteractiveShell<'a> {
                 }
             });
             shell.set_previous_status(previous_status); // Set the previous exit code again
-            out
+            Prompt::from(out)
         } else {
-            "    ".repeat(blocks)
+            Prompt::from("    ".repeat(blocks))
         }
     }
 }
