@@ -12,7 +12,8 @@
     - [Multi-line Arguments](misc/04-multiargs.md)
     - [Multi-line Strings](misc/05-multiline-strings.md)
     - [Prompt Function](misc/06-prompt_fn.md)
-    - [General Tips](misc/07-general.md)
+    - [Key Bindings](misc/07-keybindings.md)
+    - [General Tips](misc/08-general.md)
 
 - [Variables](variables/00-variables.md)
 
