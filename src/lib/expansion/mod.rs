@@ -127,7 +127,11 @@ pub trait Expander: Sized {
     /// Expand a string variable given if it's quoted / unquoted
     fn string(&self, _name: &str) -> Result<types::Str, Self::Error>;
     /// Expand a subshell expression.
-    fn command(&mut self, _command: &str) -> Result<types::Str, Self::Error>;
+    fn command(
+        &mut self,
+        _command: &str,
+        _set_cmd_duration: bool,
+    ) -> Result<types::Str, Self::Error>;
     /// Iterating upon key-value maps.
     fn map_keys(&self, _name: &str) -> Result<Args, Self::Error>;
     /// Iterating upon key-value maps.
@@ -171,7 +175,7 @@ trait ExpanderInternal: Expander {
         command: &str,
         selection: &Option<&'a str>,
     ) -> Result<(), Self::Error> {
-        let result = self.command(command)?;
+        let result = self.command(command, true)?;
         self.slice(current, result.trim_end_matches('\n'), selection)
     }
 
@@ -703,7 +707,13 @@ pub(crate) mod test {
             }
         }
 
-        fn command(&mut self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
+        fn command(
+            &mut self,
+            cmd: &str,
+            _set_cmd_duration: bool,
+        ) -> Result<types::Str, Self::Error> {
+            Ok(cmd.into())
+        }
 
         fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 

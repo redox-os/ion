@@ -16,7 +16,11 @@ impl<'a, 'b> Expander for Shell<'b> {
     type Error = IonError;
 
     /// Uses a subshell to expand a given command.
-    fn command(&mut self, command: &str) -> Result<types::Str, Self::Error> {
+    fn command(
+        &mut self,
+        command: &str,
+        set_cmd_duration: bool,
+    ) -> Result<types::Str, Self::Error> {
         let (mut reader, writer) = create_pipe()
             .map_err(|err| Error::Subprocess(Box::new(IonError::PipelineExecutionError(err))))?;
         let null_file = File::open(NULL_PATH).map_err(|err| {
@@ -30,7 +34,9 @@ impl<'a, 'b> Expander for Shell<'b> {
         let prev_stderr = self.stderr(null_file);
 
         // Execute the command
-        let result = self.on_command(command).map_err(|err| Error::Subprocess(Box::new(err)));
+        let result = self
+            .on_command(command, set_cmd_duration)
+            .map_err(|err| Error::Subprocess(Box::new(err)));
 
         // Reset the pipes, droping the stdout
         self.stdout(prev_stdout);

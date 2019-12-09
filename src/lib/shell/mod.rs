@@ -271,7 +271,7 @@ impl<'a> Shell<'a> {
             .filter_map(Result::ok)
             .batching(|bytes| Terminator::new(bytes).terminate())
         {
-            self.on_command(&cmd)?;
+            self.on_command(&cmd, true)?;
         }
 
         if let Some(block) = self.flow_control.last().map(Statement::to_string) {

@@ -17,7 +17,7 @@ use crate::{
 use err_derive::Error;
 use itertools::Itertools;
 use nix::unistd::Pid;
-use std::rc::Rc;
+use std::{rc::Rc, time::SystemTime};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Condition {
@@ -531,7 +531,7 @@ impl<'a> Shell<'a> {
                 });
 
                 if let Some(statement) = case.conditional.as_ref() {
-                    self.on_command(statement)?;
+                    self.on_command(statement, true)?;
                     if self.previous_status.is_failure() {
                         continue;
                     }
@@ -558,7 +558,13 @@ impl<'a> Shell<'a> {
     }
 
     /// Receives a command and attempts to execute the contents.
-    pub fn on_command(&mut self, command_string: &str) -> std::result::Result<(), IonError> {
+    pub fn on_command(
+        &mut self,
+        command_string: &str,
+        set_cmd_duration: bool,
+    ) -> std::result::Result<(), IonError> {
+        let command_start_time = if set_cmd_duration { Some(SystemTime::now()) } else { None };
+
         for stmt in command_string.bytes().batching(|cmd| Terminator::new(cmd).terminate()) {
             // Go through all of the statements and build up the block stack
             // When block is done return statement for execution.
@@ -569,6 +575,13 @@ impl<'a> Shell<'a> {
                 }
             }
         }
+
+        if let Some(start_time) = command_start_time {
+            if let Ok(elapsed_time) = start_time.elapsed() {
+                self.variables_mut().set("CMD_DURATION", elapsed_time.as_secs().to_string());
+            }
+        }
+
         Ok(())
     }
 }

@@ -304,7 +304,7 @@ impl<'a> InteractiveShell<'a> {
                     self.terminated.set(true);
                     {
                         let mut shell = self.shell.borrow_mut();
-                        match shell.on_command(&cmd) {
+                        match shell.on_command(&cmd, true) {
                             Ok(_) => (),
                             Err(IonError::PipelineExecutionError(
                                 PipelineError::CommandNotFound(command),
