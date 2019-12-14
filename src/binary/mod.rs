@@ -112,11 +112,8 @@ impl<'a> InteractiveShell<'a> {
             // pipline just executed to the the file and context histories. At the
             // moment, this means record how long it took.
             if Some("1".into()) == shell.variables().get_str("RECORD_SUMMARY").ok() {
-                let summary = format!(
-                    "#summary# elapsed real time: {}.{:09} seconds",
-                    elapsed.as_secs(),
-                    elapsed.subsec_nanos()
-                );
+                let summary =
+                    format!("#summary# elapsed real time: {:.9} seconds", elapsed.as_secs_f32(),);
                 println!("{}", summary);
                 context.borrow_mut().history.push(summary.into()).unwrap_or_else(|err| {
                     eprintln!("ion: history append: {}", err);

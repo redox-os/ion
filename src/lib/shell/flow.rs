@@ -405,13 +405,14 @@ impl<'a> Shell<'a> {
                 let condition = self.execute_statement(box_statement)?;
 
                 let duration = time.elapsed();
-                let seconds = duration.as_secs();
-                let nanoseconds = duration.subsec_nanos();
+                let duration = duration.as_secs_f32();
+                let seconds = duration.rem_euclid(60.);
+                let minutes = duration.div_euclid(60.);
 
-                if seconds > 60 {
-                    println!("real    {}m{:02}.{:09}s", seconds / 60, seconds % 60, nanoseconds);
+                if minutes != 0. {
+                    println!("real    {}m{:.9}s", minutes, seconds);
                 } else {
-                    println!("real    {}.{:09}s", seconds, nanoseconds);
+                    println!("real    {:.9}s", seconds);
                 }
                 if condition != Condition::NoOp {
                     return Ok(condition);
