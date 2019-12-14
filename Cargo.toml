@@ -80,6 +80,7 @@ atty = "0.2"
 permutate = "0.3"
 xdg = "2.1"
 nix = { git = "https://github.com/AdminXVII/nix", branch = "add-redox-support" }
+mktemp = "0.4"
 
 # window example
 piston-ai_behavior = { version = "0.31", optional = true }

@@ -41,11 +41,14 @@ use crate::{
 use builtins_proc::builtin;
 use itertools::Itertools;
 use liner::{Completer, Context, Prompt};
+use mktemp::Temp;
 use std::{
     borrow::Cow,
     collections::HashMap,
-    io::{self, BufRead},
+    fs::File,
+    io::{self, BufRead, BufReader},
     path::{Path, PathBuf},
+    process::{Command, Stdio},
 };
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
@@ -240,11 +243,73 @@ impl<'a> BuiltinMap<'a> {
     ///
     /// Contains `eval`, `set`
     pub fn with_unsafe(&mut self) -> &mut Self {
-        self.add("eval", &builtin_eval, "Evaluates the evaluated expression").add(
-            "set",
-            &builtin_set,
-            "Set or unset values of shell options and positional parameters.",
-        )
+        self.add("eval", &builtin_eval, "Evaluates the evaluated expression")
+            .add(
+                "set",
+                &builtin_set,
+                "Set or unset values of shell options and positional parameters.",
+            )
+            .add("source-sh", &builtin_source_sh, "Execute a sh script and load the env diff")
+    }
+}
+
+#[builtin(
+    desc = "execute a sh script and source environment variables",
+    man = "
+SYNOPSYS
+    source-sh SCRIPT
+
+DESCRIPTION
+    Execute the script literal given in argument and apply env vars diff to the current shell"
+)]
+pub fn source_sh(args: &[types::Str], _shell: &mut Shell<'_>) -> Status {
+    let arg = match args.get(1) {
+        None => return Status::bad_argument("Please pass a shell script as option"),
+        Some(arg) => arg,
+    };
+    let temp = match Temp::new_file() {
+        Ok(f) => f,
+        Err(e) => return Status::error(format!("Could not create temp file for source-sh: {}", e)),
+    };
+    let script = format!("{};env | sort > {}", arg, temp.as_path().display());
+    match Command::new("sh")
+        .args(&["-c", &script])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+    {
+        Ok(_) => {
+            let env = match File::open(temp) {
+                Ok(env) => env,
+                Err(e) => {
+                    return Status::error(format!("Could not read script environment: {}", e))
+                }
+            };
+
+            for var in BufReader::new(env).lines() {
+                let var = match var {
+                    Ok(v) => v,
+                    Err(e) => return Status::error(format!("Could not read env: {}", e)),
+                };
+                let mut iter = var.splitn(2, "=");
+                let name = iter.next().unwrap();
+                let val = match iter.next() {
+                    Some(v) => v,
+                    None => {
+                        return Status::error(format!(
+                            "Could not parse env file, no value for: '{}'",
+                            name
+                        ))
+                    }
+                };
+                let prev_val = std::env::var_os(name);
+                if prev_val.as_ref().and_then(|x| x.to_str()) != Some(val) {
+                    std::env::set_var(name, val);
+                }
+            }
+            Status::SUCCESS
+        }
+        Err(e) => Status::error(format!("Could not execute sh script: {}", e)),
     }
 }
 
