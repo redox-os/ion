@@ -271,7 +271,7 @@ pub fn source_sh(args: &[types::Str], _shell: &mut Shell<'_>) -> Status {
         Ok(f) => f,
         Err(e) => return Status::error(format!("Could not create temp file for source-sh: {}", e)),
     };
-    let script = format!("{};env | sort > {}", arg, temp.as_path().display());
+    let script = format!("{}\nenv | sort > {}", arg, temp.as_path().display());
     match Command::new("sh")
         .args(&["-c", &script])
         .stdout(Stdio::null())
