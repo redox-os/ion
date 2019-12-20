@@ -39,13 +39,13 @@ use std::fmt;
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Case<'a> {
     /// The value to match with
-    pub value: Option<String>,
+    pub value:       Option<String>,
     /// Set a variable with the exact result
-    pub binding: Option<String>,
+    pub binding:     Option<String>,
     /// An additional statement to test before matching the case statement
     pub conditional: Option<String>,
     /// The block to execute on matching input
-    pub statements: Block<'a>,
+    pub statements:  Block<'a>,
 }
 
 /// An elseif case
@@ -54,7 +54,7 @@ pub struct ElseIf<'a> {
     /// The block to test
     pub expression: Block<'a>,
     /// The block to execute on success
-    pub success: Block<'a>,
+    pub success:    Block<'a>,
 }
 
 /// The action to perform on assignment
@@ -105,33 +105,33 @@ pub enum Statement<'a> {
         /// The block to test
         expression: Block<'a>,
         /// The block to execute on success
-        success: Block<'a>,
+        success:    Block<'a>,
         /// The list of associated else if blocks
-        else_if: Vec<ElseIf<'a>>,
+        else_if:    Vec<ElseIf<'a>>,
         /// The block to execute on failure
-        failure: Block<'a>,
+        failure:    Block<'a>,
         /// The mode
-        mode: IfMode,
+        mode:       IfMode,
     },
     /// else if
     ElseIf(ElseIf<'a>),
     /// Create a function
     Function {
         /// the name of the function
-        name: types::Str,
+        name:        types::Str,
         /// the description of the function
         description: Option<types::Str>,
         /// The required arguments of the function, with their types
-        args: Vec<KeyBuf>,
+        args:        Vec<KeyBuf>,
         /// The statements in the function
-        statements: Block<'a>,
+        statements:  Block<'a>,
     },
     /// for loop
     For {
         /// The bounds
-        variables: SmallVec<[types::Str; 4]>,
+        variables:  SmallVec<[types::Str; 4]>,
         /// The value to iterator for
-        values: Vec<types::Str>,
+        values:     Vec<types::Str>,
         /// The block to execute repetitively
         statements: Block<'a>,
     },
@@ -147,7 +147,7 @@ pub enum Statement<'a> {
         /// The value to check
         expression: types::Str,
         /// A list of case to check for
-        cases: Vec<Case<'a>>,
+        cases:      Vec<Case<'a>>,
     },
     /// Else statement
     Else,

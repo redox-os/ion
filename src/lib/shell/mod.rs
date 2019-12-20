@@ -105,7 +105,7 @@ pub struct Options {
     /// Exit from the shell on the first error.
     pub err_exit: bool,
     /// Do not execute any commands given to the shell.
-    pub no_exec: bool,
+    pub no_exec:  bool,
     /// If set, denotes that this shell is running as a background job.
     pub grab_tty: bool,
 }
@@ -117,32 +117,32 @@ pub struct Options {
 pub struct Shell<'a> {
     /// Contains a list of built-in commands that were created when the program
     /// started.
-    builtins: BuiltinMap<'a>,
+    builtins:           BuiltinMap<'a>,
     /// Contains the aliases, strings, and array variable maps.
-    variables: Variables<'a>,
+    variables:          Variables<'a>,
     /// Contains the current state of flow control parameters.
-    flow_control: Block<'a>,
+    flow_control:       Block<'a>,
     /// Contains the directory stack parameters.
-    directory_stack: DirectoryStack,
+    directory_stack:    DirectoryStack,
     /// When a command is executed, the final result of that command is stored
     /// here.
-    previous_status: Status,
+    previous_status:    Status,
     /// The job ID of the previous command sent to the background.
-    previous_job: usize,
+    previous_job:       usize,
     /// Contains all the options relative to the shell
-    opts: Options,
+    opts:               Options,
     /// Contains information on all of the active background processes that are being managed
     /// by the shell.
-    background: Arc<Mutex<Vec<BackgroundProcess>>>,
+    background:         Arc<Mutex<Vec<BackgroundProcess>>>,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<foreground::Signals>,
 
     // Callbacks
     /// Custom callback for each command call
-    on_command: Option<OnCommandCallback<'a>>,
+    on_command:       Option<OnCommandCallback<'a>>,
     /// Custom callback before each command call
-    pre_command: Option<PreCommandCallback<'a>>,
+    pre_command:      Option<PreCommandCallback<'a>>,
     /// Custom callback when a background event occurs
     background_event: Option<BackgroundEventCallback>,
 

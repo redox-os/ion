@@ -80,12 +80,12 @@ fn escape(input: &str) -> String {
 #[derive(Debug, PartialEq, Clone)]
 pub struct StringMethod<'a> {
     /// Name of this method
-    pub method: &'a str,
+    pub method:    &'a str,
     /// Variable that this method will operator on. This is a bit of a misnomer
     /// as this can be an expression as well
-    pub variable: &'a str,
+    pub variable:  &'a str,
     /// Pattern to use for certain methods
-    pub pattern: &'a str,
+    pub pattern:   &'a str,
     /// Selection to use to control the output of this method
     pub selection: Option<&'a str>,
 }

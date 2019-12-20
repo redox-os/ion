@@ -177,9 +177,9 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
 /// when a special character is contained within an expanded filename.
 pub struct IonFileCompleter<'a, 'b> {
-    shell: &'b Shell<'a>,
+    shell:       &'b Shell<'a>,
     /// The directory the expansion takes place in
-    path: PathBuf,
+    path:        PathBuf,
     for_command: bool,
 }
 

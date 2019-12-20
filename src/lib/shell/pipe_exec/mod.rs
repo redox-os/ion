@@ -48,9 +48,9 @@ pub enum RedirectError {
     #[error(display = "failed to redirect {} to file '{}': {}", redirect, file, why)]
     Output {
         redirect: RedirectFrom,
-        file: String,
+        file:     String,
         #[error(cause)]
-        why: io::Error,
+        why:      io::Error,
     },
 }
 

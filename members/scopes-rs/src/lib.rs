@@ -21,7 +21,7 @@ pub struct Scopes<K: Hash + Eq, V> {
 
 #[derive(Clone, Debug)]
 pub struct Scope<K: Hash + Eq, V> {
-    vars: HashMap<K, V>,
+    vars:      HashMap<K, V>,
     /// This scope is on a namespace boundary.
     /// Any previous scopes need to be accessed through `super::`.
     namespace: bool,

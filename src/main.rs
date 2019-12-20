@@ -47,10 +47,10 @@ impl FromStr for KeyBindingsWrapper {
 struct CommandLineArgs {
     /// Shortcut layout. Valid options: "vi", "emacs"
     #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-o"))]
-    key_bindings: Option<KeyBindingsWrapper>,
+    key_bindings:     Option<KeyBindingsWrapper>,
     /// Print commands before execution
     #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-x"))]
-    print_commands: bool,
+    print_commands:   bool,
     /// Use a fake interactive mode, where errors don't exit the shell
     #[cfg_attr(
         feature = "advanced_arg_parsing",
@@ -59,20 +59,20 @@ struct CommandLineArgs {
     fake_interactive: bool,
     /// Force interactive mode
     #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-i", long = "--interactive"))]
-    interactive: bool,
+    interactive:      bool,
     /// Do not execute any commands, perform only syntax checking
     #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-n", long = "--no-execute"))]
-    no_execute: bool,
+    no_execute:       bool,
     /// Evaluate given commands instead of reading from the commandline
     #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-c"))]
-    command: Option<String>,
+    command:          Option<String>,
     /// Print the version, platform and revision of Ion then exit
     #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-v", long = "--version"))]
-    version: bool,
+    version:          bool,
     /// Script arguments (@args). If the -c option is not specified,
     /// the first parameter is taken as a filename to execute
     #[cfg_attr(feature = "advanced_arg_parsing", structopt())]
-    args: Vec<String>,
+    args:             Vec<String>,
 }
 
 fn version() -> String { include!(concat!(env!("OUT_DIR"), "/version_string")).to_string() }

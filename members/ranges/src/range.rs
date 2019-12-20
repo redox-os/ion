@@ -4,9 +4,9 @@ use super::Index;
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Range {
     /// Starting index
-    start: Index,
+    start:     Index,
     /// Ending index
-    end: Index,
+    end:       Index,
     /// Is this range inclusive? If false, this object represents a half-open
     /// range of [start, end), otherwise [start, end]
     inclusive: bool,

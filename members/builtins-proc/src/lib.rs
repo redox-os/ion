@@ -8,11 +8,11 @@ use syn;
 #[derive(Debug, FromMeta)]
 struct MacroArgs {
     #[darling(default)]
-    names: Option<String>,
+    names:             Option<String>,
     #[darling(rename = "man")]
-    help: String,
+    help:              String,
     #[darling(default)]
-    authors: Flag,
+    authors:           Flag,
     #[darling(rename = "desc")]
     short_description: String,
 }

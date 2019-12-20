@@ -100,7 +100,7 @@ pub struct TeeItem {
     /// Where to read from for this tee. Generally only necessary if we need to tee both
     /// stdout and stderr.
     pub source: Option<File>,
-    pub sinks: Vec<File>,
+    pub sinks:  Vec<File>,
 }
 
 impl TeeItem {

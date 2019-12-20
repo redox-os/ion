@@ -8,17 +8,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub struct IgnoreSetting {
     // Macro definition fails if last flag has a comment at the end of the line.
     /// ignore all commands ("all")
-    all: bool,
+    all:             bool,
     /// ignore commands with leading whitespace ("whitespace")
-    whitespace: bool,
+    whitespace:      bool,
     /// ignore commands with status code 127 ("no_such_command")
     no_such_command: bool,
     /// used if regexes are defined.
-    based_on_regex: bool,
+    based_on_regex:  bool,
     /// ignore commands that are duplicates
-    duplicates: bool,
+    duplicates:      bool,
     // Yes, a bad heap-based Vec, however unfortunately its not possible to store Regex'es in Array
-    regexes: Vec<Regex>,
+    regexes:         Vec<Regex>,
 }
 
 /// Contains all history-related functionality for the `Shell`.

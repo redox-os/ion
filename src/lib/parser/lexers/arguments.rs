@@ -24,7 +24,7 @@ pub struct Levels {
     /// Parentheses
     parens: u8,
     /// Array literals
-    array: u8,
+    array:  u8,
     /// Braces
     braces: u8,
 }
@@ -99,13 +99,13 @@ impl Levels {
 /// An efficient `Iterator` structure for splitting arguments
 #[derive(Debug)]
 pub struct ArgumentSplitter<'a> {
-    data: &'a str,
+    data:   &'a str,
     /// Number of bytes read
-    read: usize,
-    comm: Comm,
+    read:   usize,
+    comm:   Comm,
     quotes: bool,
     variab: bool,
-    array: bool,
+    array:  bool,
     method: bool,
 }
 

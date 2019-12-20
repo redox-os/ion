@@ -23,9 +23,9 @@ pub enum RedirectFrom {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Redirection {
     /// What to redirect
-    pub from: RedirectFrom,
+    pub from:   RedirectFrom,
     /// Where to redirect
-    pub file: types::Str,
+    pub file:   types::Str,
     /// Should the file be overridden
     pub append: bool,
 }
@@ -105,7 +105,7 @@ pub struct Pipeline<T> {
     /// The individual commands
     pub items: Vec<PipeItem<T>>,
     /// Should the pipeline be runned in background
-    pub pipe: PipeType,
+    pub pipe:  PipeType,
 }
 
 /// A single job to run in a pipeline
@@ -115,11 +115,11 @@ pub struct Pipeline<T> {
 #[derive(Debug, PartialEq, Clone)]
 pub struct PipeItem<T> {
     /// The command to spawn
-    pub job: T,
+    pub job:     T,
     /// Where to send output
     pub outputs: Vec<Redirection>,
     /// A list of inputs
-    pub inputs: Vec<Input>,
+    pub inputs:  Vec<Input>,
 }
 
 impl<'a> PipeItem<RefinedJob<'a>> {
