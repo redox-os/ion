@@ -43,7 +43,7 @@ impl FromStr for KeyBindingsWrapper {
 /// Ion is a commandline shell created to be a faster and easier to use
 /// alternative to the currently available shells. It is not POSIX compliant.
 #[cfg_attr(feature = "advanced_arg_parsing", derive(StructOpt))]
-#[cfg_attr(feature = "advanced_arg_parsing", structopt(name = "Ion"))]
+#[cfg_attr(feature = "advanced_arg_parsing", structopt(name = "ion"))]
 struct CommandLineArgs {
     /// Shortcut layout. Valid options: "vi", "emacs"
     #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-o"))]
