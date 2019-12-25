@@ -282,7 +282,51 @@ impl<'a> InteractiveShell<'a> {
         }
     }
 
-    fn exec<T: Fn(&mut Shell<'_>)>(self, prep_for_exit: &T) -> ! {
+    fn exec_single_command(&mut self, command: &str) {
+        let cmd: &str =
+            &designators::expand_designators(&self.context.borrow(), command.trim_end());
+        self.terminated.set(true);
+        {
+            let mut shell = self.shell.borrow_mut();
+            match shell.on_command(&cmd, true) {
+                Ok(_) => (),
+                Err(IonError::PipelineExecutionError(PipelineError::CommandNotFound(command))) => {
+                    if Self::try_cd(&command, &mut shell).ok().map_or(false, |res| res.is_failure())
+                    {
+                        if let Some(Value::Function(func)) =
+                            shell.variables().get("COMMAND_NOT_FOUND").cloned()
+                        {
+                            if let Err(why) = shell.execute_function(&func, &["ion", &command]) {
+                                eprintln!("ion: command not found handler: {}", why);
+                            }
+                        } else {
+                            eprintln!("ion: command not found: {}", command);
+                        }
+                    }
+                    // Status::COULD_NOT_EXEC
+                }
+                Err(IonError::PipelineExecutionError(PipelineError::CommandExecError(
+                    ref err,
+                    ref command,
+                ))) if err.kind() == io::ErrorKind::PermissionDenied && command.len() == 1 => {
+                    if Self::try_cd(&command[0], &mut shell)
+                        .ok()
+                        .map_or(false, |res| res.is_failure())
+                    {
+                        eprintln!("ion: {}", err);
+                        shell.reset_flow();
+                    }
+                }
+                Err(err) => {
+                    eprintln!("ion: {}", err);
+                    shell.reset_flow();
+                }
+            }
+        }
+        self.save_command(&cmd);
+    }
+
+    fn exec<T: Fn(&mut Shell<'_>)>(mut self, prep_for_exit: &T) -> ! {
         loop {
             if let Err(err) = io::stdout().flush() {
                 eprintln!("ion: failed to flush stdio: {}", err);
@@ -290,60 +334,15 @@ impl<'a> InteractiveShell<'a> {
             if let Err(err) = io::stderr().flush() {
                 println!("ion: failed to flush stderr: {}", err);
             }
-            let mut lines = std::iter::from_fn(|| self.readln(prep_for_exit))
-                .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
-            match Terminator::new(&mut lines).terminate() {
-                Some(command) => {
-                    let cmd: &str = &designators::expand_designators(
-                        &self.context.borrow(),
-                        command.trim_end(),
-                    );
-                    self.terminated.set(true);
+            match self.readln(prep_for_exit) {
+                Some(lines) => {
+                    for command in lines
+                        .into_bytes()
+                        .into_iter()
+                        .batching(|bytes| Terminator::new(bytes).terminate())
                     {
-                        let mut shell = self.shell.borrow_mut();
-                        match shell.on_command(&cmd, true) {
-                            Ok(_) => (),
-                            Err(IonError::PipelineExecutionError(
-                                PipelineError::CommandNotFound(command),
-                            )) => {
-                                if Self::try_cd(&command, &mut shell)
-                                    .ok()
-                                    .map_or(false, |res| res.is_failure())
-                                {
-                                    if let Some(Value::Function(func)) =
-                                        shell.variables().get("COMMAND_NOT_FOUND").cloned()
-                                    {
-                                        if let Err(why) =
-                                            shell.execute_function(&func, &["ion", &command])
-                                        {
-                                            eprintln!("ion: command not found handler: {}", why);
-                                        }
-                                    } else {
-                                        eprintln!("ion: command not found: {}", command);
-                                    }
-                                }
-                                // Status::COULD_NOT_EXEC
-                            }
-                            Err(IonError::PipelineExecutionError(
-                                PipelineError::CommandExecError(ref err, ref command),
-                            )) if err.kind() == io::ErrorKind::PermissionDenied
-                                && command.len() == 1 =>
-                            {
-                                if Self::try_cd(&command[0], &mut shell)
-                                    .ok()
-                                    .map_or(false, |res| res.is_failure())
-                                {
-                                    eprintln!("ion: {}", err);
-                                    shell.reset_flow();
-                                }
-                            }
-                            Err(err) => {
-                                eprintln!("ion: {}", err);
-                                shell.reset_flow();
-                            }
-                        }
+                        self.exec_single_command(&command);
                     }
-                    self.save_command(&cmd);
                 }
                 None => self.terminated.set(true),
             }
