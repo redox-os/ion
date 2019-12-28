@@ -44,19 +44,19 @@ OPTIONS
         the integers are equal
 
     INTEGER -ge INTEGER
-        the first INTEGER is greater than or equal to the first INTEGER
+        the first INTEGER is greater than or equal to the second INTEGER
 
     INTEGER -gt INTEGER
-        the first INTEGER is greater than the first INTEGER
+        the first INTEGER is greater than the second INTEGER
 
     INTEGER -le INTEGER
-        the first INTEGER is less than or equal to the first INTEGER
+        the first INTEGER is less than or equal to the second INTEGER
 
     INTEGER -lt INTEGER
-        the first INTEGER is less than the first INTEGER
+        the first INTEGER is less than the second INTEGER
 
     INTEGER -ne INTEGER
-        the first INTEGER is not equal to the first INTEGER
+        the first INTEGER is not equal to the second INTEGER
 
     FILE -ef FILE
         both files have the same device and inode numbers
