@@ -1,0 +1,3 @@
+echo "[${c::red,bold}asdf${c::default}]"
+echo "[${c::red,bold}asdf${c::default}"
+echo "${c::red,bold}asdf${c::default}]"

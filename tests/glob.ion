@@ -20,3 +20,6 @@ echo *{lock,toml}
 echo {L,R}*
 echo *{l,t}o??
 echo {L*,R*}E
+echo [C]argo.tom[l]
+echo [C]argo.toml
+echo Cargo.tom[l]

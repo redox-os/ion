@@ -5,6 +5,7 @@ echo hello%world
 echo "\$hello"
 echo "\\"
 echo "\n"
+echo -e "one\\\\\ntwo\\\\\nthree"
 echo "\""
 echo "<"
 echo '<'

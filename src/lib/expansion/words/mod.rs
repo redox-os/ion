@@ -13,6 +13,7 @@ enum Quotes {
     Double,
 }
 
+
 /// Unescapes filenames to be passed into the completer
 pub fn unescape(input: &str) -> Cow<'_, str> {
     let mut input: Cow<'_, str> = input.into();
@@ -24,6 +25,84 @@ pub fn unescape(input: &str) -> Cow<'_, str> {
         }
     }
     input
+}
+
+
+pub fn unescape_characters<'a>(input: &'a str, characters: &[char]) -> Cow<'a, str> {
+    let mut last_idx: usize = 0;
+    let mut backslash = false;
+    let mut input: Cow<'_, str> = input.into();
+    
+
+    while let Some(idx) = input[last_idx..].find('\\') {
+        if let Some(next_character) = input.chars().nth(last_idx + idx + 1) {
+            if characters.contains(&next_character) {
+                input.to_mut().remove(last_idx + idx);
+            }
+        } 
+        last_idx += idx + 1;
+    }
+
+
+    input
+}
+
+fn index_until_unescaped_character(input: &str, characters: &[u8]) -> (usize, u8, u8, bool) {
+    let mut i: usize = 0;
+    let mut prev_character = b'\0';
+    let mut last_character = b'\0';
+    let mut glob_character_found = false;
+    let mut backslash = false;
+    
+
+    for byte in input.bytes() {
+        
+
+        if backslash {
+            // Skip over escaped character
+            backslash = false; 
+        } else {
+            if byte == b'\\' {
+                backslash = true;
+            } else {
+                if !glob_character_found && [b'?', b'*'].contains(&byte) {
+                    glob_character_found = true;
+                }
+
+                
+                if characters.contains(&byte) {
+                    last_character = byte;
+                    break;
+                } else {
+                    prev_character = byte;
+                }
+            }
+        }
+
+
+        i += 1;
+    }
+    
+    (i, prev_character, last_character, glob_character_found)
+}
+
+fn index_until_character(input: &str, characters: &[u8], ret_on_match: bool) -> (usize, u8) {
+    let mut i: usize = 0;
+    let mut last_character = b'\0';
+
+
+    for byte in input.bytes() {
+        last_character = byte;
+        if ret_on_match ^ characters.contains(&byte) {
+            i += 1;
+        }
+        else {
+            break;
+        }
+    }
+
+
+    (i, last_character)
 }
 
 /// Terminal tokens for a Ion script
@@ -66,6 +145,9 @@ pub struct WordIterator<'a> {
 
 impl<'a> WordIterator<'a> {
     fn arithmetic_expression<I: Iterator<Item = u8>>(&mut self, iter: &mut I) -> WordToken<'a> {
+        let _ = iter.next();
+
+
         let mut paren: i8 = 0;
         let start = self.read;
         while let Some(character) = iter.next() {
@@ -89,7 +171,7 @@ impl<'a> WordIterator<'a> {
         panic!("ion: fatal syntax error: unterminated arithmetic expression");
     }
 
-    fn glob_check<I>(&mut self, iterator: &mut I) -> bool
+    fn glob_check<I>(&mut self, iterator: &mut I, is_text_adjacent: bool) -> bool
     where
         I: Iterator<Item = u8> + Clone,
     {
@@ -99,6 +181,7 @@ impl<'a> WordIterator<'a> {
         let mut glob = false;
         let mut square_bracket = 0;
         let mut iter = iterator.clone().peekable();
+        
         while let Some(character) = iter.next() {
             moves += 1;
             match character {
@@ -110,8 +193,8 @@ impl<'a> WordIterator<'a> {
                     // If the glob is less than three bytes in width, then it's empty and thus
                     // invalid. If it's not adjacent to text, it's not a glob.
                     let next_char = iter.peek();
-                    if !(moves <= 3 && square_bracket == 1)
-                        && (next_char != None && next_char != Some(&b' '))
+                    if (moves >= 2 && square_bracket == 0)
+                    && (is_text_adjacent || next_char != None && next_char != Some(&b' '))
                     {
                         glob = true;
                         break;
@@ -125,7 +208,8 @@ impl<'a> WordIterator<'a> {
             for _ in 0..moves {
                 iterator.next();
             }
-            self.read += moves + 1;
+            // self.read += moves + 1;
+            self.read += moves;
             true
         } else {
             self.read += 1;
@@ -218,6 +302,7 @@ impl<'a> WordIterator<'a> {
     where
         I: Iterator<Item = u8>,
     {
+        let _ = iterator.next();
         let start = self.read;
         let mut level = 0;
         while let Some(character) = iterator.next() {
@@ -322,6 +407,7 @@ impl<'a> WordIterator<'a> {
     where
         I: Iterator<Item = u8>,
     {
+        let _ = iterator.next();
         let start = self.read;
         // self.read += 1;
         while let Some(character) = iterator.next() {
@@ -368,7 +454,7 @@ impl<'a> WordIterator<'a> {
     {
         let mut method_flags = Quotes::None;
         let mut start = self.read;
-        self.read += 1;
+        // self.read += 1;
         while let Some(character) = iterator.next() {
             match character {
                 b'(' => {
@@ -505,7 +591,6 @@ impl<'a> WordIterator<'a> {
     {
         let mut method_flags = Quotes::None;
         let mut start = self.read;
-        self.read += 1;
         while let Some(character) = iterator.next() {
             match character {
                 b'(' => {
@@ -614,6 +699,7 @@ impl<'a> WordIterator<'a> {
     where
         I: Iterator<Item = u8>,
     {
+        let _ = iterator.next();
         let start = self.read;
         for character in iterator {
             if character == b'}' {
@@ -659,211 +745,295 @@ impl<'a> Iterator for WordIterator<'a> {
             return None;
         }
 
+
+        
+        
         let mut iterator = self.data.bytes().skip(self.read).peekable();
         let mut start = self.read;
         let mut glob = false;
         let mut tilde = false;
+        let mut looped = false;
 
+
+
+        
         loop {
-            match iterator.next()? {
-                _ if self.backsl => {
-                    self.read += 1;
-                    self.backsl = false;
-                    break;
-                }
-                b'\\' => {
-                    if self.quotes == Quotes::None {
-                        start += 1;
-                    }
-                    self.read += 1;
-                    self.backsl = true;
-                    break;
-                }
-                b'\'' if self.quotes != Quotes::Double => {
-                    start += 1;
-                    self.read += 1;
-                    if self.quotes == Quotes::Single {
-                        self.quotes = Quotes::None;
-                    } else {
-                        self.quotes = Quotes::Single;
-                    }
-                    break;
-                }
-                b'"' if self.quotes != Quotes::Single => {
-                    start += 1;
-                    self.read += 1;
-                    if self.quotes == Quotes::Double {
-                        self.quotes = Quotes::None;
-                        return self.next();
-                    }
-                    self.quotes = Quotes::Double;
-                    break;
-                }
-                b' ' if self.quotes == Quotes::None => {
-                    return Some(self.whitespaces(&mut iterator));
-                }
-                b'~' if self.quotes == Quotes::None => {
-                    tilde = true;
-                    self.read += 1;
-                    break;
-                }
-                b'{' if self.quotes == Quotes::None => {
-                    self.read += 1;
-                    return Some(self.braces(&mut iterator));
-                }
-                b'[' if self.quotes == Quotes::None => {
-                    if self.glob_check(&mut iterator) {
-                        glob = self.do_glob;
-                    } else {
-                        return Some(self.array(&mut iterator));
-                    }
-                }
-                b'@' if self.quotes != Quotes::Single => {
-                    return match iterator.next() {
-                        Some(b'(') => {
-                            self.read += 2;
-                            Some(self.array_process(&mut iterator))
-                        }
-                        Some(b'{') => {
-                            self.read += 2;
-                            Some(self.braced_array_variable(&mut iterator))
-                        }
-                        Some(b' ') | None => {
-                            self.read += 1;
-                            let output = &self.data[start..self.read];
-                            Some(WordToken::Normal(output.into(), glob, tilde))
-                        }
-                        _ => {
-                            self.read += 1;
-                            Some(self.array_variable(&mut iterator))
-                        }
-                    }
-                }
-                b'$' if self.quotes != Quotes::Single => {
-                    return match iterator.next() {
-                        Some(b'(') => {
-                            self.read += 2;
-                            if self.data.as_bytes()[self.read] == b'(' {
-                                // Pop the incoming left paren
-                                let _ = iterator.next();
-                                self.read += 1;
-                                Some(self.arithmetic_expression(&mut iterator))
-                            } else {
-                                Some(self.process(&mut iterator))
-                            }
-                        }
-                        Some(b'{') => {
-                            self.read += 2;
-                            Some(self.braced_variable(&mut iterator))
-                        }
-                        Some(b' ') | None => {
-                            self.read += 1;
-                            let output = &self.data[start..self.read];
-                            Some(WordToken::Normal(output.into(), glob, tilde))
-                        }
-                        _ => {
-                            self.read += 1;
-                            Some(self.variable(&mut iterator))
-                        }
-                    };
-                }
-                b'*' | b'?' => {
-                    self.read += 1;
-                    glob = self.do_glob;
-                    break;
-                }
-                _ => {
-                    self.read += 1;
-                    break;
-                }
-            }
-        }
-        while let Some(character) = iterator.next() {
+            let character = iterator.next()?;
             match character {
-                _ if self.backsl => self.backsl = false,
-                b'\\' if self.quotes != Quotes::Single => {
-                    let next = iterator.next();
-                    self.read += 1;
-
-                    if self.quotes == Quotes::Double {
-                        let _ = iterator.next();
-                        self.read += 1;
-                        return Some(WordToken::Normal(
-                            if next.map_or(true, |c| [b'$', b'@', b'\\', b'"'].contains(&c)) {
-                                unescape(&self.data[start..self.read])
-                            } else {
-                                self.data[start..self.read].into()
-                            },
-                            glob,
-                            tilde,
-                        ));
-                    }
-                }
-                b'\'' if self.quotes != Quotes::Double => {
-                    if self.quotes == Quotes::Single {
-                        self.quotes = Quotes::None;
-                    } else {
-                        self.quotes = Quotes::Single;
-                    }
-                    let output = &self.data[start..self.read];
-                    self.read += 1;
-                    return Some(WordToken::Normal(output.into(), glob, tilde));
-                }
-                b'"' if self.quotes != Quotes::Single => {
-                    if self.quotes == Quotes::Double {
-                        self.quotes = Quotes::None;
-                    } else {
-                        self.quotes = Quotes::Double;
-                    }
-                    let output = &self.data[start..self.read];
-                    self.read += 1;
-                    return Some(WordToken::Normal(output.into(), glob, tilde));
-                }
-                b' ' | b'{' if self.quotes == Quotes::None => {
-                    return Some(WordToken::Normal(
-                        unescape(&self.data[start..self.read]),
-                        glob,
-                        tilde,
-                    ));
-                }
-                b'$' | b'@' if self.quotes != Quotes::Single => {
-                    if let Some(&character) = self.data.as_bytes().get(self.read) {
-                        if character == b' ' {
+                b'\'' => {
+                    match self.quotes {
+                        Quotes::None => {
+                            start += 1;
                             self.read += 1;
-                            let output = &self.data[start..self.read];
-                            return Some(WordToken::Normal(output.into(), glob, tilde));
-                        }
-                    }
-                    if self.read == start {
-                        return self.next();
-                    } else {
-                        let output = &self.data[start..self.read];
-                        return Some(WordToken::Normal(unescape(output), glob, tilde));
-                    };
-                }
-                b'[' if self.quotes == Quotes::None => {
-                    if self.glob_check(&mut iterator) {
-                        glob = self.do_glob;
-                    } else {
-                        return Some(WordToken::Normal(
-                            self.data[start..self.read].into(),
-                            glob,
-                            tilde,
-                        ));
-                    }
-                }
-                b'*' | b'?' if self.quotes != Quotes::Single => {
-                    glob = self.do_glob;
-                }
-                _ => (),
-            }
-            self.read += 1;
-        }
+                            
 
-        if start == self.read {
-            None
-        } else {
-            Some(WordToken::Normal(unescape(&self.data[start..]), glob, tilde))
+                            let (idx, _) = index_until_character(&self.data[start..], &[b'\''], true);
+                            self.read += idx;
+
+                            
+                            // Do we care if there is no matching single quote? This case is already handled by src/lib/parser/pipelines.rs
+                            let ret = Some(WordToken::Normal(self.data[start..self.read].into(), glob, tilde));
+                            self.read += 1;
+                            return ret
+                        },
+                        Quotes::Double => {
+                            self.read += 1;
+                            return Some(WordToken::Normal(self.data[start..self.read].into(), glob, tilde))
+                        },
+                        Quotes::Single => {
+                            // Should never happen
+                            panic!();
+                        },
+                    }
+                },
+                b'"' => {
+                    match self.quotes {
+                        Quotes::None   => {
+                            start += 1;
+                            self.read += 1;
+                            self.quotes = Quotes::Double;
+
+                            
+                            let peeked_character = iterator.peek();
+                            if peeked_character == Some(&b'"') {
+                                start += 1;
+                                self.read += 1;
+                                self.quotes = Quotes::None;
+                                return Some(WordToken::Normal("".into(), glob, tilde))
+                            }
+                        },
+                        Quotes::Double => {
+                            start += 1;
+                            self.read += 1;
+                            self.quotes = Quotes::None; 
+                        },
+                        Quotes::Single => {
+                            // Should never happen
+                            panic!();
+                        },
+                    }
+                },
+                b'$' => {
+                    match self.quotes {
+                        Quotes::None | Quotes::Double => {
+                            self.read += 1;
+                            let peeked_character1 = iterator.peek();
+                            match peeked_character1 {
+                                Some(b'(') => {
+                                    let _ = iterator.next();
+                                    self.read += 1;
+                                    let peeked_character2 = iterator.peek();
+                                    if peeked_character2 == Some(&b'(')  {
+                                        self.read += 1;
+                                        return Some(self.arithmetic_expression(&mut iterator))
+                                    } else {
+                                        return Some(self.process(&mut iterator))
+                                    }
+                                },
+                                Some(b'{') => {
+                                    self.read += 1;
+                                    return Some(self.braced_variable(&mut iterator))
+                                },
+                                Some(b' ') => {
+                                    return Some(WordToken::Normal(self.data[start..self.read].into(), glob, tilde))
+                                },
+                                Some(b'?') => {
+                                    start += 1;
+                                    self.read += 1;
+                                    return Some(WordToken::Variable(self.data[start..self.read].into(), None))
+                                }
+                                _ => {
+                                    return Some(self.variable(&mut iterator))
+                                },
+                            }
+                        },
+                        Quotes::Single => {
+                            // Should never happen
+                            panic!();
+                        },
+                    }
+                },
+                b'@' => {
+                    match self.quotes {
+                        Quotes::None | Quotes::Double => {
+                            self.read += 1;
+                            let peeked_character1 = iterator.peek();
+
+                            
+                            match peeked_character1 {
+                                Some(b'(') => {
+                                    self.read += 1;
+                                    return Some(self.array_process(&mut iterator))
+                                },
+                                Some(b'{') => {
+                                    self.read += 1;
+                                    return Some(self.braced_array_variable(&mut iterator))
+                                },
+                                Some(b' ') => {
+                                    return Some(WordToken::Normal(self.data[start..self.read].into(), glob, tilde))
+                                },
+                                _ => {
+                                    return Some(self.array_variable(&mut iterator))
+                                },
+                            }
+                        },
+                        Quotes::Single => {
+                            // Should never happen
+                            panic!();
+                        },
+                    }
+                },
+                b'{' => {
+                    match self.quotes {
+                        Quotes::None => {
+                            self.read += 1;
+                            return Some(self.braces(&mut iterator))
+                        },
+                        Quotes::Single | Quotes::Double => {
+                            self.read += 1;
+                            return Some(WordToken::Normal(self.data[start..self.read].into(), glob, tilde))
+                        },
+                    }
+                },
+                b'[' => {
+                    match self.quotes {
+                        Quotes::None => {
+                            if self.glob_check(&mut iterator, false) {
+                                glob = self.do_glob;
+                                looped = true;
+                                continue
+                            } else {
+                                return Some(self.array(&mut iterator))
+                            }
+                        },
+                        Quotes::Single | Quotes::Double => {
+                            self.read += 1;
+                            return Some(WordToken::Normal(self.data[start..self.read].into(), glob, tilde))
+                        },
+                    }
+                },
+                b'~' => {
+                    if self.quotes != Quotes::Single {
+                        self.read += 1;
+                        tilde = true;
+                        return Some(WordToken::Normal(self.data[start..self.read].into(), glob, tilde))
+                    }
+                },
+                b' ' => {
+                    let (idx, _) = index_until_character(&self.data[start..], &[b' '], false);
+                    self.read += idx;
+                    return Some(WordToken::Whitespace(self.data[start..self.read].into()))
+                },
+                _ => {
+                    let (idx, prev_character, last_character, glob_character_found) = match self.quotes {
+                        Quotes::None | Quotes::Single => {
+                            match glob {
+                                true  => index_until_unescaped_character(&self.data[self.read..],  &[b' ', b'\'', b'"', b'$', b'@', b'~', b'{']),
+                                false => {
+                                    if looped {
+                                         index_until_unescaped_character(&self.data[self.read..],  &[b' ', b'\'', b'"', b'$', b'@', b'~', b'{', b'['])
+                                    } else {
+                                         index_until_unescaped_character(&self.data[start..],      &[b' ', b'\'', b'"', b'$', b'@', b'~', b'{', b'['])
+                                    }
+                                }
+                            }
+                        },
+                        Quotes::Double => {
+                            match glob {
+                                true  => index_until_unescaped_character(&self.data[self.read..], &[b' ', b'\'', b'"', b'$', b'@', b'~']),
+                                false => index_until_unescaped_character(&self.data[start..],     &[b' ', b'\'', b'"', b'$', b'@', b'~']),
+                            }
+                        },
+                    };
+
+
+
+
+                    if idx > 0 || looped {
+                        self.read += idx;
+                        looped = false;
+
+                        
+                        match last_character {
+                            b'[' => {
+                                // Point self.read to the character after the square bracket [
+                                self.read += 1;
+                                
+                                
+                                if prev_character != b'=' {
+                                    for _ in 0..idx {
+                                        // Advance the iterator for side-effects
+                                        iterator.next();
+                                    }
+                                    
+
+                                    if self.do_glob && self.quotes == Quotes::None && glob_character_found {
+                                        glob = self.do_glob;
+                                                 
+
+                                        // Even though we've found a glob character we want to call glob_check for side-effects to iterator and self.read
+                                        if self.glob_check(&mut iterator, true) {
+                                            if iterator.peek() != None {
+                                                // We haven't reached the end of the iterator yet
+                                                // For example *werty[abc]efg
+                                                looped = true;
+                                                continue
+                                            } else {
+                                                // We've reached the end of the iterator
+                                                // For example *werty[abc]
+                                                // Yes, this branch does nothing
+                                            }
+                                        } else {
+                                            // We've already found a glob character but we've also found an invalid glob with square brackets
+                                            // For example *werty[] or *werty[ abc]
+                                            // Rewind self.read by 2 so we can read up to but not including the square bracket [
+                                            // and treat whatever comes after the end of our word as part of a new word token
+                                            self.read -= 2;
+                                        }
+                                    } else {
+                                        if self.glob_check(&mut iterator, true) {
+                                            // We've found a valid glob with square brackets
+                                            glob = self.do_glob;
+                                            if iterator.peek() != None {
+                                                // We haven't reached the end of the iterator yet
+                                                // For example werty[abc]efg
+                                                looped = true;
+                                                continue
+                                            } else {
+                                                // We've reached the end of the iterator
+                                                // For example werty[abc]
+                                                // Yes, this branch does nothing
+                                            }
+                                        } else {
+                                            // We've found an invalid glob with square brackets
+                                            // For example werty[] or werty[ abc]
+                                            // Rewind self.read by 2 so we can read up to but not including the square bracket [
+                                            // and treat whatever comes after the end of our word as part of a new word token
+                                            self.read -= 2;
+                                        }
+                                    }
+                                } else {
+                                    // Handles the corner case of let map:hmap[[int]] = [key1=[1 2 3 4 5] key2=[6 7 8]]
+                                    // This branch will result in the word token key1=[ being returned
+                                    // Yes, this branch does nothing
+                                }
+                            },
+                            _ => {
+                                if self.do_glob && self.quotes == Quotes::None && glob_character_found {
+                                    glob = self.do_glob;
+                                }
+                            },
+                        }
+              
+
+                        let output = self.data[start..self.read].into();
+                        let output = unescape_characters(output, &[' ', '\'', '"', '$', '@', '~', '?', '*', '{', '(', ')', '}', '\\']);
+                        return Some(WordToken::Normal(output, glob, tilde))
+                    } else {
+                        return None
+                    }
+                },
+            }
         }
     }
 }
