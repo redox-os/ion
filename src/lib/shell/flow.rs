@@ -492,6 +492,7 @@ impl<'a> Shell<'a> {
     /// Expand an expression and run a branch based on the value of the
     /// expanded expression
     fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case<'a>]) -> Result {
+        use regex::RegexSet;
         // Logic for determining if the LHS of a match-case construct (the value we are
         // matching against) matches the RHS of a match-case construct (a value
         // in a case statement). For example, checking to see if the value
@@ -502,13 +503,13 @@ impl<'a> Shell<'a> {
         let is_array = is_array(expression.as_ref());
         let value = self.expand_string(expression.as_ref())?;
         for case in cases.iter() {
-            if case
-                .value
-                .as_ref()
-                .and_then(|v| self.expand_string(v).ok())
-                .filter(|v| v.iter().all(|v| !value.contains(v)))
-                .is_none()
-            {
+            if value.iter().all(|value| {
+                case.value
+                    .as_ref()
+                    .and_then(|v| self.expand_string(v).ok())
+                    .and_then(|v| RegexSet::new(v).ok())
+                    .map_or(false, |regex| regex.is_match(value))
+            }) {
                 // let pattern_is_array = is_array(&value);
                 let previous_bind = case.binding.as_ref().and_then(|bind| {
                     if is_array {

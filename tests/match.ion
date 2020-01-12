@@ -18,6 +18,16 @@ end
 analyze $out1
 analyze $out2
 
+fn analyze_regex output
+  match output
+    case ".*application/x-gzip"; echo "Use tar -xzf"
+    case _ ; echo "Unknown file type"
+  end
+end
+
+analyze $out1
+analyze $out2
+
 fn wildcard input
   match $input
     case _; echo "WILDCARD!"
