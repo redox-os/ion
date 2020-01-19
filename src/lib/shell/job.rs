@@ -104,7 +104,7 @@ pub struct TeeItem {
 }
 
 impl TeeItem {
-    pub fn new() -> Self { Self { sinks: Vec::new(), source: None } }
+    pub const fn new() -> Self { Self { sinks: Vec::new(), source: None } }
 
     pub fn add(&mut self, sink: File) { self.sinks.push(sink); }
 

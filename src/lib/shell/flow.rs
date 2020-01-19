@@ -645,10 +645,11 @@ fn expand_pipeline<'a>(
                             pline.items.extend(item_iter.cloned());
                         } else {
                             // Error in expansion
-                            Err(PipelineError::InvalidAlias(
+                            return Err(PipelineError::InvalidAlias(
                                 item.job.args[0].to_string(),
                                 alias.0.to_string(),
-                            ))?;
+                            )
+                            .into());
                         }
                     }
                     _ => (),

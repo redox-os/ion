@@ -130,13 +130,13 @@ impl<'b> Shell<'b> {
 
             match (&rhs, &key.kind) {
                 (Value::HashMap(_), Primitive::Indexed(..)) => {
-                    Err("cannot insert hmap into index".to_string())?
+                    return Err("cannot insert hmap into index".to_string())
                 }
                 (Value::BTreeMap(_), Primitive::Indexed(..)) => {
-                    Err("cannot insert bmap into index".to_string())?
+                    return Err("cannot insert bmap into index".to_string())
                 }
                 (Value::Array(_), Primitive::Indexed(..)) => {
-                    Err("multi-dimensional arrays are not yet supported".to_string())?
+                    return Err("multi-dimensional arrays are not yet supported".to_string())
                 }
                 _ if [Operator::Equal, Operator::OptionalEqual].contains(&operator) => {
                     backup.push((key, rhs))

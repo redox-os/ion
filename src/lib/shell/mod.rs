@@ -80,23 +80,28 @@ pub enum IonError {
 }
 
 impl From<ParseError> for IonError {
-    fn from(cause: ParseError) -> Self { IonError::InvalidSyntax(cause) }
+    #[must_use]
+    fn from(cause: ParseError) -> Self { Self::InvalidSyntax(cause) }
 }
 
 impl From<FunctionError> for IonError {
-    fn from(cause: FunctionError) -> Self { IonError::Function(cause) }
+    #[must_use]
+    fn from(cause: FunctionError) -> Self { Self::Function(cause) }
 }
 
 impl From<BlockError> for IonError {
-    fn from(cause: BlockError) -> Self { IonError::StatementFlowError(cause) }
+    #[must_use]
+    fn from(cause: BlockError) -> Self { Self::StatementFlowError(cause) }
 }
 
 impl From<PipelineError> for IonError {
-    fn from(cause: PipelineError) -> Self { IonError::PipelineExecutionError(cause) }
+    #[must_use]
+    fn from(cause: PipelineError) -> Self { Self::PipelineExecutionError(cause) }
 }
 
 impl From<ExpansionError<IonError>> for IonError {
-    fn from(cause: ExpansionError<Self>) -> Self { IonError::ExpansionError(cause) }
+    #[must_use]
+    fn from(cause: ExpansionError<Self>) -> Self { Self::ExpansionError(cause) }
 }
 
 /// Options for the shell
@@ -160,6 +165,7 @@ pub type PreCommandCallback<'a> = Box<dyn Fn(&Shell<'_>, &Pipeline<RefinedJob<'_
 pub type BackgroundEventCallback = Arc<dyn Fn(usize, Pid, BackgroundEvent) + Send + Sync>;
 
 impl<'a> Default for Shell<'a> {
+    #[must_use]
     fn default() -> Self { Self::new() }
 }
 
@@ -186,9 +192,11 @@ impl<'a> Shell<'a> {
     }
 
     /// Create a new shell with default settings
+    #[must_use]
     pub fn new() -> Self { Self::with_builtins(BuiltinMap::default()) }
 
     /// Create a shell with custom builtins
+    #[must_use]
     pub fn with_builtins(builtins: BuiltinMap<'a>) -> Self {
         Self::install_signal_handler();
 
@@ -232,9 +240,11 @@ impl<'a> Shell<'a> {
     }
 
     /// Access the directory stack
+    #[must_use]
     pub const fn dir_stack(&self) -> &DirectoryStack { &self.directory_stack }
 
     /// Mutable access to the directory stack
+    #[must_use]
     pub fn dir_stack_mut(&mut self) -> &mut DirectoryStack { &mut self.directory_stack }
 
     /// Resets the flow control fields to their default values.
@@ -246,6 +256,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Get the depth of the current block
+    #[must_use]
     pub fn block_len(&self) -> usize { self.flow_control.len() }
 
     /// A method for executing a function, using `args` as the input.
@@ -338,13 +349,14 @@ impl<'a> Shell<'a> {
         }
 
         if self.opts.err_exit && !exit_status.is_success() {
-            Err(PipelineError::EarlyExit)?
+            return Err(PipelineError::EarlyExit.into());
         }
 
         Ok(exit_status)
     }
 
     /// Get the pid of the last executed job
+    #[must_use]
     pub fn previous_job(&self) -> Option<usize> {
         if self.previous_job == !0 {
             None
@@ -359,6 +371,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Set the callback to call before each command
+    #[must_use]
     pub fn background_event_mut(&mut self) -> &mut Option<BackgroundEventCallback> {
         &mut self.background_event
     }
@@ -369,6 +382,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Set the callback to call before each command
+    #[must_use]
     pub fn pre_command_mut(&mut self) -> &mut Option<PreCommandCallback<'a>> {
         &mut self.pre_command
     }
@@ -382,6 +396,7 @@ impl<'a> Shell<'a> {
     pub fn on_command_mut(&mut self) -> &mut Option<OnCommandCallback<'a>> { &mut self.on_command }
 
     /// Get access to the builtins
+    #[must_use]
     pub const fn builtins(&self) -> &BuiltinMap<'a> { &self.builtins }
 
     /// Get a mutable access to the builtins
@@ -389,21 +404,27 @@ impl<'a> Shell<'a> {
     /// Warning: Previously defined functions will rely on previous versions of the builtins, even
     /// if they are redefined. It is strongly advised to avoid mutating the builtins while the shell
     /// is running
+    #[must_use]
     pub fn builtins_mut(&mut self) -> &mut BuiltinMap<'a> { &mut self.builtins }
 
     /// Access to the shell options
+    #[must_use]
     pub const fn opts(&self) -> &Options { &self.opts }
 
     /// Mutable access to the shell options
+    #[must_use]
     pub fn opts_mut(&mut self) -> &mut Options { &mut self.opts }
 
     /// Access to the variables
+    #[must_use]
     pub const fn variables(&self) -> &Variables<'a> { &self.variables }
 
     /// Mutable access to the variables
+    #[must_use]
     pub fn variables_mut(&mut self) -> &mut Variables<'a> { &mut self.variables }
 
     /// Access to the variables
+    #[must_use]
     pub fn background_jobs<'mutex>(
         &'mutex self,
     ) -> impl Deref<Target = Vec<BackgroundProcess>> + 'mutex {
@@ -430,6 +451,7 @@ impl<'a> Shell<'a> {
     pub fn set_previous_status(&mut self, status: Status) { self.previous_status = status; }
 
     /// Get the last command's return code and/or the code for the error
+    #[must_use]
     pub const fn previous_status(&self) -> Status { self.previous_status }
 
     fn assign(&mut self, key: &Key<'_>, value: Value<Rc<Function<'a>>>) -> Result<(), String> {

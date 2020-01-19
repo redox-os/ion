@@ -23,7 +23,7 @@ pub struct SignalHandler;
 impl SignalHandler {
     pub fn new() -> Self {
         block();
-        SignalHandler
+        Self
     }
 }
 

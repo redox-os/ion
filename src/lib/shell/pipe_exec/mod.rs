@@ -119,7 +119,8 @@ pub enum PipelineError {
 }
 
 impl From<RedirectError> for PipelineError {
-    fn from(cause: RedirectError) -> Self { PipelineError::RedirectPipeError(cause) }
+    #[must_use]
+    fn from(cause: RedirectError) -> Self { Self::RedirectPipeError(cause) }
 }
 
 /// Create an OS pipe and write the contents of a byte slice to one end
@@ -146,11 +147,11 @@ pub fn stdin_of<T: AsRef<str>>(input: &T) -> Result<File, PipelineError> {
 impl Input {
     pub(self) fn get_infile(&self) -> Result<File, PipelineError> {
         match self {
-            Input::File(ref filename) => match File::open(filename.as_str()) {
+            Self::File(ref filename) => match File::open(filename.as_str()) {
                 Ok(file) => Ok(file),
                 Err(why) => Err(RedirectError::File(filename.to_string(), why).into()),
             },
-            Input::HereString(ref string) => stdin_of(&string),
+            Self::HereString(ref string) => stdin_of(&string),
         }
     }
 }
@@ -295,7 +296,6 @@ fn prepare<'a>(
 impl<'b> Shell<'b> {
     /// For tee jobs
     fn exec_multi_out(
-        &mut self,
         items: &mut (Option<TeeItem>, Option<TeeItem>),
         redirection: RedirectFrom,
     ) -> Status {
@@ -322,7 +322,7 @@ impl<'b> Shell<'b> {
     }
 
     /// For cat jobs
-    fn exec_multi_in(&mut self, sources: &mut [File], stdin: &mut Option<File>) -> Status {
+    fn exec_multi_in(sources: &mut [File], stdin: &mut Option<File>) -> Status {
         let stdout = io::stdout();
         let mut stdout = stdout.lock();
         for file in stdin.iter_mut().chain(sources) {
@@ -546,12 +546,12 @@ fn spawn_proc(
         }),
         Variant::Cat { ref mut sources } => {
             fork_exec_internal(stdout, None, stdin, *group, |_, _, mut stdin| {
-                shell.exec_multi_in(sources, &mut stdin)
+                Shell::exec_multi_in(sources, &mut stdin)
             })
         }
         Variant::Tee { ref mut items } => {
             fork_exec_internal(stdout, stderr, stdin, *group, |_, _, _| {
-                shell.exec_multi_out(items, redirection)
+                Shell::exec_multi_out(items, redirection)
             })
         }
     }?;

@@ -88,6 +88,7 @@ impl<'a> Variables<'a> {
         self.0.append_scopes(scopes)
     }
 
+    #[must_use]
     pub(crate) fn index_scope_for_var(&self, name: &str) -> Option<usize> {
         self.0.index_scope_for_var(name)
     }
@@ -109,6 +110,7 @@ impl<'a> Variables<'a> {
     /// Further minimizes the directory path in the same manner that Fish does by default.
     /// That is, if more than two parents are visible in the path, all parent directories
     /// of the current directory will be reduced to a single character.
+    #[must_use]
     fn get_minimal_directory(&self) -> types::Str {
         let swd = self.get_simplified_directory();
 
@@ -140,12 +142,14 @@ impl<'a> Variables<'a> {
     ///
     /// Useful for getting smaller prompts, this will produce a simplified variant of the
     /// working directory which the leading `HOME` prefix replaced with a tilde character.
+    #[must_use]
     fn get_simplified_directory(&self) -> types::Str {
         let home = self.get_str("HOME").unwrap_or_else(|_| "?".into());
         env::var("PWD").unwrap().replace(&*home, "~").into()
     }
 
     /// Indicates if name is valid for functions and variables
+    #[must_use]
     pub fn is_valid_name(name: &str) -> bool {
         let mut iter = name.chars();
         iter.next().map_or(false, |c| c.is_alphabetic() || c == '_')
@@ -197,6 +201,7 @@ impl<'a> Variables<'a> {
     }
 
     /// Get a variable on the current scope
+    #[must_use]
     pub fn get(&self, mut name: &str) -> Option<&Value<Rc<Function<'a>>>> {
         const GLOBAL_NS: &str = "global::";
         const SUPER_NS: &str = "super::";
@@ -220,6 +225,7 @@ impl<'a> Variables<'a> {
     }
 
     /// Get a mutable access to a variable on the current scope
+    #[must_use]
     pub fn get_mut(&mut self, name: &str) -> Option<&mut Value<Rc<Function<'a>>>> {
         if name.starts_with("super::") || name.starts_with("global::") {
             // Cannot mutate outer namespace
@@ -230,6 +236,7 @@ impl<'a> Variables<'a> {
 }
 
 impl<'a> Default for Variables<'a> {
+    #[must_use]
     fn default() -> Self {
         let mut map: Scopes<types::Str, Value<Rc<Function<'a>>>> = Scopes::with_capacity(64);
         map.set("HISTORY_SIZE", "1000");

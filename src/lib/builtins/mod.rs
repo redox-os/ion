@@ -291,7 +291,7 @@ pub fn source_sh(args: &[types::Str], _shell: &mut Shell<'_>) -> Status {
                     Ok(v) => v,
                     Err(e) => return Status::error(format!("Could not read env: {}", e)),
                 };
-                let mut iter = var.splitn(2, "=");
+                let mut iter = var.splitn(2, '=');
                 let name = iter.next().unwrap();
                 let val = match iter.next() {
                     Some(v) => v,

@@ -44,7 +44,7 @@ pub struct AssignmentActions<'a> {
 }
 
 impl<'a> AssignmentActions<'a> {
-    pub fn new(keys: &'a str, operator: Operator, values: &'a str) -> AssignmentActions<'a> {
+    pub const fn new(keys: &'a str, operator: Operator, values: &'a str) -> AssignmentActions<'a> {
         AssignmentActions {
             keys: KeyIterator::new(keys),
             operator,

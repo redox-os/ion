@@ -159,10 +159,13 @@ impl<'a> StringMethod<'a> {
             "trim_start" => output.push_str(get_var!().trim_start()),
             "repeat" => match MethodArgs::new(self.pattern, expand).join(" ")?.parse::<usize>() {
                 Ok(repeat) => output.push_str(&get_var!().repeat(repeat)),
-                Err(_) => Err(MethodError::WrongArgument(
-                    "repeat",
-                    "argument is not a valid positive integer",
-                ))?,
+                Err(_) => {
+                    return Err(MethodError::WrongArgument(
+                        "repeat",
+                        "argument is not a valid positive integer",
+                    )
+                    .into())
+                }
             },
             "replace" => {
                 let params = {
@@ -174,7 +177,13 @@ impl<'a> StringMethod<'a> {
                     (Some(replace), Some(with)) => {
                         output.push_str(&get_var!().replace(replace.as_str(), &with));
                     }
-                    _ => Err(MethodError::WrongArgument("replace", "two arguments are required"))?,
+                    _ => {
+                        return Err(MethodError::WrongArgument(
+                            "replace",
+                            "two arguments are required",
+                        )
+                        .into())
+                    }
                 }
             }
             "replacen" => {
@@ -188,13 +197,20 @@ impl<'a> StringMethod<'a> {
                         if let Ok(nth) = nth.parse::<usize>() {
                             output.push_str(&get_var!().replacen(replace.as_str(), &with, nth));
                         } else {
-                            Err(MethodError::WrongArgument(
+                            return Err(MethodError::WrongArgument(
                                 "replacen",
                                 "third argument isn't a valid integer",
-                            ))?
+                            )
+                            .into());
                         }
                     }
-                    _ => Err(MethodError::WrongArgument("replacen", "three arguments required"))?,
+                    _ => {
+                        return Err(MethodError::WrongArgument(
+                            "replacen",
+                            "three arguments required",
+                        )
+                        .into())
+                    }
                 }
             }
             "regex_replace" => {
@@ -206,10 +222,16 @@ impl<'a> StringMethod<'a> {
                 match params {
                     (Some(replace), Some(with)) => match Regex::new(&replace) {
                         Ok(re) => output.push_str(&re.replace_all(&get_var!(), &with[..])),
-                        Err(why) => Err(MethodError::InvalidRegex(replace.to_string(), why))?,
+                        Err(why) => {
+                            return Err(MethodError::InvalidRegex(replace.to_string(), why).into())
+                        }
                     },
                     _ => {
-                        Err(MethodError::WrongArgument("regex_replace", "two arguments required"))?
+                        return Err(MethodError::WrongArgument(
+                            "regex_replace",
+                            "two arguments required",
+                        )
+                        .into())
                     }
                 }
             }
@@ -326,7 +348,11 @@ impl<'a> StringMethod<'a> {
                     output.push_str(&first_str)
                 };
             }
-            _ => Err(Error::from(MethodError::InvalidScalarMethod(self.method.to_string())))?,
+            _ => {
+                return Err(
+                    Error::from(MethodError::InvalidScalarMethod(self.method.to_string())).into()
+                )
+            }
         }
         Ok(())
     }

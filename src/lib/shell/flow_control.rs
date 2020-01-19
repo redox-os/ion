@@ -206,6 +206,7 @@ impl<'a> fmt::Display for Statement<'a> {
 
 impl<'a> Statement<'a> {
     /// Check if the statement is a block-based statement
+    #[must_use]
     pub fn is_block(&self) -> bool {
         match *self {
             Statement::Case(_)
@@ -252,7 +253,7 @@ impl<'a> Function<'a> {
         args: &[S],
     ) -> Result<(), IonError> {
         if args.len() - 1 != self.args.len() {
-            Err(FunctionError::InvalidArgumentCount)?;
+            return Err(FunctionError::InvalidArgumentCount.into());
         }
 
         let values = self
@@ -293,9 +294,11 @@ impl<'a> Function<'a> {
     }
 
     /// Get the function's description
+    #[must_use]
     pub fn description(&self) -> Option<&types::Str> { self.description.as_ref() }
 
     /// Create a new function
+    #[must_use]
     pub const fn new(
         description: Option<types::Str>,
         name: types::Str,

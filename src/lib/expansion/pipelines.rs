@@ -199,7 +199,7 @@ impl<'a> Pipeline<RefinedJob<'a>> {
 
 impl<'a> Pipeline<Job<'a>> {
     /// A useless, empty pipeline
-    pub fn new() -> Self { Pipeline { pipe: PipeType::Normal, items: Vec::new() } }
+    pub const fn new() -> Self { Pipeline { pipe: PipeType::Normal, items: Vec::new() } }
 
     /// Expand the pipeline to a set of arguments for execution
     pub fn expand(

@@ -31,9 +31,9 @@ pub enum ProcessState {
 impl fmt::Display for ProcessState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            ProcessState::Running => write!(f, "Running"),
-            ProcessState::Stopped => write!(f, "Stopped"),
-            ProcessState::Empty => write!(f, "Empty"),
+            Self::Running => write!(f, "Running"),
+            Self::Stopped => write!(f, "Stopped"),
+            Self::Empty => write!(f, "Empty"),
         }
     }
 }
@@ -72,12 +72,15 @@ impl BackgroundProcess {
     }
 
     /// Get the pid associated with the job
+    #[must_use]
     pub const fn pid(&self) -> Pid { self.pid }
 
     /// Check if the process is still running
+    #[must_use]
     pub fn is_running(&self) -> bool { self.state == ProcessState::Running }
 
     /// Check if this is in fact a process
+    #[must_use]
     pub fn exists(&self) -> bool { self.state != ProcessState::Empty }
 
     /// Stop capturing information about the process. *This action is irreversible*
