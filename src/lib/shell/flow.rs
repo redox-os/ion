@@ -503,13 +503,16 @@ impl<'a> Shell<'a> {
         let is_array = is_array(expression.as_ref());
         let value = self.expand_string(expression.as_ref())?;
         for case in cases.iter() {
-            if value.iter().all(|value| {
-                case.value
-                    .as_ref()
-                    .and_then(|v| self.expand_string(v).ok())
-                    .and_then(|v| RegexSet::new(v).ok())
-                    .map_or(false, |regex| regex.is_match(value))
-            }) {
+            let is_match = if let Some(v) = &case.value {
+                let v = self.expand_string(v)?;
+                // Anchor to start and end
+                let v = v.into_iter().map(|v| format!("^{}$", v));
+                RegexSet::new(v).ok().map_or(false, |regex| value.iter().all(|v| regex.is_match(&v)))
+            } else {
+                true
+            };
+
+            if is_match {
                 // let pattern_is_array = is_array(&value);
                 let previous_bind = case.binding.as_ref().and_then(|bind| {
                     if is_array {
