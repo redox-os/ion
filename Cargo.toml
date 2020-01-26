@@ -79,7 +79,7 @@ structopt = "0.3"
 atty = "0.2"
 permutate = "0.3"
 xdg = "2.1"
-nix = { git = "https://github.com/AdminXVII/nix", branch = "add-redox-support" }
+nix = { git = "https://github.com/AdminXVII/nix", branch = "add-redox-support-bis" }
 mktemp = "0.4"
 
 # window example
