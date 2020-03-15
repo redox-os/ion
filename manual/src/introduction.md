@@ -2,7 +2,7 @@
 
 Ion is a modern system shell that features a simple, yet powerful, syntax. It is written entirely
 in Rust, which greatly increases the overall quality and security of the shell, eliminating the
-possibilities of a [ShellShock](http://www.wikiwand.com/en/Shellshock_(software_bug))-like vulnerability, and making development easier. It also
+possibilities of a [ShellShock](https://en.wikipedia.org/wiki/Shellshock_(software_bug))-like vulnerability, and making development easier. It also
 offers a level of performance that exceeds that of Dash, when taking advantage of Ion's features.
 While it is developed alongside, and primarily for, RedoxOS, it is a fully capable on other *nix
 platforms, and we are currently searching for a Windows developer to port it to Windows.
