@@ -56,7 +56,7 @@ mod tests {
             Ok(vec![
                 KeyBuf { name: "a".into(), kind: Primitive::Integer },
                 KeyBuf { name: "b".into(), kind: Primitive::Boolean },
-                KeyBuf { name: "c".into(), kind: Primitive::StrArray },
+                KeyBuf { name: "c".into(), kind: Primitive::Array(Box::new(Primitive::Str)) },
                 KeyBuf { name: "d".into(), kind: Primitive::Str },
             ])
         );

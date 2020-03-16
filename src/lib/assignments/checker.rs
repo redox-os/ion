@@ -99,21 +99,13 @@ pub fn value_check<E: Expander>(
     if is_array(value) {
         let extracted = shell.get_array(value)?;
         match expected {
-            Primitive::StrArray | Primitive::Str => extracted
+            Primitive::Str => extracted
                 .iter()
                 .map(|item| value_check(shell, item, &Primitive::Str))
                 .collect::<Result<_, _>>(),
-            Primitive::BooleanArray => extracted
+            Primitive::Array(ref inner) => extracted
                 .iter()
-                .map(|item| value_check(shell, item, &Primitive::Boolean))
-                .collect::<Result<_, _>>(),
-            Primitive::IntegerArray => extracted
-                .iter()
-                .map(|item| value_check(shell, item, &Primitive::Integer))
-                .collect::<Result<_, _>>(),
-            Primitive::FloatArray => extracted
-                .iter()
-                .map(|item| value_check(shell, item, &Primitive::Float))
+                .map(|item| value_check(shell, item, inner))
                 .collect::<Result<_, _>>(),
             Primitive::HashMap(_) | Primitive::BTreeMap(_) => get_map_of(expected, shell, value),
             Primitive::Indexed(_, ref kind) => value_check(shell, value, kind),
@@ -181,13 +173,13 @@ mod test {
     #[test]
     fn is_integer_array_() {
         assert_eq!(
-            value_check(&mut DummyExpander, "[1 2 3]", &Primitive::IntegerArray).unwrap(),
+            value_check(&mut DummyExpander, "[1 2 3]", &Primitive::Array(Box::new(Primitive::Integer))).unwrap(),
             Value::Array(vec![
                 Value::Str("1".into()),
                 Value::Str("2".into()),
                 Value::Str("3".into())
             ])
         );
-        assert!(value_check(&mut DummyExpander, "[1 2 three]", &Primitive::IntegerArray).is_err());
+        assert!(value_check(&mut DummyExpander, "[1 2 three]", &Primitive::Array(Box::new(Primitive::Integer))).is_err());
     }
 }

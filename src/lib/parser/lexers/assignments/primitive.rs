@@ -5,20 +5,14 @@ use std::fmt::{self, Display, Formatter};
 pub enum Primitive {
     /// A plain string (ex: `"a string"`)
     Str,
-    /// An array of string (ex: `["-" b c d]`)
-    StrArray,
     /// A true-false value
     Boolean,
-    /// An array of booleans
-    BooleanArray,
     /// An integer numeric type
     Integer,
-    /// An array of integer numeric type
-    IntegerArray,
     /// A floating-point value
     Float,
-    /// A floating-point value array
-    FloatArray,
+    /// Arrays
+    Array(Box<Primitive>),
     /// A hash map
     HashMap(Box<Primitive>),
     /// A btreemap
@@ -31,13 +25,9 @@ impl Primitive {
     pub(crate) fn parse(data: &str) -> Option<Self> {
         match data {
             "str" => Some(Primitive::Str),
-            "[str]" => Some(Primitive::StrArray),
             "bool" => Some(Primitive::Boolean),
-            "[bool]" => Some(Primitive::BooleanArray),
             "int" => Some(Primitive::Integer),
-            "[int]" => Some(Primitive::IntegerArray),
             "float" => Some(Primitive::Float),
-            "[float]" => Some(Primitive::FloatArray),
             _ => {
                 let open_bracket = data.find('[')?;
                 let close_bracket = data.rfind(']')?;
@@ -49,7 +39,8 @@ impl Primitive {
                 } else if kind == "bmap" {
                     Some(Primitive::BTreeMap(Box::new(Self::parse(inner)?)))
                 } else {
-                    None
+                    // It's an array
+                    Some(Primitive::Array(Box::new(Self::parse(inner)?)))
                 }
             }
         }
@@ -60,13 +51,10 @@ impl Display for Primitive {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
             Primitive::Str => write!(f, "str"),
-            Primitive::StrArray => write!(f, "[str]"),
             Primitive::Boolean => write!(f, "bool"),
-            Primitive::BooleanArray => write!(f, "[bool]"),
             Primitive::Float => write!(f, "float"),
-            Primitive::FloatArray => write!(f, "[float]"),
             Primitive::Integer => write!(f, "int"),
-            Primitive::IntegerArray => write!(f, "[int]"),
+            Primitive::Array(ref kind) => write!(f, "[{}]", kind),
             Primitive::HashMap(ref kind) => match **kind {
                 Primitive::Str => write!(f, "hmap[]"),
                 ref kind => write!(f, "hmap[{}]", kind),
