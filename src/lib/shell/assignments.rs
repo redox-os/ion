@@ -20,22 +20,39 @@ fn list_vars(shell: &Shell<'_>) -> Result<(), io::Error> {
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
 
-    // Write all the string variables to the buffer.
-    buffer.write_all(b"# String Variables\n")?;
-    for (key, val) in shell.variables.string_vars() {
-        writeln!(buffer, "{} = {}", key, val)?;
-    }
-
-    // Then immediately follow that with a list of array variables.
-    buffer.write_all(b"\n# Array Variables\n")?;
-    for (key, val) in shell.variables.arrays() {
-        write!(buffer, "{} = [ ", key)?;
-        let mut vars = val.iter();
-        if let Some(var) = vars.next() {
-            write!(buffer, "'{}' ", var)?;
-            vars.map(|var| write!(buffer, ", '{}' ", var)).collect::<Result<Vec<_>, _>>()?;
+    for (key, val) in shell.variables.variables() {
+        write!(buffer, "{} = ", key)?;
+        match val {
+            Value::Str(ref s) => writeln!(buffer, "{}", s)?,
+            Value::Array(ref vals) => {
+                write!(buffer, "[")?;
+                let mut vals = vals.iter();
+                if let Some(val) = vals.next() {
+                    write!(buffer, " '{}'", val)?;
+                    vals.map(|v| write!(buffer, ", '{}'", v)).collect::<Result<Vec<_>, _>>()?;
+                }
+                writeln!(buffer, " ]")?;
+            },
+            Value::HashMap(ref s) => {
+                write!(buffer, "[")?;
+                let mut vals = s.iter();
+                if let Some((key, val)) = vals.next() {
+                    write!(buffer, " '{}'='{}'", key, val)?;
+                    vals.map(|(k, v)| write!(buffer, ", '{}'='{}'", k, v)).collect::<Result<Vec<_>, _>>()?;
+                }
+                writeln!(buffer, " ]")?;
+            },
+            Value::BTreeMap(ref s) => {
+                write!(buffer, "[")?;
+                let mut vals = s.iter();
+                if let Some((key, val)) = vals.next() {
+                    write!(buffer, " '{}'='{}'", key, val)?;
+                    vals.map(|(k, v)| write!(buffer, ", '{}'='{}'", k, v)).collect::<Result<Vec<_>, _>>()?;
+                }
+                writeln!(buffer, " ]")?;
+            },
+            _ => unsafe { std::hint::unreachable_unchecked() }
         }
-        writeln!(buffer, "]")?;
     }
     Ok(())
 }

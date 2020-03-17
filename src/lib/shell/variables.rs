@@ -54,6 +54,21 @@ impl<'a> Variables<'a> {
         })
     }
 
+    /// Get all the variables
+    pub fn variables(&self) -> impl Iterator<Item = (&types::Str, &Value<Rc<Function<'a>>>)> {
+        self.0.scopes().rev().flat_map(|map| {
+            map.iter().filter_map(|(key, val)| {
+                match val {
+                    val @ Value::Array(_) |
+                    val @ Value::Str(_) |
+                    val @ Value::HashMap(_) |
+                    val @ Value::BTreeMap(_) => Some((key, val)),
+                    _ => None
+                }
+            })
+        })
+    }
+
     /// Get all the array values
     pub fn arrays(&self) -> impl Iterator<Item = (&types::Str, &types::Array<Rc<Function<'a>>>)> {
         self.0.scopes().rev().flat_map(|map| {
