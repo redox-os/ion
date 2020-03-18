@@ -487,6 +487,9 @@ impl<'a> Shell<'a> {
                                 }
                                 Ok(())
                             }
+                            Value::Str(_) => {
+                                Err("cannot assign to an index of a string".into())
+                            }
                             _ => Ok(()),
                         }
                     }
