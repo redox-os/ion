@@ -1,6 +1,6 @@
 ion 1.0.0-alpha
 The fast, safe, modern rust shell. Ion is a commandline shell created to be a faster and easier to use alternative to
-the currently available shells. It is not POSIX compliant.
+the currently available shells. It is not POSIX compliant
 
 USAGE:
     ion [FLAGS] [OPTIONS] [args]...
