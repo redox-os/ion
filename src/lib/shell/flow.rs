@@ -507,7 +507,9 @@ impl<'a> Shell<'a> {
                 let v = self.expand_string(v)?;
                 // Anchor to start and end
                 let v = v.into_iter().map(|v| format!("^{}$", v));
-                RegexSet::new(v).ok().map_or(false, |regex| value.iter().all(|v| regex.is_match(&v)))
+                RegexSet::new(v)
+                    .ok()
+                    .map_or(false, |regex| value.iter().all(|v| regex.is_match(&v)))
             } else {
                 true
             };
@@ -676,18 +678,18 @@ mod tests {
     fn new_if() -> Statement<'static> {
         Statement::If {
             expression: vec![Statement::Default],
-            success:    Vec::new(),
-            else_if:    Vec::new(),
-            failure:    Vec::new(),
-            mode:       IfMode::Success,
+            success: Vec::new(),
+            else_if: Vec::new(),
+            failure: Vec::new(),
+            mode: IfMode::Success,
         }
     }
     fn new_case() -> Statement<'static> {
         Statement::Case(Case {
-            value:       None,
-            binding:     None,
+            value: None,
+            binding: None,
             conditional: None,
-            statements:  Vec::new(),
+            statements: Vec::new(),
         })
     }
 

@@ -1,7 +1,7 @@
 use super::{completer::IonCompleter, InteractiveShell};
 use ion_shell::Shell;
+use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use std::io::ErrorKind;
-use nix::fcntl::{OFlag, fcntl, FcntlArg};
 
 impl<'a> InteractiveShell<'a> {
     /// Make sure to reset the fd to blocking mode
