@@ -10,7 +10,7 @@ pub enum AssignmentError<'a> {
     #[error(display = "expected {}, but received {}", _0, _1)]
     InvalidValue(Primitive, Primitive),
     #[error(display = "{}", _0)]
-    TypeError(#[error(cause)] TypeError),
+    TypeError(#[error(source)] TypeError),
     #[error(
         display = "extra values were supplied, and thus ignored. Previous assignment: '{}' = '{}'",
         _0,

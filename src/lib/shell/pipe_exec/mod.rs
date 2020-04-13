@@ -40,52 +40,53 @@ use std::{
 pub enum RedirectError {
     /// Input
     #[error(display = "failed to redirect '{}' to stdin: {}", _0, _1)]
-    File(String, #[error(cause)] io::Error),
+    File(String, #[error(source)] io::Error),
     #[error(display = "failed to write herestring '{}': {}", _0, _1)]
-    WriteError(String, #[error(cause)] io::Error),
+    WriteError(String, #[error(source)] io::Error),
 
     /// Output
     #[error(display = "failed to redirect {} to file '{}': {}", redirect, file, why)]
     Output {
         redirect: RedirectFrom,
         file:     String,
-        #[error(cause)]
+        #[error(source)]
         why:      io::Error,
     },
 }
 
 /// This is created when Ion fails to create a pipeline
 #[derive(Debug, Error)]
+#[error(no_from)]
 pub enum PipelineError {
     /// The fork failed
     #[error(display = "failed to fork: {}", _0)]
-    Fork(#[error(cause)] nix::Error),
+    Fork(#[error(source)] nix::Error),
     /// Failed to setup capturing for function
     #[error(display = "error reading stdout of child: {}", _0)]
-    CaptureFailed(#[error(cause)] io::Error),
+    CaptureFailed(#[error(source)] io::Error),
 
     /// Failed to duplicate a file descriptor
     #[error(display = "could not duplicate the pipe: {}", _0)]
-    CloneFdFailed(#[error(cause)] nix::Error),
+    CloneFdFailed(#[error(source)] nix::Error),
 
     /// Could not clone the file
     #[error(display = "could not clone the pipe: {}", _0)]
-    ClonePipeFailed(#[error(cause)] io::Error),
+    ClonePipeFailed(#[error(source)] io::Error),
     /// Could not set the pipe as a redirection
     #[error(display = "{}", _0)]
-    RedirectPipeError(#[error(cause)] RedirectError),
+    RedirectPipeError(#[error(source)] RedirectError),
     /// Failed to create a pipe
     #[error(display = "could not create pipe: {}", _0)]
-    CreatePipeError(#[error(cause)] nix::Error),
+    CreatePipeError(#[error(source)] nix::Error),
     /// Failed to create a fork
     #[error(display = "could not fork: {}", _0)]
-    CreateForkError(#[error(cause)] nix::Error),
+    CreateForkError(#[error(source)] nix::Error),
     /// Failed to terminate the jobs after a termination
     #[error(display = "failed to terminate foreground jobs: {}", _0)]
-    TerminateJobsError(#[error(cause)] nix::Error),
+    TerminateJobsError(#[error(source)] nix::Error),
     /// Could not execute the command
     #[error(display = "command exec error: {}", _0)]
-    CommandExecError(#[error(cause)] io::Error, types::Args),
+    CommandExecError(#[error(source)] io::Error, types::Args),
     /// Could not expand the alias
     #[error(display = "unable to pipe outputs of alias: '{} = {}'", _0, _1)]
     InvalidAlias(String, String),
@@ -110,12 +111,12 @@ pub enum PipelineError {
 
     /// Failed to grab the tty
     #[error(display = "could not grab the terminal: {}", _0)]
-    TerminalGrabFailed(#[error(cause)] nix::Error),
+    TerminalGrabFailed(#[error(source)] nix::Error),
 
     /// Failed to send signal to a process group. This typically happens when trying to start the
     /// pipeline after it's creation
     #[error(display = "could not kill the processes: {}", _0)]
-    KillFailed(#[error(cause)] nix::Error),
+    KillFailed(#[error(source)] nix::Error),
 }
 
 impl From<RedirectError> for PipelineError {

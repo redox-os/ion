@@ -13,6 +13,7 @@ const ARG_DEFAULT_SIZE: usize = 10;
 
 /// An error produced during pipeline parsing
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Error)]
+#[error(no_from)]
 pub enum PipelineParsingError {
     // redirections
     /// No file was provided after the redirection output
@@ -39,7 +40,7 @@ pub enum PipelineParsingError {
     // paired
     /// Error with paired tokens (parens, brackets & braces)
     #[error(display = "{}", _0)]
-    Paired(#[error(cause)] LevelsError),
+    Paired(#[error(source)] LevelsError),
 }
 
 impl From<LevelsError> for PipelineParsingError {

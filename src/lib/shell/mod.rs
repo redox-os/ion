@@ -58,25 +58,26 @@ use std::{
 
 /// Errors from execution
 #[derive(Debug, Error)]
+#[error(no_from)]
 pub enum IonError {
     // Parse-time error
     /// Parsing failed
     #[error(display = "syntax error: {}", _0)]
-    InvalidSyntax(#[error(cause)] ParseError),
+    InvalidSyntax(#[error(source)] ParseError),
     /// Incorrect order of blocks
     #[error(display = "block error: {}", _0)]
-    StatementFlowError(#[error(cause)] BlockError),
+    StatementFlowError(#[error(source)] BlockError),
 
     // Run time errors
     /// Function execution error
     #[error(display = "function error: {}", _0)]
-    Function(#[error(cause)] FunctionError),
+    Function(#[error(source)] FunctionError),
     /// Failed to run a pipeline
     #[error(display = "pipeline execution error: {}", _0)]
-    PipelineExecutionError(#[error(cause)] PipelineError),
+    PipelineExecutionError(#[error(source)] PipelineError),
     /// Could not properly expand to a pipeline
     #[error(display = "expansion error: {}", _0)]
-    ExpansionError(#[error(cause)] ExpansionError<IonError>),
+    ExpansionError(#[error(source)] ExpansionError<IonError>),
 }
 
 impl From<ParseError> for IonError {

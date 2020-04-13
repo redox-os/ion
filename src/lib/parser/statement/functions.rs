@@ -6,7 +6,7 @@ pub enum FunctionParseError {
     #[error(display = "repeated argument name: '{}'", _0)]
     RepeatedArgument(String),
     #[error(display = "{}", _0)]
-    TypeError(#[error(cause)] TypeError),
+    TypeError(#[error(source)] TypeError),
 }
 
 /// The arguments expression given to a function declaration goes into here, which will be

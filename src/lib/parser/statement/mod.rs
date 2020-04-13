@@ -19,6 +19,7 @@ pub type Result<'a> = std::result::Result<Statement<'a>, Error>;
 
 /// An Error occured during parsing
 #[derive(Debug, Error, PartialEq, Eq, Hash, Clone)]
+#[error(no_from)]
 pub enum Error {
     /// The command name is illegal
     #[error(display = "illegal command name: {}", _0)]
@@ -61,7 +62,7 @@ pub enum Error {
     NoInKeyword,
     /// Error with match statements
     #[error(display = "case error: {}", _0)]
-    Case(#[error(cause)] CaseError),
+    Case(#[error(source)] CaseError),
     /// The provided function name was invalid
     #[error(
         display = "'{}' is not a valid function name
@@ -71,10 +72,10 @@ pub enum Error {
     InvalidFunctionName(String),
     /// The arguments did not match the function's signature
     #[error(display = "function argument error: {}", _0)]
-    InvalidFunctionArgument(#[error(cause)] FunctionParseError),
+    InvalidFunctionArgument(#[error(source)] FunctionParseError),
     /// Error occured during parsing of a pipeline
     #[error(display = "{}", _0)]
-    Pipeline(#[error(cause)] PipelineParsingError),
+    Pipeline(#[error(source)] PipelineParsingError),
 }
 
 impl From<FunctionParseError> for Error {

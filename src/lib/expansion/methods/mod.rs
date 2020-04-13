@@ -37,7 +37,7 @@ pub enum MethodError {
 
     /// An invalid regex was provided. This is specific to the `matches` method
     #[error(display = "regex_replace: error in regular expression '{}': {}", _0, _1)]
-    InvalidRegex(String, #[error(cause)] regex::Error),
+    InvalidRegex(String, #[error(source)] regex::Error),
 }
 
 impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {

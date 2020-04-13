@@ -59,7 +59,7 @@ path = "src/main.rs"
 
 [dependencies]
 calculate = { git = "https://gitlab.redox-os.org/redox-os/calc" }
-err-derive = "0.1"
+err-derive = "0.2"
 glob = "0.3"
 redox_liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }
 rand = "0.7"

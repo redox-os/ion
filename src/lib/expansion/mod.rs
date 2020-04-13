@@ -30,13 +30,14 @@ use unicode_segmentation::UnicodeSegmentation;
 
 /// Expansion errored
 #[derive(Debug, Error)]
+#[error(no_from)]
 pub enum Error<T: fmt::Debug + error::Error + fmt::Display + 'static> {
     /// Error during method expansion
     #[error(display = "{}", _0)]
-    MethodError(#[error(cause)] MethodError),
+    MethodError(#[error(source)] MethodError),
     /// Wrong type was given
     #[error(display = "{}", _0)]
-    TypeError(#[error(cause)] TypeError),
+    TypeError(#[error(source)] TypeError),
     /// Indexed out of the array bounds
     #[error(display = "invalid index")] // TODO: Add more info
     OutOfBound,
@@ -49,7 +50,7 @@ pub enum Error<T: fmt::Debug + error::Error + fmt::Display + 'static> {
     UnsupportedNamespace(String),
     /// Failed to parse a value as an hexadecimal value
     #[error(display = "could not parse '{}' as hexadecimal value: {}", _0, _1)]
-    InvalidHex(String, #[error(cause)] std::num::ParseIntError),
+    InvalidHex(String, #[error(source)] std::num::ParseIntError),
     /// Could not parse as a valid color
     #[error(display = "could not parse '{}' as a color", _0)]
     ColorError(String),
@@ -72,7 +73,7 @@ pub enum Error<T: fmt::Debug + error::Error + fmt::Display + 'static> {
 
     /// Subprocess error
     #[error(display = "Could not expand subprocess: {}", _0)]
-    Subprocess(#[error(cause)] Box<T>),
+    Subprocess(#[error(source)] Box<T>),
 
     /// Could not parse the index for array or map-like variable
     #[error(display = "Can't parse '{}' as a valid index for variable", _0)]
