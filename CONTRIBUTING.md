@@ -1,13 +1,17 @@
 # Contributor Guidelines
 
+Contributors MUST:
+Comply with the templates using [conventional commit](https://www.conventionalcommits.org/en/v1.0.0-beta.4/) or **explicitly reason why not**
+
 ## Merge Requests
 
 Contributors MUST:
 
-- Discuss a feature before implementing it
-- Include unit and integration tests applicable to the changes and fixes you made
+- Comply with the templates using [conventional commit](https://www.conventionalcommits.org/en/v1.0.0-beta.4/) or **explicitly reason why not**
+- For **bug fixes** fill 1. Description, 2.Related issue, 3.Regression test, 4.Refactoring statement, 6.Documentation and 7.Performance
+- For **features** fill 1. Description, 2.Related discussion, 3.Unit test, 4. Integration test, 5. Refactoring statement, 6.Documentation and 7.Performance
+- For **BREAKING CHANGE**, where valid programs are not working anymore, create a Request For Comment(RFC)
 - Format your code with `cargo +nightly fmt` before creating a commit
-- Follow [Conventional Commit] guidelines, so that our changelogs are useful
 - Squash commits, such that each commit clearly does a specific thing, either locally or using gitlab's custom checkbox.
 - [Adhere to a git workflow using rebase](https://medium.com/singlestone/a-git-workflow-using-rebase-1b1210de83e5)
 - Rebase upon the master branch, rather than merging it
@@ -16,8 +20,8 @@ Contributors MUST:
 Contributors MUST NOT:
 
 - Have merge commits in their merge requests
-- Make breaking changes without clearly documenting them in the commit
-- Have commits which do not adhere to [Conventional Commit] guidelines
+- Have breaking changes without RFC
+- Have commits which do not adhere to [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0-beta.4/) guidelines
 
 Contributors SHOULD NOT:
 
@@ -27,27 +31,28 @@ Contributors SHOULD NOT:
 
 ## Finding an issue
 
-First, find an area to work on within the shell or one of it's related projects.
+1. Find an area to work on within the shell or one of it's related projects.
 This may be:
 
 - An existing issue which has been reported
 - A feature that is missing that you would like to develop
 - An issue you've discovered that you would like to fix
 
-Once you have found something that you want to work on, submit your intent to
-the issue board, either by creating an issue for an issue which does not exist,
-or commenting on an issue that you are working on it.
+2. Submit your intent to the issue board. Write into an existing issue or create a new issue.
 
 ## On Unit & Integration Tests
 
-Changes made to the code should normally be accompanied by both unit and integration tests,
-in order to prevent these issues from re-occuring in the future.
+Feature addition to the code should be accompanied by unit and integration tests,
+in order to prevent issues from creating on refactoring in the future.
+Bug fixes should be combined with regression tests in order to prevent issues from 
+re-occuring in the future.
 
 If you see an area that deserves a test, feel free to add extra tests in your pull requests.
 When submitting new functionality, especially complex functionality, try to write as many
 tests as you can think of to cover all possible code paths that your function(s) might take.
-Integration tests are located in the **examples** directory, and are the most important place
+Integration tests are located in the **tests** directory, and are the most important place
 to create tests -- unit tests come second after the integration tests.
+Regression tests are both integration and unit tests, depending on the bug.
 
 Integration tests are much more useful in general, as they cover real world use cases and
 stress larger portions of the code base at once. Yet unit tests still have their place, as
