@@ -77,11 +77,24 @@ sudo make update-shells prefix=/usr
 
 # Vim/NeoVim Syntax Highlighting Plugin
 
-We do have an [officially-supported syntax highlighting plugin](https://gitlab.redox-os.org/redox-os/ion-vim) for all the
-vim/nvim users out there.
+For vim/nvim users there is an [officially-supported syntax highlighting plugin](https://gitlab.redox-os.org/redox-os/ion-vim).
 
 ```vimscript
 Plugin 'vmchale/ion-vim'
 ```
 
-![Screenshot of Syntax Highlighting](https://i.imgur.com/JzZp7WT.png)
+![Vim Syntax Highlighting](.gitlab/vim_syntax.png)
+
+# Emacs Syntax Highlighting Plugin
+
+For emacs users there is a [kindly-supported syntax highlighting plugin](https://github.com/iwahbe/ion-mode).
+
+```emacs
+(add-to-list 'load-path  (expand-file-name "/path/to/ion-mode"))
+(require 'ion-mode)
+(autoload 'ion-mode (locate-library "ion-mode") "Ion majore mode" t)
+(add-to-list 'auto-mode-alist '("\\.ion\\'" . ion-mode))
+(add-to-list 'auto-mode-alist '("/ion/initrc" . ion-mode))
+```
+
+![Emacs Syntax Highlighting](.gitlab/emacs_syntax.png)
