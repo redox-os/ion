@@ -260,17 +260,21 @@ SYNOPSYS
     source-sh SCRIPT
 
 DESCRIPTION
-    Execute the script literal given in argument and apply env vars diff to the current shell"
+    Execute the script given in argument and apply env vars diff to the current shell
+    If the script is a file, the file is executed, else is it treated as a literal script"
 )]
 pub fn source_sh(args: &[types::Str], _shell: &mut Shell<'_>) -> Status {
-    let arg = match args.get(1) {
+    let mut arg = match args.get(1) {
         None => return Status::bad_argument("Please pass a shell script as option"),
-        Some(arg) => arg,
+        Some(arg) => Cow::Borrowed(arg),
     };
     let temp = match Temp::new_file() {
         Ok(f) => f,
         Err(e) => return Status::error(format!("Could not create temp file for source-sh: {}", e)),
     };
+    if let Ok(s) = std::fs::read_to_string(arg.as_str()) {
+        arg = Cow::Owned(s.into());
+    }
     let script = format!("{}\nenv | sort > {}", arg, temp.as_path().display());
     match Command::new("sh")
         .args(&["-c", &script])
@@ -296,14 +300,13 @@ pub fn source_sh(args: &[types::Str], _shell: &mut Shell<'_>) -> Status {
                 let val = match iter.next() {
                     Some(v) => v,
                     None => {
-                        return Status::error(format!(
-                            "Could not parse env file, no value for: '{}'",
-                            name
-                        ))
+                        eprintln!("Invalid environment variable '{}'. Proceeding anyway", name);
+                        continue;
                     }
                 };
                 let prev_val = std::env::var_os(name);
                 if prev_val.as_ref().and_then(|x| x.to_str()) != Some(val) {
+                    println!("Set {} to {}", name, val);
                     std::env::set_var(name, val);
                 }
             }

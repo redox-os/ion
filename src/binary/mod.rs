@@ -434,5 +434,6 @@ where
 
 fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
     // -> impl Iterator<Item = (usize, usize)> + 'a
-    WordDivide { iter: buf.chars().copied().enumerate(), count: 0, word_start: None }.collect() // TODO: return iterator directly :D
+    WordDivide { iter: buf.chars().copied().enumerate(), count: 0, word_start: None }.collect()
+    // TODO: return iterator directly :D
 }
