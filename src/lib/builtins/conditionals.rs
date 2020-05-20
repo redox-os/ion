@@ -23,28 +23,28 @@ string_function!(
     desc = "check if a given string starts with another one",
     man = "
 SYNOPSIS
-    starts_with <PATTERN> tests...
+    starts-with <PATTERN> tests...
 
 DESCRIPTION
-    Returns 0 if any argument starts_with contains the first argument, else returns 0"
+    Returns 0 if the first argument starts with any other argument, else returns 0"
 )], starts_with);
 string_function!(
 #[builtin(
-    desc = "check if a given string starts with another one",
+    desc = "check if a given string ends with another one",
     man = "
 SYNOPSIS
-    starts_with <PATTERN> tests...
+    ends-with <PATTERN> tests...
 
 DESCRIPTION
-    Returns 0 if any argument starts_with contains the first argument, else returns 0"
+    Returns 0 if the first argument ends with any other argument, else returns 0"
 )], ends_with);
 string_function!(
 #[builtin(
-    desc = "check if a given string starts with another one",
+    desc = "check if a given string contains another one",
     man = "
 SYNOPSIS
-    starts_with <PATTERN> tests...
+    contains <PATTERN> tests...
 
 DESCRIPTION
-    Returns 0 if any argument starts_with contains the first argument, else returns 0"
+    Returns 0 if the first argument contains any other argument, else returns 0"
 )], contains);
