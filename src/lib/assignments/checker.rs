@@ -46,7 +46,7 @@ fn get_map_of<E: Expander>(
     primitive_type: &Primitive,
     shell: &mut E,
     expression: &str,
-) -> expansion::Result<Value<Rc<types::Function<'static>>>, E::Error> {
+) -> expansion::Result<Value<Rc<types::Function>>, E::Error> {
     let array = shell.expand_string(expression)?;
 
     let inner_kind = match primitive_type {
@@ -95,7 +95,7 @@ pub fn value_check<E: Expander>(
     shell: &mut E,
     value: &str,
     expected: &Primitive,
-) -> expansion::Result<Value<Rc<types::Function<'static>>>, E::Error> {
+) -> expansion::Result<Value<Rc<types::Function>>, E::Error> {
     if is_array(value) {
         let extracted = shell.get_array(value)?;
         match expected {
@@ -173,13 +173,23 @@ mod test {
     #[test]
     fn is_integer_array_() {
         assert_eq!(
-            value_check(&mut DummyExpander, "[1 2 3]", &Primitive::Array(Box::new(Primitive::Integer))).unwrap(),
+            value_check(
+                &mut DummyExpander,
+                "[1 2 3]",
+                &Primitive::Array(Box::new(Primitive::Integer))
+            )
+            .unwrap(),
             Value::Array(vec![
                 Value::Str("1".into()),
                 Value::Str("2".into()),
                 Value::Str("3".into())
             ])
         );
-        assert!(value_check(&mut DummyExpander, "[1 2 three]", &Primitive::Array(Box::new(Primitive::Integer))).is_err());
+        assert!(value_check(
+            &mut DummyExpander,
+            "[1 2 three]",
+            &Primitive::Array(Box::new(Primitive::Integer))
+        )
+        .is_err());
     }
 }

@@ -32,26 +32,28 @@ fn list_vars(shell: &Shell<'_>) -> Result<(), io::Error> {
                     vals.map(|v| write!(buffer, ", '{}'", v)).collect::<Result<Vec<_>, _>>()?;
                 }
                 writeln!(buffer, " ]")?;
-            },
+            }
             Value::HashMap(ref s) => {
                 write!(buffer, "[")?;
                 let mut vals = s.iter();
                 if let Some((key, val)) = vals.next() {
                     write!(buffer, " '{}'='{}'", key, val)?;
-                    vals.map(|(k, v)| write!(buffer, ", '{}'='{}'", k, v)).collect::<Result<Vec<_>, _>>()?;
+                    vals.map(|(k, v)| write!(buffer, ", '{}'='{}'", k, v))
+                        .collect::<Result<Vec<_>, _>>()?;
                 }
                 writeln!(buffer, " ]")?;
-            },
+            }
             Value::BTreeMap(ref s) => {
                 write!(buffer, "[")?;
                 let mut vals = s.iter();
                 if let Some((key, val)) = vals.next() {
                     write!(buffer, " '{}'='{}'", key, val)?;
-                    vals.map(|(k, v)| write!(buffer, ", '{}'='{}'", k, v)).collect::<Result<Vec<_>, _>>()?;
+                    vals.map(|(k, v)| write!(buffer, ", '{}'='{}'", k, v))
+                        .collect::<Result<Vec<_>, _>>()?;
                 }
                 writeln!(buffer, " ]")?;
-            },
-            _ => unsafe { std::hint::unreachable_unchecked() }
+            }
+            _ => unsafe { std::hint::unreachable_unchecked() },
         }
     }
     Ok(())
@@ -122,7 +124,7 @@ impl<'b> Shell<'b> {
     pub(crate) fn calculate<'a>(
         &mut self,
         actions: AssignmentActions<'a>,
-    ) -> Result<Vec<(Key<'a>, Value<Rc<Function<'b>>>)>, String> {
+    ) -> Result<Vec<(Key<'a>, Value<Rc<Function>>)>, String> {
         let mut backup: Vec<_> = Vec::with_capacity(4);
         for action in actions {
             let Action(key, operator, expression) = action.map_err(|e| e.to_string())?;
@@ -204,9 +206,9 @@ impl<'b> Shell<'b> {
 // parsed
 fn apply<'a>(
     op: Operator,
-    lhs: &Value<Rc<Function<'a>>>,
-    rhs: Value<Rc<Function<'a>>>,
-) -> Result<Value<Rc<Function<'a>>>, OpError> {
+    lhs: &Value<Rc<Function>>,
+    rhs: Value<Rc<Function>>,
+) -> Result<Value<Rc<Function>>, OpError> {
     match op {
         Operator::Add => lhs + rhs,
         Operator::Divide => lhs / rhs,

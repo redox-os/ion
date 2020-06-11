@@ -12,9 +12,9 @@ use unicode_segmentation::UnicodeSegmentation;
 /// Contain a dynamically-typed variable value
 pub use types_rs::Value;
 /// A structure containing dynamically-typed values organised in scopes
-pub struct Variables<'a>(Scopes<types::Str, Value<Rc<Function<'a>>>>);
+pub struct Variables(Scopes<types::Str, Value<Rc<Function>>>);
 
-impl<'a> Variables<'a> {
+impl Variables {
     /// Get all strings
     pub fn string_vars(&self) -> impl Iterator<Item = (&types::Str, &types::Str)> {
         self.0.scopes().flat_map(|map| {
@@ -42,7 +42,7 @@ impl<'a> Variables<'a> {
     }
 
     /// Get all the functions
-    pub fn functions(&self) -> impl Iterator<Item = (&types::Str, &Rc<Function<'a>>)> {
+    pub fn functions(&self) -> impl Iterator<Item = (&types::Str, &Rc<Function>)> {
         self.0.scopes().rev().flat_map(|map| {
             map.iter().filter_map(|(key, val)| {
                 if let types_rs::Value::Function(val) = val {
@@ -55,22 +55,20 @@ impl<'a> Variables<'a> {
     }
 
     /// Get all the variables
-    pub fn variables(&self) -> impl Iterator<Item = (&types::Str, &Value<Rc<Function<'a>>>)> {
+    pub fn variables(&self) -> impl Iterator<Item = (&types::Str, &Value<Rc<Function>>)> {
         self.0.scopes().rev().flat_map(|map| {
-            map.iter().filter_map(|(key, val)| {
-                match val {
-                    val @ Value::Array(_) |
-                    val @ Value::Str(_) |
-                    val @ Value::HashMap(_) |
-                    val @ Value::BTreeMap(_) => Some((key, val)),
-                    _ => None
-                }
+            map.iter().filter_map(|(key, val)| match val {
+                val @ Value::Array(_)
+                | val @ Value::Str(_)
+                | val @ Value::HashMap(_)
+                | val @ Value::BTreeMap(_) => Some((key, val)),
+                _ => None,
             })
         })
     }
 
     /// Get all the array values
-    pub fn arrays(&self) -> impl Iterator<Item = (&types::Str, &types::Array<Rc<Function<'a>>>)> {
+    pub fn arrays(&self) -> impl Iterator<Item = (&types::Str, &types::Array<Rc<Function>>)> {
         self.0.scopes().rev().flat_map(|map| {
             map.iter().filter_map(|(key, val)| {
                 if let types_rs::Value::Array(val) = val {
@@ -92,14 +90,11 @@ impl<'a> Variables<'a> {
     pub(crate) fn pop_scopes<'b>(
         &'b mut self,
         index: usize,
-    ) -> impl Iterator<Item = Scope<types::Str, Value<Rc<Function<'a>>>>> + 'b {
+    ) -> impl Iterator<Item = Scope<types::Str, Value<Rc<Function>>>> + 'b {
         self.0.pop_scopes(index)
     }
 
-    pub(crate) fn append_scopes(
-        &mut self,
-        scopes: Vec<Scope<types::Str, Value<Rc<Function<'a>>>>>,
-    ) {
+    pub(crate) fn append_scopes(&mut self, scopes: Vec<Scope<types::Str, Value<Rc<Function>>>>) {
         self.0.append_scopes(scopes)
     }
 
@@ -111,7 +106,7 @@ impl<'a> Variables<'a> {
     /// Set a variable to a value in the current scope. If a variable already exists in a writable
     /// scope, it is updated, else a new variable is created in the current scope, possibly
     /// shadowing other variables
-    pub fn set<T: Into<Value<Rc<Function<'a>>>>>(&mut self, name: &str, value: T) {
+    pub fn set<T: Into<Value<Rc<Function>>>>(&mut self, name: &str, value: T) {
         let value = value.into();
         if let Some(val) = self.0.get_mut(name) {
             std::mem::replace(val, value);
@@ -173,7 +168,7 @@ impl<'a> Variables<'a> {
 
     /// Remove a variable from the current scope. If the value can't be removed (it is outside a
     /// function or does not exist), returns None
-    pub fn remove(&mut self, name: &str) -> Option<Value<Rc<Function<'a>>>> {
+    pub fn remove(&mut self, name: &str) -> Option<Value<Rc<Function>>> {
         if name.starts_with("super::") || name.starts_with("global::") {
             // Cannot mutate outer namespace
             return None;
@@ -217,7 +212,7 @@ impl<'a> Variables<'a> {
 
     /// Get a variable on the current scope
     #[must_use]
-    pub fn get(&self, mut name: &str) -> Option<&Value<Rc<Function<'a>>>> {
+    pub fn get(&self, mut name: &str) -> Option<&Value<Rc<Function>>> {
         const GLOBAL_NS: &str = "global::";
         const SUPER_NS: &str = "super::";
 
@@ -241,7 +236,7 @@ impl<'a> Variables<'a> {
 
     /// Get a mutable access to a variable on the current scope
     #[must_use]
-    pub fn get_mut(&mut self, name: &str) -> Option<&mut Value<Rc<Function<'a>>>> {
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Value<Rc<Function>>> {
         if name.starts_with("super::") || name.starts_with("global::") {
             // Cannot mutate outer namespace
             return None;
@@ -250,10 +245,10 @@ impl<'a> Variables<'a> {
     }
 }
 
-impl<'a> Default for Variables<'a> {
+impl Default for Variables {
     #[must_use]
     fn default() -> Self {
-        let mut map: Scopes<types::Str, Value<Rc<Function<'a>>>> = Scopes::with_capacity(64);
+        let mut map: Scopes<types::Str, Value<Rc<Function>>> = Scopes::with_capacity(64);
         map.set("HISTORY_SIZE", "1000");
         map.set("HISTFILE_SIZE", "100000");
         map.set(
@@ -293,9 +288,9 @@ pub(crate) mod tests {
     };
     use serial_test_derive::serial;
 
-    pub struct VariableExpander<'a>(pub Variables<'a>);
+    pub struct VariableExpander(pub Variables);
 
-    impl<'a> Expander for VariableExpander<'a> {
+    impl Expander for VariableExpander {
         type Error = IonError;
 
         fn string(&self, var: &str) -> Result<types::Str, IonError> { self.0.get_str(var) }

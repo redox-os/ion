@@ -127,7 +127,7 @@ impl<'a> PipeItem<RefinedJob<'a>> {
     pub fn command(&self) -> &types::Str { self.job.command() }
 }
 
-impl<'a> PipeItem<Job<'a>> {
+impl<'a> PipeItem<Job> {
     /// Expand a single job to argument literals for execution
     pub fn expand(
         &self,
@@ -160,7 +160,7 @@ impl<'a> PipeItem<Job<'a>> {
     }
 
     /// Create a new pipeitem with the given job and redirections
-    pub const fn new(job: Job<'a>, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
+    pub const fn new(job: Job, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
         Self { job, outputs, inputs }
     }
 }
@@ -197,7 +197,7 @@ impl<'a> Pipeline<RefinedJob<'a>> {
     }
 }
 
-impl<'a> Pipeline<Job<'a>> {
+impl<'a> Pipeline<Job> {
     /// A useless, empty pipeline
     pub const fn new() -> Self { Pipeline { pipe: PipeType::Normal, items: Vec::new() } }
 

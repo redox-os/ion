@@ -69,8 +69,8 @@ pub enum BlockError {
 
 impl<'a> Shell<'a> {
     fn insert_into_block(
-        block: &mut Block<'a>,
-        statement: Statement<'a>,
+        block: &mut Block,
+        statement: Statement,
     ) -> std::result::Result<(), BlockError> {
         let block = match block.last_mut().expect("Should not insert statement if stack is empty!")
         {
@@ -124,9 +124,9 @@ impl<'a> Shell<'a> {
     }
 
     fn insert_statement(
-        block: &mut Block<'a>,
-        statement: Statement<'a>,
-    ) -> std::result::Result<Option<Statement<'a>>, BlockError> {
+        block: &mut Block,
+        statement: Statement,
+    ) -> std::result::Result<Option<Statement>, BlockError> {
         match statement {
             // Push new block to stack
             Statement::For { .. }
@@ -250,10 +250,10 @@ impl<'a> Shell<'a> {
     /// expressions
     fn execute_if(
         &mut self,
-        expression: &[Statement<'a>],
-        success: &[Statement<'a>],
-        else_if: &[ElseIf<'a>],
-        failure: &[Statement<'a>],
+        expression: &[Statement],
+        success: &[Statement],
+        else_if: &[ElseIf],
+        failure: &[Statement],
     ) -> Result {
         // Try execute success branch
         self.execute_statements(expression)?;
@@ -279,7 +279,7 @@ impl<'a> Shell<'a> {
         &mut self,
         variables: &[types::Str],
         values: &[types::Str],
-        statements: &[Statement<'a>],
+        statements: &[Statement],
     ) -> Result {
         macro_rules! set_vars_then_exec {
             ($chunk:expr, $def:expr) => {
@@ -324,11 +324,7 @@ impl<'a> Shell<'a> {
 
     /// Executes all of the statements within a while block until a certain
     /// condition is met.
-    fn execute_while(
-        &mut self,
-        expression: &[Statement<'a>],
-        statements: &[Statement<'a>],
-    ) -> Result {
+    fn execute_while(&mut self, expression: &[Statement], statements: &[Statement]) -> Result {
         loop {
             self.execute_statements(expression)?;
             if self.previous_status.is_failure() {
@@ -345,7 +341,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a single statement
-    pub fn execute_statement(&mut self, statement: &Statement<'a>) -> Result {
+    pub fn execute_statement(&mut self, statement: &Statement) -> Result {
         match statement {
             Statement::Let(action) => {
                 self.previous_status = self.local(action);
@@ -475,7 +471,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Simply executes all supplied statements.
-    pub fn execute_statements(&mut self, statements: &[Statement<'a>]) -> Result {
+    pub fn execute_statements(&mut self, statements: &[Statement]) -> Result {
         self.variables.new_scope(false);
 
         let condition = statements
@@ -491,7 +487,7 @@ impl<'a> Shell<'a> {
 
     /// Expand an expression and run a branch based on the value of the
     /// expanded expression
-    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case<'a>]) -> Result {
+    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case]) -> Result {
         use regex::RegexSet;
         // Logic for determining if the LHS of a match-case construct (the value we are
         // matching against) matches the RHS of a match-case construct (a value
@@ -599,10 +595,10 @@ impl<'a> Shell<'a> {
 // TODO: If the aliases are made standard functions, the error type must be changed
 fn expand_pipeline<'a>(
     shell: &Shell<'a>,
-    pipeline: &Pipeline<Job<'a>>,
-) -> std::result::Result<(Pipeline<Job<'a>>, Vec<Statement<'a>>), IonError> {
+    pipeline: &Pipeline<Job>,
+) -> std::result::Result<(Pipeline<Job>, Vec<Statement>), IonError> {
     let mut item_iter = pipeline.items.iter();
-    let mut items: Vec<PipeItem<Job<'a>>> = Vec::with_capacity(item_iter.size_hint().0);
+    let mut items: Vec<PipeItem<Job>> = Vec::with_capacity(item_iter.size_hint().0);
     let mut statements = Vec::new();
 
     while let Some(item) = item_iter.next() {
@@ -672,10 +668,10 @@ fn expand_pipeline<'a>(
 mod tests {
     use super::*;
 
-    fn new_match() -> Statement<'static> {
+    fn new_match() -> Statement {
         Statement::Match { expression: types::Str::from(""), cases: Vec::new() }
     }
-    fn new_if() -> Statement<'static> {
+    fn new_if() -> Statement {
         Statement::If {
             expression: vec![Statement::Default],
             success:    Vec::new(),
@@ -684,7 +680,7 @@ mod tests {
             mode:       IfMode::Success,
         }
     }
-    fn new_case() -> Statement<'static> {
+    fn new_case() -> Statement {
         Statement::Case(Case {
             value:       None,
             binding:     None,

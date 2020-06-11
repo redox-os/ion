@@ -14,7 +14,7 @@ use crate::{
 };
 use std::char;
 
-pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
+pub fn parse(code: &str, builtins: &BuiltinMap<'_>) -> super::Result {
     let cmd = code.trim();
     match cmd {
         "return" => Ok(Statement::Return(None)),
@@ -195,7 +195,6 @@ mod tests {
                             .into_iter()
                             .collect(),
                         RedirectFrom::None,
-                        None,
                     ),
                     outputs: Vec::new(),
                     inputs:  Vec::new(),

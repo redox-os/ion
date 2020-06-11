@@ -37,7 +37,7 @@ use std::fmt;
 /// Case { value: None, ... }
 /// ```
 #[derive(Debug, PartialEq, Clone, Default)]
-pub struct Case<'a> {
+pub struct Case {
     /// The value to match with
     pub value:       Option<String>,
     /// Set a variable with the exact result
@@ -45,16 +45,16 @@ pub struct Case<'a> {
     /// An additional statement to test before matching the case statement
     pub conditional: Option<String>,
     /// The block to execute on matching input
-    pub statements:  Block<'a>,
+    pub statements:  Block,
 }
 
 /// An elseif case
 #[derive(Debug, PartialEq, Clone)]
-pub struct ElseIf<'a> {
+pub struct ElseIf {
     /// The block to test
-    pub expression: Block<'a>,
+    pub expression: Block,
     /// The block to execute on success
-    pub success:    Block<'a>,
+    pub success:    Block,
 }
 
 /// The action to perform on assignment
@@ -93,28 +93,28 @@ pub enum IfMode {
 /// Contains all the possible actions for the shell
 // TODO: Enable statements and expressions to contain &str values.
 #[derive(Debug, PartialEq, Clone)]
-pub enum Statement<'a> {
+pub enum Statement {
     /// Assignment
     Let(LocalAction),
     /// A case
-    Case(Case<'a>),
+    Case(Case),
     /// Export a variable
     Export(ExportAction),
     /// An if block
     If {
         /// The block to test
-        expression: Block<'a>,
+        expression: Block,
         /// The block to execute on success
-        success:    Block<'a>,
+        success:    Block,
         /// The list of associated else if blocks
-        else_if:    Vec<ElseIf<'a>>,
+        else_if:    Vec<ElseIf>,
         /// The block to execute on failure
-        failure:    Block<'a>,
+        failure:    Block,
         /// The mode
         mode:       IfMode,
     },
     /// else if
-    ElseIf(ElseIf<'a>),
+    ElseIf(ElseIf),
     /// Create a function
     Function {
         /// the name of the function
@@ -124,7 +124,7 @@ pub enum Statement<'a> {
         /// The required arguments of the function, with their types
         args:        Vec<KeyBuf>,
         /// The statements in the function
-        statements:  Block<'a>,
+        statements:  Block,
     },
     /// for loop
     For {
@@ -133,21 +133,21 @@ pub enum Statement<'a> {
         /// The value to iterator for
         values:     Vec<types::Str>,
         /// The block to execute repetitively
-        statements: Block<'a>,
+        statements: Block,
     },
     /// while
     While {
         /// The block to test
-        expression: Block<'a>,
+        expression: Block,
         /// The block to execute repetitively
-        statements: Block<'a>,
+        statements: Block,
     },
     /// Match
     Match {
         /// The value to check
         expression: types::Str,
         /// A list of case to check for
-        cases:      Vec<Case<'a>>,
+        cases:      Vec<Case>,
     },
     /// Else statement
     Else,
@@ -160,20 +160,20 @@ pub enum Statement<'a> {
     /// Exit from the current function/script
     Return(Option<types::Str>),
     /// Execute a pipeline
-    Pipeline(Pipeline<Job<'a>>),
+    Pipeline(Pipeline<Job>),
     /// Time the statement
-    Time(Box<Statement<'a>>),
+    Time(Box<Statement>),
     /// Execute the statement if the previous command succeeded
-    And(Box<Statement<'a>>),
+    And(Box<Statement>),
     /// Execute the statement if the previous command failed
-    Or(Box<Statement<'a>>),
+    Or(Box<Statement>),
     /// Succeed on failure of the inner statement
-    Not(Box<Statement<'a>>),
+    Not(Box<Statement>),
     /// An empty statement
     Default,
 }
 
-impl<'a> fmt::Display for Statement<'a> {
+impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -204,7 +204,7 @@ impl<'a> fmt::Display for Statement<'a> {
     }
 }
 
-impl<'a> Statement<'a> {
+impl Statement {
     /// Check if the statement is a block-based statement
     #[must_use]
     pub fn is_block(&self) -> bool {
@@ -223,15 +223,15 @@ impl<'a> Statement<'a> {
 }
 
 /// A collection of statement in a block (delimited by braces in most languages)
-pub type Block<'a> = Vec<Statement<'a>>;
+pub type Block = Vec<Statement>;
 
 /// A user-defined function
 #[derive(Clone, Debug, PartialEq, Default)]
-pub struct Function<'a> {
+pub struct Function {
     description: Option<types::Str>,
     name:        types::Str,
     args:        Vec<KeyBuf>,
-    statements:  Block<'a>,
+    statements:  Block,
 }
 
 /// Error during function execution
@@ -245,9 +245,9 @@ pub enum FunctionError {
     InvalidArgumentType(Primitive, String),
 }
 
-impl<'a> Function<'a> {
+impl Function {
     /// execute the function in the shell
-    pub fn execute<S: AsRef<str>>(
+    pub fn execute<'a, S: AsRef<str>>(
         &self,
         shell: &mut Shell<'a>,
         args: &[S],
@@ -303,7 +303,7 @@ impl<'a> Function<'a> {
         description: Option<types::Str>,
         name: types::Str,
         args: Vec<KeyBuf>,
-        statements: Vec<Statement<'a>>,
+        statements: Vec<Statement>,
     ) -> Self {
         Self { description, name, args, statements }
     }

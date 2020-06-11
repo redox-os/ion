@@ -107,9 +107,7 @@ impl<'a> Action<'a> {
     ) -> Result<Action<'a>, AssignmentError<'a>> {
         match var.kind {
             Primitive::Indexed(..) | Primitive::Str => Ok(Action(var, operator, value)),
-            Primitive::Array(_)
-            | Primitive::HashMap(_)
-            | Primitive::BTreeMap(_) => {
+            Primitive::Array(_) | Primitive::HashMap(_) | Primitive::BTreeMap(_) => {
                 if is_array {
                     Ok(Action(var, operator, value))
                 } else {
@@ -117,7 +115,10 @@ impl<'a> Action<'a> {
                 }
             }
             _ if !is_array => Ok(Action(var, operator, value)),
-            _ => Err(AssignmentError::InvalidValue(var.kind, Primitive::Array(Box::new(Primitive::Str)))),
+            _ => Err(AssignmentError::InvalidValue(
+                var.kind,
+                Primitive::Array(Box::new(Primitive::Str)),
+            )),
         }
     }
 }
@@ -183,7 +184,11 @@ mod tests {
         assert_eq!(actions.len(), 3);
         assert_eq!(
             actions[0],
-            Ok(Action(Key { name: "a", kind: Primitive::Array(Box::new(Primitive::Str)) }, Operator::Equal, "[one two]",))
+            Ok(Action(
+                Key { name: "a", kind: Primitive::Array(Box::new(Primitive::Str)) },
+                Operator::Equal,
+                "[one two]",
+            ))
         );
         assert_eq!(
             actions[1],

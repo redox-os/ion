@@ -7,7 +7,7 @@ use crate as ion_shell;
 use crate::{shell::variables::Variables, types, Shell};
 use builtins_proc::builtin;
 
-fn print_list(vars: &Variables<'_>) {
+fn print_list(vars: &Variables) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 

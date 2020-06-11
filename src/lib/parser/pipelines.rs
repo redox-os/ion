@@ -54,22 +54,20 @@ trait AddItem<'a> {
         args: Args,
         outputs: Vec<Redirection>,
         inputs: Vec<Input>,
-        builtin: &BuiltinMap<'a>,
     );
 }
 
-impl<'a> AddItem<'a> for Pipeline<Job<'a>> {
+impl<'a> AddItem<'a> for Pipeline<Job> {
     fn add_item(
         &mut self,
         redirection: RedirectFrom,
         args: Args,
         outputs: Vec<Redirection>,
         inputs: Vec<Input>,
-        builtins: &BuiltinMap<'a>,
     ) {
         if !args.is_empty() {
-            let builtin = builtins.get(&args[0]);
-            self.items.push(PipeItem::new(Job::new(args, redirection, builtin), outputs, inputs));
+            //            let builtin = builtins.contains(&args[0]);
+            self.items.push(PipeItem::new(Job::new(args, redirection), outputs, inputs));
         }
     }
 }
@@ -117,10 +115,7 @@ impl<'a> Collector<'a> {
             .map(|file| outputs.push(Redirection { from, file: file.into(), append }))
     }
 
-    fn parse<'builtins>(
-        &self,
-        builtins: &BuiltinMap<'builtins>,
-    ) -> Result<Pipeline<Job<'builtins>>, PipelineParsingError> {
+    fn parse<'builtins>(&self) -> Result<Pipeline<Job>, PipelineParsingError> {
         let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Args::with_capacity(ARG_DEFAULT_SIZE);
         let mut pipeline = Pipeline::new();
@@ -150,7 +145,6 @@ impl<'a> Collector<'a> {
                                 std::mem::replace(&mut args, Args::with_capacity(ARG_DEFAULT_SIZE)),
                                 std::mem::replace(&mut outputs, Vec::new()),
                                 std::mem::replace(&mut inputs, Vec::new()),
-                                builtins,
                             );
                         }
                         Some(&(_, b'!')) => {
@@ -185,7 +179,6 @@ impl<'a> Collector<'a> {
                                 std::mem::replace(&mut args, Args::with_capacity(ARG_DEFAULT_SIZE)),
                                 std::mem::replace(&mut outputs, Vec::new()),
                                 std::mem::replace(&mut inputs, Vec::new()),
-                                builtins,
                             );
                         }
                         Some(_) | None => self.push_arg(&mut args, &mut bytes)?,
@@ -198,7 +191,6 @@ impl<'a> Collector<'a> {
                         std::mem::replace(&mut args, Args::with_capacity(ARG_DEFAULT_SIZE)),
                         std::mem::replace(&mut outputs, Vec::new()),
                         std::mem::replace(&mut inputs, Vec::new()),
-                        builtins,
                     );
                 }
                 b'>' => {
@@ -237,7 +229,7 @@ impl<'a> Collector<'a> {
             }
         }
 
-        pipeline.add_item(RedirectFrom::None, args, outputs, inputs, builtins);
+        pipeline.add_item(RedirectFrom::None, args, outputs, inputs);
         Ok(pipeline)
     }
 
@@ -417,9 +409,9 @@ impl<'a> Collector<'a> {
     /// Collect a pipeline on the given data
     pub fn run<'builtins>(
         data: &'a str,
-        builtins: &BuiltinMap<'builtins>,
-    ) -> Result<Pipeline<Job<'builtins>>, PipelineParsingError> {
-        Collector::new(data).parse(builtins)
+        _builtins: &BuiltinMap<'builtins>,
+    ) -> Result<Pipeline<Job>, PipelineParsingError> {
+        Collector::new(data).parse()
     }
 
     const fn new(data: &'a str) -> Self { Self { data } }
@@ -841,7 +833,7 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(args!["cat"], RedirectFrom::Stdout, None),
+                    job:     Job::new(args!["cat"], RedirectFrom::Stdout),
                     inputs:  vec![
                         Input::File("file1".into()),
                         Input::HereString("\"herestring\"".into()),
@@ -849,7 +841,7 @@ mod tests {
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(args!["tr", "'x'", "'y'"], RedirectFrom::None, None),
+                    job:     Job::new(args!["tr", "'x'", "'y'"], RedirectFrom::None),
                     inputs:  Vec::new(),
                     outputs: vec![
                         Redirection {
@@ -883,20 +875,17 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job: Job::new(args!["cat"], RedirectFrom::Stdout, None),
-
+                    job:     Job::new(args!["cat"], RedirectFrom::Stdout),
                     inputs:  Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job: Job::new(args!["echo", "hello"], RedirectFrom::Stdout, None),
-
+                    job:     Job::new(args!["echo", "hello"], RedirectFrom::Stdout),
                     inputs:  Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job: Job::new(args!["cat"], RedirectFrom::None, None),
-
+                    job:     Job::new(args!["cat"], RedirectFrom::None),
                     inputs:  vec![Input::File("stuff".into())],
                     outputs: vec![Redirection {
                         from:   RedirectFrom::Stderr,
@@ -918,19 +907,19 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job: Job::new(args!["cat"], RedirectFrom::Stdout, None),
+                    job: Job::new(args!["cat"], RedirectFrom::Stdout),
 
                     inputs:  Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job: Job::new(args!["echo", "hello"], RedirectFrom::Stdout, None),
+                    job: Job::new(args!["echo", "hello"], RedirectFrom::Stdout),
 
                     inputs:  Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job: Job::new(args!["cat"], RedirectFrom::None, None),
+                    job: Job::new(args!["cat"], RedirectFrom::None),
 
                     inputs:  vec![Input::File("stuff".into())],
                     outputs: vec![Redirection {
@@ -991,7 +980,7 @@ mod tests {
         let input = "math <<< $(cat math.txt)";
         let expected = Pipeline {
             items: vec![PipeItem {
-                job: Job::new(args!["math"], RedirectFrom::None, None),
+                job: Job::new(args!["math"], RedirectFrom::None),
 
                 inputs:  vec![Input::HereString("$(cat math.txt)".into())],
                 outputs: vec![],
@@ -1009,13 +998,13 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job: Job::new(args!["cat"], RedirectFrom::Stdout, None),
+                    job: Job::new(args!["cat"], RedirectFrom::Stdout),
 
                     inputs:  Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job: Job::new(args!["tr", "'o'", "'x'"], RedirectFrom::None, None),
+                    job: Job::new(args!["tr", "'o'", "'x'"], RedirectFrom::None),
 
                     inputs:  vec![Input::HereString("$VAR".into())],
                     outputs: vec![Redirection {
@@ -1051,7 +1040,7 @@ mod tests {
         let input = "echo zardoz >> foo\\'bar";
         let expected = Pipeline {
             items: vec![PipeItem {
-                job: Job::new(args!["echo", "zardoz"], RedirectFrom::None, None),
+                job: Job::new(args!["echo", "zardoz"], RedirectFrom::None),
 
                 inputs:  Vec::new(),
                 outputs: vec![Redirection {
@@ -1066,7 +1055,7 @@ mod tests {
     }
 
     fn assert_parse_error(s: &str) {
-        assert!(super::Collector::new(s).parse(&BuiltinMap::new()).is_err());
+        assert!(super::Collector::new(s).parse().is_err());
     }
 
     #[test]

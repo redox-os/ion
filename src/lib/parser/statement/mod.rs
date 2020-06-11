@@ -15,7 +15,7 @@ use crate::{builtins::BuiltinMap, shell::flow_control::Statement};
 use err_derive::Error;
 use std::char;
 
-pub type Result<'a> = std::result::Result<Statement<'a>, Error>;
+pub type Result = std::result::Result<Statement, Error>;
 
 /// An Error occured during parsing
 #[derive(Debug, Error, PartialEq, Eq, Hash, Clone)]
@@ -92,10 +92,7 @@ impl From<PipelineParsingError> for Error {
 
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`
-pub fn parse_and_validate<'b>(
-    statement: StatementVariant<'_>,
-    builtins: &BuiltinMap<'b>,
-) -> Result<'b> {
+pub fn parse_and_validate<'b>(statement: StatementVariant, builtins: &BuiltinMap<'b>) -> Result {
     match statement {
         StatementVariant::And(statement) => {
             Ok(Statement::And(Box::new(parse(statement, builtins)?)))

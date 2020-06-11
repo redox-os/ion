@@ -171,10 +171,16 @@ mod tests {
              p:bmap[hmap[bool]] d:a",
         );
         assert_eq!(parser.next().unwrap(), Ok(Key { name: "a", kind: Primitive::Integer },));
-        assert_eq!(parser.next().unwrap(), Ok(Key { name: "b", kind: Primitive::Array(Box::new(Primitive::Str)) },));
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key { name: "b", kind: Primitive::Array(Box::new(Primitive::Str)) },)
+        );
         assert_eq!(parser.next().unwrap(), Ok(Key { name: "c", kind: Primitive::Boolean },));
         assert_eq!(parser.next().unwrap(), Ok(Key { name: "d", kind: Primitive::Str },));
-        assert_eq!(parser.next().unwrap(), Ok(Key { name: "e", kind: Primitive::Array(Box::new(Primitive::Integer)) },));
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key { name: "e", kind: Primitive::Array(Box::new(Primitive::Integer)) },)
+        );
         assert_eq!(
             parser.next().unwrap(),
             Ok(Key { name: "f", kind: Primitive::Indexed("0".into(), Box::new(Primitive::Str)) },)
@@ -203,15 +209,18 @@ mod tests {
         );
         assert_eq!(
             parser.next().unwrap(),
-            Ok(Key { name: "k", kind: Primitive::HashMap(Box::new(Primitive::Array(Box::new(Primitive::Integer)))) },)
+            Ok(Key {
+                name: "k",
+                kind: Primitive::HashMap(Box::new(Primitive::Array(Box::new(Primitive::Integer)))),
+            },)
         );
         assert_eq!(
             parser.next().unwrap(),
             Ok(Key {
                 name: "l",
-                kind: Primitive::HashMap(Box::new(Primitive::HashMap(Box::new(
-                    Primitive::Array(Box::new(Primitive::Boolean))
-                )))),
+                kind: Primitive::HashMap(Box::new(Primitive::HashMap(Box::new(Primitive::Array(
+                    Box::new(Primitive::Boolean)
+                ))))),
             },)
         );
         assert_eq!(
@@ -224,7 +233,10 @@ mod tests {
         );
         assert_eq!(
             parser.next().unwrap(),
-            Ok(Key { name: "o", kind: Primitive::BTreeMap(Box::new(Primitive::Array(Box::new(Primitive::Float)))) },)
+            Ok(Key {
+                name: "o",
+                kind: Primitive::BTreeMap(Box::new(Primitive::Array(Box::new(Primitive::Float)))),
+            },)
         );
         assert_eq!(
             parser.next().unwrap(),

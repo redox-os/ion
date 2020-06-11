@@ -58,7 +58,7 @@ impl Status {
     pub fn toggle(&mut self) { self.0 = if self.is_success() { 1 } else { 0 }; }
 }
 
-impl<'a> From<Status> for Value<Rc<types::Function<'a>>> {
+impl From<Status> for Value<Rc<types::Function>> {
     fn from(status: Status) -> Self { Value::Str(status.into()) }
 }
 

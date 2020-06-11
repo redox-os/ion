@@ -7,19 +7,18 @@ use crate::{
 use std::{fmt, fs::File, str};
 
 #[derive(Clone)]
-pub struct Job<'a> {
+pub struct Job {
     pub args:        types::Args,
     pub redirection: RedirectFrom,
-    pub builtin:     Option<BuiltinFunction<'a>>,
 }
 
-impl<'a> Job<'a> {
+impl Job {
     /// Get the job command (its first arg)
     pub fn command(&self) -> &types::Str { &self.args[0] }
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
-    pub fn expand(&self, shell: &mut Shell<'a>) -> expansion::Result<RefinedJob<'a>, IonError> {
+    pub fn expand<'a>(&self, shell: &mut Shell<'a>) -> expansion::Result<RefinedJob<'a>, IonError> {
         let mut args = types::Args::new();
         for arg in &self.args {
             args.extend(expand_arg(arg, shell)?);
@@ -27,29 +26,23 @@ impl<'a> Job<'a> {
 
         Ok(if let Some(Value::Function(_)) = shell.variables.get(&self.args[0]) {
             RefinedJob::function(self.args.clone(), self.redirection)
-        } else if let Some(builtin) = self.builtin {
-            RefinedJob::builtin(builtin, args, self.redirection)
+        } else if let Some(bt) = shell.builtins.get(&args[0]) {
+            RefinedJob::builtin(bt, args, self.redirection)
         } else {
             RefinedJob::external(args, self.redirection)
         })
     }
 
-    pub fn new(
-        args: types::Args,
-        redirection: RedirectFrom,
-        builtin: Option<BuiltinFunction<'a>>,
-    ) -> Self {
-        Job { args, redirection, builtin }
-    }
+    pub fn new(args: types::Args, redirection: RedirectFrom) -> Self { Job { args, redirection } }
 }
 
-impl<'a> PartialEq for Job<'a> {
-    fn eq(&self, other: &Job<'_>) -> bool {
+impl PartialEq for Job {
+    fn eq(&self, other: &Job) -> bool {
         self.args == other.args && self.redirection == other.redirection
     }
 }
 
-impl<'a> fmt::Debug for Job<'a> {
+impl fmt::Debug for Job {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

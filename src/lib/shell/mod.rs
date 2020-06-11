@@ -125,9 +125,9 @@ pub struct Shell<'a> {
     /// started.
     builtins:           BuiltinMap<'a>,
     /// Contains the aliases, strings, and array variable maps.
-    variables:          Variables<'a>,
+    variables:          Variables,
     /// Contains the current state of flow control parameters.
-    flow_control:       Block<'a>,
+    flow_control:       Block,
     /// Contains the directory stack parameters.
     directory_stack:    DirectoryStack,
     /// When a command is executed, the final result of that command is stored
@@ -263,7 +263,7 @@ impl<'a> Shell<'a> {
     /// A method for executing a function, using `args` as the input.
     pub fn execute_function<S: AsRef<str>>(
         &mut self,
-        function: &Rc<Function<'a>>,
+        function: &Rc<Function>,
         args: &[S],
     ) -> Result<Status, IonError> {
         function.clone().execute(self, args)?;
@@ -295,7 +295,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub fn run_pipeline(&mut self, pipeline: &Pipeline<Job<'a>>) -> Result<Status, IonError> {
+    pub fn run_pipeline(&mut self, pipeline: &Pipeline<Job>) -> Result<Status, IonError> {
         let command_start_time = SystemTime::now();
 
         let mut pipeline = pipeline.expand(self)?;
@@ -418,11 +418,11 @@ impl<'a> Shell<'a> {
 
     /// Access to the variables
     #[must_use]
-    pub const fn variables(&self) -> &Variables<'a> { &self.variables }
+    pub const fn variables(&self) -> &Variables { &self.variables }
 
     /// Mutable access to the variables
     #[must_use]
-    pub fn variables_mut(&mut self) -> &mut Variables<'a> { &mut self.variables }
+    pub fn variables_mut(&mut self) -> &mut Variables { &mut self.variables }
 
     /// Access to the variables
     #[must_use]
@@ -440,7 +440,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Get a function if it exists
-    pub fn get_func<T: AsRef<str>>(&self, f: T) -> Option<Rc<Function<'a>>> {
+    pub fn get_func<T: AsRef<str>>(&self, f: T) -> Option<Rc<Function>> {
         if let Some(Value::Function(function)) = self.variables().get(f.as_ref()) {
             Some(function.clone())
         } else {
@@ -455,7 +455,7 @@ impl<'a> Shell<'a> {
     #[must_use]
     pub const fn previous_status(&self) -> Status { self.previous_status }
 
-    fn assign(&mut self, key: &Key<'_>, value: Value<Rc<Function<'a>>>) -> Result<(), String> {
+    fn assign(&mut self, key: &Key<'_>, value: Value<Rc<Function>>) -> Result<(), String> {
         match (&key.kind, &value) {
             (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
                 let index = value_check(self, index_name, index_kind)
@@ -487,9 +487,7 @@ impl<'a> Shell<'a> {
                                 }
                                 Ok(())
                             }
-                            Value::Str(_) => {
-                                Err("cannot assign to an index of a string".into())
-                            }
+                            Value::Str(_) => Err("cannot assign to an index of a string".into()),
                             _ => Ok(()),
                         }
                     }

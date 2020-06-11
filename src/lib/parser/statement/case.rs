@@ -14,7 +14,7 @@ pub enum Error {
     ExtraVar(String),
 }
 
-impl<'a> FromStr for Case<'a> {
+impl FromStr for Case {
     type Err = Error;
 
     fn from_str(data: &str) -> Result<Self, Self::Err> {

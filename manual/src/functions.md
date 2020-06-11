@@ -76,3 +76,10 @@ end
 
 echo one two three four five | format_with "-"
 ```
+
+## Library usage:
+
+When using Ion as a shell library, it is possible you may want to change the builtin functions associated with a Shell.
+
+If you do this, all function calls will use the new buildtins to run. meaning that if you removed the builtin function it the shell will try to find the command, and if you added a builtin, that will override any other command.
+
