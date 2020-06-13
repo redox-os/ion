@@ -82,14 +82,10 @@ impl Variables {
 
     /// Create a new scope. If namespace is true, variables won't be droppable across the scope
     /// boundary
-    pub fn new_scope(&mut self, namespace: bool) {
-        self.0.new_scope(namespace)
-    }
+    pub fn new_scope(&mut self, namespace: bool) { self.0.new_scope(namespace) }
 
     /// Exit the current scope
-    pub fn pop_scope(&mut self) {
-        self.0.pop_scope()
-    }
+    pub fn pop_scope(&mut self) { self.0.pop_scope() }
 
     pub(crate) fn pop_scopes<'b>(
         &'b mut self,
@@ -298,9 +294,7 @@ pub(crate) mod tests {
     impl Expander for VariableExpander {
         type Error = IonError;
 
-        fn string(&self, var: &str) -> Result<types::Str, IonError> {
-            self.0.get_str(var)
-        }
+        fn string(&self, var: &str) -> Result<types::Str, IonError> { self.0.get_str(var) }
 
         fn array(
             &self,
@@ -318,9 +312,7 @@ pub(crate) mod tests {
             Ok(cmd.into())
         }
 
-        fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> {
-            Ok(input.into())
-        }
+        fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 
         fn map_keys(&self, _name: &str) -> Result<types::Args, Self::Error> {
             Err(expansion::Error::VarNotFound)
