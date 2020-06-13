@@ -196,10 +196,7 @@ impl Variables {
                     .map_err(|cause| Error::InvalidHex(variable.into(), cause))?;
                 Ok((c as char).to_string().into())
             }
-            Some(("env", variable)) => match env::var(variable) {
-                Ok(v) => Ok(v.into()),
-                Err(_) => Ok("".into()),
-            },
+            Some(("env", variable)) => Ok(env::var(variable).unwrap_or_default().into()),
             Some(("super", _)) | Some(("global", _)) | None => {
                 // Otherwise, it's just a simple variable name.
                 match self.get(name) {
