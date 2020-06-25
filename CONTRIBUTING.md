@@ -70,7 +70,7 @@ Before submitting a merge request (MR) on GitLab, ensure that you've run your te
 pass. This can be done by running the following two commands:
 
 ```sh
-cargo +nightly test --lib && bash examples/run_examples.sh
+cargo +nightly test --lib && bash tests/run_examples.sh
 ```
 
 ## Format your code
