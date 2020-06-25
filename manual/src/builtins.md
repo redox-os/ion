@@ -379,8 +379,9 @@ SYNOPSIS
 
 DESCRIPTION
     random generates a pseudo-random integer. IT IS NOT SECURE.
-    The range depends on what arguments you pass. If no arguments are given the range is [0, 32767].
-    If two arguments are given the range is [START, END].
+    The range is half open and depends on what arguments you pass.
+    If no arguments are given the range is [0, 32767).
+    If two arguments are given the range is [START, END).
 ```
 
 ## read - read a line of input into some variables
