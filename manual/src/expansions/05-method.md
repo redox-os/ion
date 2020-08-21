@@ -49,9 +49,7 @@ echo $len([1 2 3 4 5])
 ## Method Arguments
 
 Some methods may have their behavior tweaked by supplying some additional arguments. The `@split()`
-method, for example, may be optionally supplied a pattern for splitting. At the moment, a comma
-is used to specify that arguments are to follow the input, but each argument supplied after that
-is space-delimited.
+method, for example, may be optionally supplied a pattern for splitting.
 
 ```sh
 for elem in @split("some space-delimited values"); echo $elem; end
@@ -256,7 +254,7 @@ with, a new string will be returned with all matches replaced.
 
 ```sh
 let input = "one two one two"
-echo $replace(input, one 1)
+echo $replace(input one 1)
 echo $replace($replace(input one 1) two 2)
 ```
 
@@ -297,15 +295,15 @@ as a regex.
 #### Examples
 
 ```sh
-echo $regex_replace("FOOBAR" "^F" "f")
-echo $regex_replace("FOOBAR" "^f" "F")
+echo $regex_replace("bob" "^b" "B")
+echo $regex_replace("bob" 'b$' "B")
 ```
 
 #### Output
 
 ```
-fOOBAR
-FOOBAR
+Bob
+boB
 ```
 
 ### reverse
@@ -396,7 +394,7 @@ echo $unescape($line)
 
 ### or
 
-Defaults to string variables. Fallback to a given value if the variable is not defined
+Defaults to string variables. Fallback to a given value if the variable is not defined or is an empty string.
 
 #### Example
 
@@ -428,11 +426,12 @@ The following are the currently-supported array methods.
 ### lines
 
 Defaults to string variables. The supplied string will be split into one string per line in the input argument.
+This is equivalent to `@split(value '\n')`.
 
 #### Examples
 
 ```sh
-for line in @lines($unescape("first\nsecond\nthird")
+for line in @lines($unescape("first\nsecond\nthird"))
     echo $line
 end
 ```
@@ -504,13 +503,13 @@ each byte is displayed as their actual 8-bit number.
 #### Examples
 
 ```sh
-echo @bytes("foobar")
+echo @bytes("abc")
 ```
 
 #### Output
 
 ```
-102 111 111 98 97 114
+97 98 99
 ```
 
 ### chars

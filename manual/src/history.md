@@ -93,7 +93,7 @@ ions init file.
   # let HISTORY_IGNORE = [ all ] # saved
   # let HISTORY_IGNORE = [ whitespace ] # saved
   #  true # ignored
-  #  let HISTORY_IGNORE = [  ] # saved
+  # let HISTORY_IGNORE = [  ] # saved
   #  let HISTORY_IGNORE = [ whitespace ] # ignored
   # history
   echo @HISTORY_IGNORE

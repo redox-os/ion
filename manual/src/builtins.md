@@ -68,14 +68,14 @@ DESCRIPTION
     With arguments cd changes the working directory to the directory you provided.
 ```
 
-## contains - check if a given string starts with another one
+## contains - check if a given string contains another one
 
 ```txt
 SYNOPSIS
     contains <PATTERN> tests...
 
 DESCRIPTION
-    Returns 0 if any given argument contains the first argument, else returns 1
+    Returns 0 if the first argument contains any of the other ones, else returns 1
 ```
 
 ## dir-depth - set the dir stack depth
@@ -155,14 +155,14 @@ OPTIONS
         \v  vertical tab (VT)
 ```
 
-## ends-with - check if a given string starts with another one
+## ends-with - check if a given string ends with another one
 
 ```txt
 SYNOPSIS
     ends-with <PATTERN> tests...
 
 DESCRIPTION
-    Returns 0 if any argument ends with the first argument, else returns 1
+    Returns 0 if the first argument ends with any of the other ones, else returns 1
 ```
 
 ## eval - evaluates the specified commands
@@ -436,7 +436,7 @@ SYNOPSIS
     starts-with <PATTERN> tests...
 
 DESCRIPTION
-    Returns 0 if any given argument starts with the first argument, else returns 1
+    Returns 0 if the first argument starts with any of the other ones, else returns 1
 ```
 
 ## status - Evaluates the current runtime status

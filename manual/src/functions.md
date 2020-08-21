@@ -65,7 +65,6 @@ hello John 25 [ coding eating sleeping ]
 
 ## Function piping
 
-
 As with any other statement, you can pipe functions using `read`.
 
 ```sh
@@ -76,6 +75,18 @@ end
 
 echo one two three four five | format_with "-"
 ```
+
+## Docstrings
+
+Functions can be given a description with the following syntax:
+
+```
+fn square x -- Squares a single number
+    echo $(( x * x ))
+end
+```
+
+This description is then printed when `fn` is run without arguments.
 
 ## Library usage:
 

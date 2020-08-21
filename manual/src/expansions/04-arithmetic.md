@@ -18,7 +18,7 @@ string variables. Supported operators are as below:
 - Bitwise XOR(`$((a ^ b))`)
 - Bitwise AND(`$((a & b))`)
 - Bitwise OR(`$((a | b)))`)
-- Bitwise NOT(`$(a ~ b))`)
+- Bitwise NOT(`$((a ~ b))`)
 - Left Shift(`$((a << b))`)
 - Right Shift(`$((a >> b))`)
 - Parenthesis(`$((4 * (pi * r²)))`)

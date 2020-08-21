@@ -46,10 +46,10 @@ Match guards can be added to a match to employ an additional test
 ```sh
 let foo = bar
 match $string
-    case _; echo "no match found"
     case "this" if eq $foo bar
         echo "this and foo = bar"
     case "this"
         echo "this and foo != bar"
+    case _; echo "no match found"
 end
 ```

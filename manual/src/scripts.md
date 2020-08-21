@@ -19,5 +19,5 @@ if test $len(@args) -eq 1
     exit
 end
 
-echo Arguments: @args[1..]i
+echo Arguments: @args[1..]
 ```

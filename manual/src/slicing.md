@@ -2,7 +2,7 @@
 
 Ion supports a universal syntax for slicing strings and arrays. For maximum language support,
 strings are sliced and indexed by graphemes. Arrays are sliced and indexed by their elements.
-Slicing uses the same **[]** characters as arrays, but the shell can differentiation between
+Slicing uses the same **[]** characters as arrays, but the shell can differentiate between
 a slice and an array based on the placement of the characters (immediately after an expansion).
 
 **NOTE:** It's important to note that indexes count from 0, as in most other languages.
@@ -34,7 +34,14 @@ When using inclusive ranges, the end index does not refer to the Nth value, but 
 
 ```sh
 $ let array = [{1...10}]
-$ echo @array[1...5]
+$ echo @array[0...5]
+> 1 2 3 4 5 6
+```
+
+The `=` character may be used instead of the third dot.
+
+```sh
+$ echo @array[0..=5]
 > 1 2 3 4 5 6
 ```
 
@@ -53,7 +60,7 @@ $ echo {10..1}
 ## Negative Values Supported
 
 Although this will not work for arrays, you may supply negative values with ranges to create
-negative values in a range of numbers.i
+negative values in a range of numbers.
 
 ```sh
 $ echo {-10...10}
@@ -73,9 +80,8 @@ the end index.
 ```sh
 $ echo {0..3...12}
 > 0 3 6 9 12
-$ echo {1..2..12}
+$ echo {0..3..12}
 > 0 3 6 9
-$ let array = [{1...30}]
 ```
 
 ### Stepping Forward w/ Array Slicing

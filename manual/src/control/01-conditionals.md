@@ -47,7 +47,7 @@ reason for a shell language to have multiple different keywords to end different
 ## Complete List of Conditional Builtins
 
 - [x] and
-- [z] contains
+- [x] contains
 - [x] exists
 - [x] eq
 - [ ] intersects
@@ -59,8 +59,8 @@ reason for a shell language to have multiple different keywords to end different
 - [x] test
 - [ ] < (Polish Notation)
 - [ ] <= (Polish Notation)
-- [ ] > (Polish Notation)
-- [ ] >= (Polish Notation)
+- [ ] &gt; (Polish Notation)
+- [ ] &gt;= (Polish Notation)
 - [ ] = (Polish Notation)
 
 ## Using the **&&** and **||** Operators

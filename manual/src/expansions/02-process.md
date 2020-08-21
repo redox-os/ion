@@ -8,8 +8,8 @@ into an array delimited by whitespaces.
 
 ```sh
 let string = $(cmd args...)
-let array = @(cmd args...)
+let array = [ @(cmd args...) ]
 ```
 **NOTES:**
-- To split outputs by line, see `@lines($(cmd))`.
-- `@(cmd)` is equivalent to `@split($(cmd))`
+- To split outputs by line, see [@lines($(cmd))](https://doc.redox-os.org/ion-manual/html/expansions/05-method.html#lines).
+- `@(cmd)` is equivalent to [@split($(cmd))](https://doc.redox-os.org/ion-manual/html/expansions/05-method.html#split).
