@@ -47,7 +47,7 @@ let c:bool = n
 echo $a $b $c
 
 
-let a:str b[str] c:int d:float[] = one [two three] 4 [5.1 6.2 7.3]
+let a:str b:[str] c:int d:[float] = one [two three] 4 [5.1 6.2 7.3]
 echo $a
 echo @b
 echo $c
