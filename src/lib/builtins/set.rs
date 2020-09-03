@@ -38,6 +38,7 @@ BASH EQUIVALENTS
 pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let mut args_iter = args.iter();
     let mut positionals = None;
+    args_iter.next();
 
     while let Some(arg) = args_iter.next() {
         match arg.as_str() {

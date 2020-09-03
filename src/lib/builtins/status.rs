@@ -30,7 +30,15 @@ pub fn status(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let is_login = env::args().nth(0).unwrap().chars().nth(0).unwrap() == '-';
 
     match args.len() {
-        0 => {
+        1 => {
+            if is_login {
+                println!("This is a login shell");
+            } else {
+                println!("This is not a login shell");
+            }
+            Status::SUCCESS
+        }
+        _ => {
             for arg in args {
                 match &**arg {
                     "--is-login" => login_shell = true,
@@ -70,14 +78,5 @@ pub fn status(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
 
             Status::TRUE
         }
-        1 => {
-            if is_login {
-                println!("This is a login shell");
-            } else {
-                println!("This is not a login shell");
-            }
-            Status::SUCCESS
-        }
-        _ => Status::error("status takes one argument"),
     }
 }
