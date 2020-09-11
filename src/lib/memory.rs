@@ -24,7 +24,7 @@ pub struct IonPool;
 
 impl IonPool {
     pub fn string<T, F: FnMut(&mut Str) -> T>(mut callback: F) -> T {
-        STRINGS.with(|pool| match pool.pull() {
+        STRINGS.with(|pool| match pool.try_pull() {
             Some(ref mut string) => call_and_shrink!(string, callback),
             None => callback(&mut Str::new()),
         })
