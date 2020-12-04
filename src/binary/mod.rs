@@ -26,7 +26,6 @@ use std::{
 };
 use xdg::BaseDirectories;
 
-#[cfg(not(feature = "advanced_arg_parsing"))]
 pub const MAN_ION: &str = r#"ion 1.0.0-alpha
 The fast, safe, modern rust shell. Ion is a commandline shell created to be a faster and easier to use alternative to
 the currently available shells. It is not POSIX compliant.

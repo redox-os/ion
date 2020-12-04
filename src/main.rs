@@ -13,74 +13,39 @@ use std::{
     sync::Arc,
 };
 
-#[cfg(not(feature = "advanced_arg_parsing"))]
 use crate::binary::MAN_ION;
-#[cfg(not(feature = "advanced_arg_parsing"))]
 use std::env;
-#[cfg(feature = "advanced_arg_parsing")]
-use std::str::FromStr;
-#[cfg(feature = "advanced_arg_parsing")]
-use structopt::StructOpt;
 
 mod binary;
 
 struct KeyBindingsWrapper(KeyBindings);
 
-#[cfg(feature = "advanced_arg_parsing")]
-impl FromStr for KeyBindingsWrapper {
-    type Err = String;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        match input {
-            "vi" => Ok(KeyBindingsWrapper(KeyBindings::Vi)),
-            "emacs" => Ok(KeyBindingsWrapper(KeyBindings::Emacs)),
-            _ => Err("unknown key bindings".to_string()),
-        }
-    }
-}
 
 /// The fast, safe, modern rust shell.
 /// Ion is a commandline shell created to be a faster and easier to use
 /// alternative to the currently available shells. It is not POSIX compliant.
-#[cfg_attr(feature = "advanced_arg_parsing", derive(StructOpt))]
-#[cfg_attr(feature = "advanced_arg_parsing", structopt(name = "ion"))]
 struct CommandLineArgs {
     /// Shortcut layout. Valid options: "vi", "emacs"
-    #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-o"))]
     key_bindings:     Option<KeyBindingsWrapper>,
     /// Print commands before execution
-    #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-x"))]
     print_commands:   bool,
     /// Use a fake interactive mode, where errors don't exit the shell
-    #[cfg_attr(
-        feature = "advanced_arg_parsing",
-        structopt(short = "-f", long = "--fake-interactive")
-    )]
     fake_interactive: bool,
     /// Force interactive mode
-    #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-i", long = "--interactive"))]
     interactive:      bool,
     /// Do not execute any commands, perform only syntax checking
-    #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-n", long = "--no-execute"))]
     no_execute:       bool,
     /// Evaluate given commands instead of reading from the commandline
-    #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-c"))]
     command:          Option<String>,
     /// Print the version, platform and revision of Ion then exit
-    #[cfg_attr(feature = "advanced_arg_parsing", structopt(short = "-v", long = "--version"))]
     version:          bool,
     /// Script arguments (@args). If the -c option is not specified,
     /// the first parameter is taken as a filename to execute
-    #[cfg_attr(feature = "advanced_arg_parsing", structopt())]
     args:             Vec<String>,
 }
 
 fn version() -> String { include!(concat!(env!("OUT_DIR"), "/version_string")).to_string() }
 
-#[cfg(feature = "advanced_arg_parsing")]
-fn parse_args() -> CommandLineArgs { CommandLineArgs::from_args() }
-
-#[cfg(not(feature = "advanced_arg_parsing"))]
 fn parse_args() -> CommandLineArgs {
     let mut args = env::args().skip(1);
     let mut command = None;
