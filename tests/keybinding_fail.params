@@ -1,0 +1,4 @@
+-o
+viemacs
+-c
+echo 1

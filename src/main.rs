@@ -14,90 +14,150 @@ use std::{
 };
 
 use crate::binary::MAN_ION;
+use err_derive::Error;
 use std::env;
 
 mod binary;
 
 struct KeyBindingsWrapper(KeyBindings);
 
-
 /// The fast, safe, modern rust shell.
 /// Ion is a commandline shell created to be a faster and easier to use
 /// alternative to the currently available shells. It is not POSIX compliant.
 struct CommandLineArgs {
-    /// Shortcut layout. Valid options: "vi", "emacs"
-    key_bindings:     Option<KeyBindingsWrapper>,
-    /// Print commands before execution
-    print_commands:   bool,
+    /// Print the help page of Ion then exit
+    help:             bool,
+    /// Print the version, platform and revision of Ion then exit
+    version:          bool,
+    /// Do not execute any commands, perform only syntax checking
+    no_execute:       bool,
     /// Use a fake interactive mode, where errors don't exit the shell
     fake_interactive: bool,
     /// Force interactive mode
     interactive:      bool,
-    /// Do not execute any commands, perform only syntax checking
-    no_execute:       bool,
+    /// Print commands before execution
+    print_commands:   bool,
+    /// Shortcut layout. Valid options: "vi", "emacs"
+    key_bindings:     Option<KeyBindingsWrapper>,
     /// Evaluate given commands instead of reading from the commandline
     command:          Option<String>,
-    /// Print the version, platform and revision of Ion then exit
-    version:          bool,
     /// Script arguments (@args). If the -c option is not specified,
     /// the first parameter is taken as a filename to execute
     args:             Vec<String>,
 }
 
+#[derive(Debug, Error)]
+pub enum ParsingError {
+    #[error(display = "flag or option set twice, see --help")]
+    ArgTwiceSet,
+    #[error(display = "invalid keybinding, see --help")]
+    InvalidKeybinding,
+}
+
 fn version() -> String { include!(concat!(env!("OUT_DIR"), "/version_string")).to_string() }
 
-fn parse_args() -> CommandLineArgs {
+fn parse_args() -> Result<CommandLineArgs, ParsingError> {
+    let mut arg_twice_set = false;
+    let mut invalid_keybinding = false;
     let mut args = env::args().skip(1);
-    let mut command = None;
-    let mut key_bindings = None;
-    let mut no_execute = false;
-    let mut print_commands = false;
-    let mut interactive = false;
-    let mut fake_interactive = false;
     let mut version = false;
+    let mut help = false;
+    let mut no_execute = false;
+    let mut fake_interactive = false;
+    let mut interactive = false;
+    let mut print_commands = false;
+    let mut key_bindings = None;
+    let mut command = None;
     let mut additional_arguments = Vec::new();
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "-v" | "--version" => {
+                if version == true {
+                    arg_twice_set = true;
+                }
+                version = true;
+            }
+            "-h" | "--help" => {
+                if help == true {
+                    arg_twice_set = true;
+                }
+                help = true;
+            }
+            "-n" | "--no-execute" => {
+                if no_execute == true {
+                    arg_twice_set = true;
+                }
+                no_execute = true;
+            }
+            "-f" | "--fake-interactive" => {
+                if fake_interactive == true {
+                    arg_twice_set = true;
+                }
+                fake_interactive = true;
+            }
+            "-i" | "--interactive" => {
+                if interactive == true {
+                    arg_twice_set = true;
+                }
+                interactive = true;
+            }
+            "-x" => {
+                if print_commands == true {
+                    arg_twice_set = true;
+                }
+                print_commands = true;
+            }
             "-o" => {
+                match key_bindings {
+                    Some(KeyBindingsWrapper(KeyBindings::Vi)) => arg_twice_set = true,
+                    Some(KeyBindingsWrapper(KeyBindings::Emacs)) => arg_twice_set = true,
+                    None => (),
+                }
                 key_bindings = match args.next().as_ref().map(|s| s.as_str()) {
                     Some("vi") => Some(KeyBindingsWrapper(KeyBindings::Vi)),
                     Some("emacs") => Some(KeyBindingsWrapper(KeyBindings::Emacs)),
                     Some(_) => {
-                        eprintln!("ion: invalid option for option -o");
-                        process::exit(1);
+                        invalid_keybinding = true;
+                        break;
                     }
                     None => {
-                        eprintln!("ion: no option given for option -o");
-                        process::exit(1);
+                        invalid_keybinding = true;
+                        break;
                     }
                 }
             }
-            "-x" => print_commands = true,
-            "-n" | "--no-execute" => no_execute = true,
-            "-c" => command = args.next(),
-            "-v" | "--version" => version = true,
-            "-h" | "--help" => {
-                println!("{}", MAN_ION);
-                process::exit(0);
+            "-c" => {
+                // convert Option<String< to Option<&str> due to type system limitation
+                match command.as_deref() {
+                    Some(_p) => arg_twice_set = true,
+                    None => (),
+                }
+                command = args.next();
             }
-            "-i" | "--interactive" => interactive = true,
-            "-f" | "--fake-interactive" => fake_interactive = true,
             _ => {
                 additional_arguments.push(arg);
             }
         }
     }
-    CommandLineArgs {
-        key_bindings,
-        print_commands,
-        interactive,
-        fake_interactive,
-        no_execute,
-        command,
-        version,
-        args: additional_arguments,
+    if arg_twice_set {
+        return Err(ParsingError::ArgTwiceSet);
     }
+    if invalid_keybinding {
+        return Err(ParsingError::InvalidKeybinding);
+    }
+    // bubble up errors
+    Ok(CommandLineArgs {
+        help,
+        version,
+        no_execute,
+        fake_interactive,
+        interactive,
+        print_commands,
+        key_bindings,
+        command,
+        args: additional_arguments,
+    })
 }
 
 fn set_unique_pid() -> nix::Result<()> {
@@ -113,11 +173,30 @@ fn set_unique_pid() -> nix::Result<()> {
 }
 
 fn main() {
-    let command_line_args = parse_args();
+    let parsedargs = parse_args();
+    let command_line_args = match parsedargs {
+        Ok(parsedargs) => parsedargs,
+        Err(ParsingError::ArgTwiceSet) => {
+            eprintln!("flag or option set twice, see --help");
+            process::exit(1);
+        }
+        Err(ParsingError::InvalidKeybinding) => {
+            eprintln!("invalid keybinding, see --help");
+            process::exit(1);
+        }
+    };
 
+    if command_line_args.help {
+        println!("{}", MAN_ION);
+        return;
+    }
     if command_line_args.version {
         println!("{}", version());
         return;
+    }
+    if command_line_args.command.is_some() && (command_line_args.args.len() != 0) {
+        eprintln!("either execute command or file(s)");
+        process::exit(1);
     }
 
     let mut builtins = BuiltinMap::default();
