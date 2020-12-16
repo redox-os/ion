@@ -20,43 +20,6 @@ DESCRIPTION
     Returns true if the value given to it is equal to '1' or 'true'.
 ```
 
-## math - Floating-point calculator
-
-```txt
-SYNOPSIS
-    math [EXPRESSION]
-
-DESCRIPTION
-    Evaluates arithmetic expressions
-
-SPECIAL EXPRESSIONS
-    help (only in interactive mode)
-        prints this help text
-
-    --help (only in non-interactive mode)
-        prints this help text
-
-    exit (only in interactive mode)
-        exits the program
-
-NOTATIONS
-    infix notation
-        e.g. 3 * 4 + 5
-
-    polish notation
-        e.g. + * 3 4 5
-
-EXAMPLES
-    Add two plus two in infix notation
-        math 2+2
-
-    Add two plus two in polish notation
-        math + 2 2
-
-AUTHOR
-    Written by Hunter Goldstein.
-```
-
 ## cd - Change directory.
 
 ```txt
@@ -298,6 +261,25 @@ DESCRIPTION
     Get the short description for BUILTIN. If no argument is provided, list all the builtins
 ```
 
+## history - print command history
+
+```txt
+SYNOPSIS
+    history [option]
+
+DESCRIPTION
+    Prints or manupulate the command history.
+
+OPTIONS:
+    +inc_append: Append each command to history as entered.
+    -inc_append: Default, do not append each command to history as entered.
+    +shared: Share history between shells using the same history file, implies inc_append.
+    -shared: Default, do not share shell history.
+    +duplicates: Default, allow duplicates in history.
+    -duplicates: Do not allow duplicates in history.
+```
+
+
 ## eq, is - checks if two arguments are the same
 
 ```txt
@@ -347,6 +329,43 @@ EXAMPLES
         matches xs x
     Returns false:
         matches x xs
+```
+
+## math - Floating-point calculator
+
+```txt
+SYNOPSIS
+    math [EXPRESSION]
+
+DESCRIPTION
+    Evaluates arithmetic expressions
+
+SPECIAL EXPRESSIONS
+    help (only in interactive mode)
+        prints this help text
+
+    --help (only in non-interactive mode)
+        prints this help text
+
+    exit (only in interactive mode)
+        exits the program
+
+NOTATIONS
+    infix notation
+        e.g. 3 * 4 + 5
+
+    polish notation
+        e.g. + * 3 4 5
+
+EXAMPLES
+    Add two plus two in infix notation
+        math 2+2
+
+    Add two plus two in polish notation
+        math + 2 2
+
+AUTHOR
+    Written by Hunter Goldstein.
 ```
 
 ## popd - shift through the directory stack

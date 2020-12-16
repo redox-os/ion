@@ -13,3 +13,20 @@ let array = [ @(cmd args...) ]
 **NOTES:**
 - To split outputs by line, see [@lines($(cmd))](https://doc.redox-os.org/ion-manual/html/expansions/05-method.html#lines).
 - `@(cmd)` is equivalent to [@split($(cmd))](https://doc.redox-os.org/ion-manual/html/expansions/05-method.html#split).
+
+
+```sh
+mkdir -p _tmp _tmp/t1 _tmp/t2
+cd _tmp
+let res = $(ls)
+let res2 = [ @(ls) ]
+echo $res    # output the string
+echo @res2     # output the array
+cd ..
+rm -fr _tmp
+```
+```txt
+t1
+t2
+t1 t2
+```

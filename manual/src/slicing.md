@@ -5,7 +5,9 @@ strings are sliced and indexed by graphemes. Arrays are sliced and indexed by th
 Slicing uses the same **[]** characters as arrays, but the shell can differentiate between
 a slice and an array based on the placement of the characters (immediately after an expansion).
 
-**NOTE:** It's important to note that indexes count from 0, as in most other languages.
+**NOTE:** It's important to note that indexes count from 0, as in most other system programming languages.
+
+**NOTE:** `...` and `..=` can be used interchangeable.
 
 ## Exclusive Range
 
@@ -14,18 +16,19 @@ the Nth element, where N is the last index value. The Nth element's ID is always
 less than the Nth value.
 
 ```sh
-$ let array = [{1...10}]
-$ echo @array[0..5]
-> 1 2 3 4 5
+let array = [{1...10}]
+echo @array[0..5]
+echo @array[..5]
 
-$ echo @array[..5]
-> 1 2 3 4 5
-
-$ let string = "hello world"
-$ echo $string[..5]
-> hello
-$ echo $string[6..]
-> world
+let string = "hello world"
+echo $string[..5]
+echo $string[6..]
+```
+```txt
+1 2 3 4 5
+1 2 3 4 5
+hello
+world
 ```
 
 ## Inclusive Range
@@ -33,16 +36,20 @@ $ echo $string[6..]
 When using inclusive ranges, the end index does not refer to the Nth value, but the actual index ID.
 
 ```sh
-$ let array = [{1...10}]
-$ echo @array[0...5]
-> 1 2 3 4 5 6
+let array = [{1...10}]
+echo @array[0...5]
+```
+```txt
+1 2 3 4 5 6
 ```
 
 The `=` character may be used instead of the third dot.
 
 ```sh
-$ echo @array[0..=5]
-> 1 2 3 4 5 6
+echo @array[0..=5]
+```
+```txt
+1 2 3 4 5 6
 ```
 
 ## Descending Ranges
@@ -51,10 +58,12 @@ Ranges do not have to always be specified in ascending order. Descending ranges 
 supported. However, at this time you cannot provide an descending range as an index to an array.
 
 ```sh
-$ echo {10...1}
-> 10 9 8 7 6 5 4 3 2 1
-$ echo {10..1}
-> 10 9 8 7 6 5 4 3 2
+echo {10...1}
+echo {10..1}
+```
+```txt
+10 9 8 7 6 5 4 3 2 1
+10 9 8 7 6 5 4 3 2
 ```
 
 ## Negative Values Supported
@@ -63,8 +72,10 @@ Although this will not work for arrays, you may supply negative values with rang
 negative values in a range of numbers.
 
 ```sh
-$ echo {-10...10}
-> -10 -9 -8 -7 -6 -5 -4 -3 -2 -1 0 1 2 3 4 5 6 7 8 9 10
+echo {-10...10}
+```
+```txt
+-10 -9 -8 -7 -6 -5 -4 -3 -2 -1 0 1 2 3 4 5 6 7 8 9 10
 ```
 
 ## Stepping Ranges
@@ -78,10 +89,12 @@ two periods and a stepping value, followed by either another two periods or thre
 the end index.
 
 ```sh
-$ echo {0..3...12}
-> 0 3 6 9 12
-$ echo {0..3..12}
-> 0 3 6 9
+echo {0..3...12}
+echo {0..3..12}
+```
+```txt
+0 3 6 9 12
+0 3 6 9
 ```
 
 ### Stepping Forward w/ Array Slicing
@@ -90,9 +103,11 @@ Array slicing, on the other hand, uses a more Haskell-ish syntax, whereby instea
 the stepping with two periods, it is specified with a comma.
 
 ```sh
-$ let array = [{0...30}]
-$ echo @array[0,3..]
-> 0 3 6 9 12 15 18 21 24 27 30
+let array = [{0...30}]
+echo @array[0,3..]
+```
+```txt
+0 3 6 9 12 15 18 21 24 27 30
 ```
 
 ## Stepping In Reverse w/ Brace Ranges
@@ -100,10 +115,12 @@ $ echo @array[0,3..]
 Brace ranges may also specify a range that descends in value, rather than increases.
 
 ```sh
-$ echo {10..-2...-10}
-> 10 8 6 4 2 0 -2 -4 -6 -8 -10
-$ echo {10..-2..-10}
-> 10 8 6 4 2 0 -2 -4 -6 -8
+echo {10..-2...-10}
+echo {10..-2..-10}
+```
+```txt
+10 8 6 4 2 0 -2 -4 -6 -8 -10
+10 8 6 4 2 0 -2 -4 -6 -8
 ```
 
 ## Stepping In Reverse w/ Array Slicing
@@ -114,9 +131,11 @@ Also note that when a negative stepping is supplied, it is automatically inferre
 end index value to be 0 when not specified.
 
 ```sh
-$ let array = [{0...30}]
-$ echo @array[30,-3..]
-> 30 27 24 21 18 15 12 9 6 3 0
+let array = [{0...30}]
+echo @array[30,-3..]
+```
+```txt
+30 27 24 21 18 15 12 9 6 3 0
 ```
 
 ## Process Expansions Also Support Slicing
@@ -124,6 +143,6 @@ $ echo @array[30,-3..]
 Variables aren't the only elements that support slicing. Process expansions also support slicing.
 
 ```sh
-$ echo $(cat file)[..10]
-$ echo @(cat file)[..10]
+echo $(cat file)[..10]
+echo @(cat file)[..10]
 ```

@@ -28,7 +28,7 @@ let array = [ one two 'three four' ]
 
 Values can be fetched from an array via their position in the array as the index.
 
-```
+```sh
 let array = [ 1 2 3 4 5 6 7 8 9 10 ]
 echo @array[0]
 echo @array[5..=8]
@@ -55,7 +55,7 @@ echo @array
 echo $as_string
 ```
 
-```
+```txt
 hello world this is the ion shell
 hello world this is the ion shell
 ```
@@ -71,7 +71,7 @@ let array ::= 0
 echo @array
 ```
 
-```
+```txt
 0 1 2 3 5 6 7
 ```
 
@@ -83,4 +83,18 @@ individual argument, if any arguments exist.
 ```sh
 let args = [-l -a --color]
 ls @args
+```
+
+## Using command output as array
+
+```sh
+mkdir -p _tmp _tmp/t1 _tmp/t2
+cd _tmp
+let res = [ @(ls) ]
+echo @res     # output the array
+cd ..
+rm -fr _tmp
+```
+```txt
+t1 t2
 ```

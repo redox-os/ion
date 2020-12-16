@@ -21,6 +21,13 @@ true
 false
 ```
 
+The REPL provides the following useful shortcuts for history searching:
+- Ctrl + s => forward search history ;
+- Ctrl + r => reverse search history ;
+- Ctrl + f => accept autosuggestion ;
+- Ctrl + u => delete content ;
+- Ctrl + c => interrupt command .
+
 ## Variables
 
 The following local variables can be used to modify Ion's history behavior:

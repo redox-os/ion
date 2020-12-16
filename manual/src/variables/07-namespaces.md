@@ -43,7 +43,7 @@ Lastly, you can use true colors using hexes. ${c::0x000000} and ${c::0x000} woul
 As a last tip, you can delimit different attributes using commas, so ${c::black}${c::redbg} is also ${c::black,redbg}.
 
 ### Example
-```
+```sh
 fn PROMPT
   printf "${c::red}${c::bluebg}${c::bold}%s${c::reset}" $(git branch)
 end
@@ -51,25 +51,33 @@ end
 would print the git branches in bold red over a blue background.
 
 ## Scopes (super and global namespaces)
-Since Ion has proper scoping contrary to other shells, helpers are provided to access variables in various scopes. The super namespaces crosses a function boundary and the global namespace accesses, well, the global scope.
+Since Ion has proper scoping contrary to other shells, helpers are provided to access variables in various scopes. 
+The super namespaces crosses a function boundary and the global namespace accesses the global scope.
+This allows variable shadowing.
 
 ### Example
-```
+```sh
 let a = 1
 
 fn demo
-  let b = 2
+  let a = 2
 
   fn nested
-    echo ${super::b}
+    let a = 3
     echo ${global::a}
+    echo ${super::a}
+    echo $a
   end
   nested
 end
 
 demo
 ```
-Will output 2 and 1
+```txt
+1
+2
+3
+```
 
 ## Environment variable (env namespace)
 Ion errors when users access undefined variables. Usually, though, environment variables can't be predicted. It is also clearer to define where they are used. As such, the env namespace will simply emit an empty string if the environment variable is not defined.

@@ -15,11 +15,14 @@ have been read. Then the characters that were collected will be used as the name
 variable to substitute with.
 
 ```sh
-$ let string = "example string"
-$ echo $string
-> example string
-$ echo $string:$string
-> example string:example string
+let string = "example string"
+echo $string
+
+echo $string:$string
+```
+```txt
+example string
+example string:example string
 ```
 
 **NOTE:**
@@ -33,10 +36,11 @@ return an array of strings. This means that it's possible to use an array variab
 in a command, as each element in the array will be treated as a separate shell word.
 
 ```sh
-$ let array = [one two three]
-$ echo @array
-> one two three
-$ cmd @args
+let array = [one two three]
+echo @array
+```
+```txt
+one two three
 ```
 
 However, do note that double-quoted arrays are coerced into strings, with spaces separating each

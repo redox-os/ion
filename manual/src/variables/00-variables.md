@@ -23,10 +23,7 @@ let a b = one [two three four]
 echo $a
 echo @b
 ```
-
-#### Output
-
-```
+```txt
 one
 two
 one
@@ -46,16 +43,12 @@ let b:bool = true
 let c:bool = n
 echo $a $b $c
 
-
 let a:str b:[str] c:int d:[float] = one [two three] 4 [5.1 6.2 7.3]
 echo $a
 echo @b
 echo $c
 echo @d
 ```
-
-#### Output
-
 ```
 true
 true

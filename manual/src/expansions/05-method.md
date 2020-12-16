@@ -89,10 +89,7 @@ basename (complete filename, extension included). IE: `/parent/filename.ext` -> 
 ```sh
 echo $basename("/parent/filename.ext")
 ```
-
-#### Output
-
-```
+```txt
 filename.ext
 ```
 
@@ -106,10 +103,7 @@ extension of the complete filename. IE: `/parent/filename.ext` -> `ext`.
 ```sh
 echo $extension("/parent/filename.ext")
 ```
-
-#### Output
-
-```
+```txt
 ext
 ```
 
@@ -123,10 +117,7 @@ file name portion of the complete filename. IE: `/parent/filename.ext` -> `filen
 ```sh
 echo $filename("/parent/filename.ext")
 ```
-
-#### Output
-
-```
+```txt
 filename
 ```
 
@@ -143,10 +134,7 @@ let array = [1 2 3 4 5]
 echo $join(array)
 echo $join(array ", ")
 ```
-
-#### Output
-
-```
+```txt
 1 2 3 4 5
 1, 2, 3, 4, 5
 ```
@@ -162,10 +150,7 @@ string appears. It returns `-1` if it isn't contained.
 echo $find("FOOBAR" "OB")
 echo $find("FOOBAR" "ob")
 ```
-
-#### Output
-
-```
+```txt
 2
 -1
 ```
@@ -183,10 +168,7 @@ echo $len("foobar")
 echo $len("❤️")
 echo $len([one two three four])
 ```
-
-#### Output
-
-```
+```txt
 6
 1
 4
@@ -203,10 +185,7 @@ in the output, not the number of graphemes.
 echo $len_bytes("foobar")
 echo $len_bytes("❤️")
 ```
-
-#### Output
-
-```
+```txt
 6
 6
 ```
@@ -221,10 +200,7 @@ parent directory's name. IE: `/root/parent/filename.ext` -> `/root/parent`
 ```sh
 echo $parent("/root/parent/filename.ext")
 ```
-
-#### Output
-
-```
+```txt
 /root/parent
 ```
 
@@ -238,10 +214,7 @@ amount of times, where N is the supplied number.
 ```sh
 echo $repeat("abc, " 3)
 ```
-
-#### Output
-
-```
+```txt
 abc, abc, abc,
 ```
 
@@ -257,10 +230,7 @@ let input = "one two one two"
 echo $replace(input one 1)
 echo $replace($replace(input one 1) two 2)
 ```
-
-#### Output
-
-```
+```txt
 1 two 1 two
 1 2 1 2
 ```
@@ -277,10 +247,7 @@ let input = "one two one two"
 echo $replacen(input "one" "three" 1)
 echo $replacen(input "two" "three" 2)
 ```
-
-#### Output
-
-```
+```txt
 three two one two
 one three one three
 ```
@@ -298,10 +265,7 @@ as a regex.
 echo $regex_replace("bob" "^b" "B")
 echo $regex_replace("bob" 'b$' "B")
 ```
-
-#### Output
-
-```
+```txt
 Bob
 boB
 ```
@@ -316,10 +280,7 @@ in reverse order.
 ```sh
 echo $reverse("foobar")
 ```
-
-#### Output
-
-```
+```txt
 raboof
 ```
 
@@ -333,10 +294,7 @@ lowercase equivalent, if an lowercase equivalent exists.
 ```sh
 echo $to_lowercase("FOOBAR")
 ```
-
-#### Output
-
-```
+```txt
 foobar
 ```
 
@@ -350,10 +308,7 @@ uppercase equivalent, if an uppercase equivalent exists.
 ```sh
 echo $to_uppercase("foobar")
 ```
-
-#### Output
-
-```
+```txt
 FOOBAR
 ```
 
@@ -367,10 +322,7 @@ Defaults to string variables. Escapes the content of the string.
 let line = " Mary   had\ta little  \n\t lamb\t"
 echo $escape($line)
 ```
-
-#### Output
-
-```
+```txt
  Mary   had\\ta little  \\n\\t lamb\\t
 ```
 
@@ -384,10 +336,7 @@ Defaults to string variables. Unescapes the content of the string.
 let line = " Mary   had\ta little  \n\t lamb\t"
 echo $unescape($line)
 ```
-
-#### Output
-
-```
+```txt
  Mary   had	a little
 	 lamb
 ```
@@ -403,10 +352,7 @@ echo $or($unknown_variable "Fallback")
 let var = 42
 echo $or($var "Not displayed")
 ```
-
-#### Output
-
-```
+```txt
 Fallback
 42
 ```
@@ -435,10 +381,7 @@ for line in @lines($unescape("first\nsecond\nthird"))
     echo $line
 end
 ```
-
-#### Output
-
-```
+```txt
 first
 second
 third
@@ -461,10 +404,7 @@ for data in @split("person age data")
     echo $data
 end
 ```
-
-#### Output
-
-```
+```txt
 person
 age
 some data
@@ -485,10 +425,7 @@ echo @split_at("FOOBAR")
 echo @split_at("FOOBAR" "-1")
 echo @split_at("FOOBAR" "8")
 ```
-
-#### Output
-
-```
+```txt
 FOO BAR
 ion: split_at: requires an argument
 ion: split_at: requires a valid number as an argument
@@ -505,10 +442,7 @@ each byte is displayed as their actual 8-bit number.
 ```sh
 echo @bytes("abc")
 ```
-
-#### Output
-
-```
+```txt
 97 98 99
 ```
 
@@ -523,10 +457,7 @@ for char in @chars("foobar")
     echo $char
 end
 ```
-
-#### Output
-
-```
+```txt
 f
 o
 o
@@ -546,10 +477,7 @@ for grapheme in @graphemes("foobar")
     echo $grapheme
 end
 ```
-
-#### Output
-
-```
+```txt
 f
 o
 o
@@ -567,10 +495,6 @@ Defaults to array variables. Returns a reversed copy of the input array.
 ```sh
 echo @reverse([1 2 3])
 ```
-
-#### Output
-
-```
+```txt
 3 2 1
 ```
-

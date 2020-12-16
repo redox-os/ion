@@ -94,3 +94,12 @@ When using Ion as a shell library, it is possible you may want to change the bui
 
 If you do this, all function calls will use the new builtins to run. meaning that if you removed the builtin function it the shell will try to find the command, and if you added a builtin, that will override any other command.
 
+## Advanced usage (THIS MAY BREAK ANY TIME)
+
+```sh
+fn square x:int; echo $(( x * x )); end
+square 22
+```
+```txt
+484
+```
