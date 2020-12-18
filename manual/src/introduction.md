@@ -9,15 +9,18 @@ platforms, and we are currently searching for a Windows developer to port it to 
 
 # Goals
 
-Syntax and feature decisions for Ion are made based upon three measurements: is the feature useful,
-is it simple to use, and will it's implementation be efficient to parse and execute? A feature is
-considered useful if there's a valid use case for it, in the concept of a shell language. The
-syntax for the feature should be simple for a human to read and write, with extra emphasis on
-readability, given that most time is spent reading scripts than writing them. The implementation
-should require minimal to zero heap allocations, and be implemented in a manner that requires
-minimal CPU cycles (so long as it's also fully documented and easy to maintain!).
+Syntax and feature decisions for Ion are made based upon three measurements: 
+ 1. Is the feature useful?
+ 2. Is it simple to use?
+ 3. Will it's implementation be efficient to parse and execute? 
 
-It should also be taken into consideration that shells operate entirely upon strings, and therefore
+A feature is considered useful if there's a valid use case for it, in the concept of a shell language. The
+syntax for the feature should be simple for a human to read and write, with extra emphasis on
+readability, given that **most time is spent reading scripts** than writing them. The implementation
+should require *minimal to zero heap allocations*, and be implemented in a manner that requires
+*minimal CPU cycles* (so long as it's also **fully documented** and **easy to maintain**!).
+
+It should also be taken into consideration that *shells operate entirely upon strings*, and therefore
 should be fully equipped for all manner of string manipulation capabilities. That means that users
 of a shell should not immediately need to grasp for tools like **cut**, **sed**, and **awk**. Ion
 offers a great deal of control over slicing and manipulating text. Arrays are treated as first

@@ -4,16 +4,9 @@
 
 - [Migrating from POSIX shells](migrating.md)
 
-- [Miscellaneous](misc/index.md)
+- [General rules](general.md)
 
-    - [Implicit `cd`](misc/01-implicitcd.md)
-    - [XDG App Directories](misc/02-xdg.md)
-    - [Quoting Rules](misc/03-quotation.md)
-    - [Multi-line Arguments](misc/04-multiargs.md)
-    - [Multi-line Strings](misc/05-multiline-strings.md)
-    - [Prompt Function](misc/06-prompt_fn.md)
-    - [Key Bindings](misc/07-keybindings.md)
-    - [General Tips](misc/08-general.md)
+- [Read–eval–print loop](repl.md)
 
 - [Variables](variables/00-variables.md)
 
