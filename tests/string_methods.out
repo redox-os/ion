@@ -1,0 +1,64 @@
+# ANCHOR: basename
+filename.ext
+# ANCHOR_END: basename
+# ANCHOR: extension
+ext
+# ANCHOR_END: extension
+# ANCHOR: filename
+filename
+# ANCHOR_END: filename
+# ANCHOR: join
+1 2 3 4 5
+1, 2, 3, 4, 5
+# ANCHOR_END: join
+# ANCHOR: find
+2
+-1
+# ANCHOR_END: find
+# ANCHOR: len
+6
+1
+4
+# ANCHOR_END: len
+# ANCHOR: len_bytes
+6
+6
+# ANCHOR_END: len_bytes
+# ANCHOR: parent
+/root/parent
+# ANCHOR_END: parent
+# ANCHOR: repeat
+abc, abc, abc, 
+# ANCHOR_END: repeat
+# ANCHOR: replace
+1 two 1 two
+1 2 1 2
+# ANCHOR_END: replace
+# ANCHOR: replacen
+three two one two
+one three one three
+# ANCHOR_END: replacen
+# ANCHOR: regex_replace
+Bob
+boB
+# ANCHOR_END: regex_replace
+# ANCHOR: reverse
+raboof
+# ANCHOR_END: reverse
+# ANCHOR: to_lowercase
+foobar
+# ANCHOR_END: to_lowercase
+# ANCHOR: to_uppercase
+FOOBAR
+# ANCHOR_END: to_uppercase
+# ANCHOR: escape
+ Mary   had\\ta little  \\n\\t lamb\\t
+# ANCHOR_END: escape
+# ANCHOR: unescape
+ Mary   had	a little  
+	 lamb	
+# ANCHOR_END: unescape
+# ANCHOR: or
+Fallback
+42
+# ANCHOR_END: or

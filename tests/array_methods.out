@@ -1,9 +1,46 @@
-one one
-one twoone
-o n e t w o
-111 110 101 116 119 111
-o n e t w o
+# ANCHOR: lines
 firstline secondline
+third
+fourth
+fifth
+# ANCHOR_END: lines
+# ANCHOR: split
+one one
+person
+age
+some data
+person
+age
+data
+# ANCHOR_END: split
+# ANCHOR: split_at
+one twoone
+FOO BAR
+# ANCHOR_END: split_at
+# ANCHOR: bytes
+111 110 101 116 119 111
+97 98 99
+# ANCHOR_END: bytes
+# ANCHOR: chars
+o n e t w o
+f
+o
+o
+b
+a
+r
+# ANCHOR_END: chars
+# ANCHOR: graphemes
+o n e t w o
+f
+o
+o
+b
+a
+r
+# ANCHOR_END: graphemes
+# ANCHOR: reverse
 3 2 1
 a
 3 2 1
+# ANCHOR_END: reverse

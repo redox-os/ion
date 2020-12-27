@@ -25,6 +25,8 @@
     - [Brace Expansions](expansions/03-brace.md)
     - [Arithmetic Expansions](expansions/04-arithmetic.md)
     - [Method Expansions](expansions/05-method.md)
+    - [String Methods](expansions/06-stringmethods.md)
+    - [Array Methods](expansions/07-arraymethods.md)
 
 - [Slicing Syntax](slicing.md)
 

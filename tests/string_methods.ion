@@ -1,0 +1,69 @@
+echo '# ANCHOR: basename'
+echo $basename("/parent/filename.ext")
+echo '# ANCHOR_END: basename'
+echo '# ANCHOR: extension'
+echo $extension("/parent/filename.ext")
+echo '# ANCHOR_END: extension'
+echo '# ANCHOR: filename'
+echo $filename("/parent/filename.ext")
+echo '# ANCHOR_END: filename'
+echo '# ANCHOR: join'
+let array = [1 2 3 4 5]
+echo $join(array)
+echo $join(array ", ")
+echo '# ANCHOR_END: join'
+echo '# ANCHOR: find'
+echo $find("FOOBAR" "OB")
+echo $find("FOOBAR" "ob")
+echo '# ANCHOR_END: find'
+echo '# ANCHOR: len'
+echo $len("foobar")
+echo $len("❤️")
+echo $len([one two three four])
+echo '# ANCHOR_END: len'
+echo '# ANCHOR: len_bytes'
+echo $len_bytes("foobar")
+echo $len_bytes("❤️")
+echo '# ANCHOR_END: len_bytes'
+echo '# ANCHOR: parent'
+echo $parent("/root/parent/filename.ext")
+echo '# ANCHOR_END: parent'
+echo '# ANCHOR: repeat'
+echo $repeat("abc, " 3)
+echo '# ANCHOR_END: repeat'
+echo '# ANCHOR: replace'
+let input = "one two one two"
+echo $replace(input one 1)
+echo $replace($replace(input one 1) two 2)
+echo '# ANCHOR_END: replace'
+echo '# ANCHOR: replacen'
+let input = "one two one two"
+echo $replacen(input "one" "three" 1)
+echo $replacen(input "two" "three" 2)
+echo '# ANCHOR_END: replacen'
+echo '# ANCHOR: regex_replace'
+echo $regex_replace("bob" "^b" "B")
+echo $regex_replace("bob" 'b$' "B")
+echo '# ANCHOR_END: regex_replace'
+echo '# ANCHOR: reverse'
+echo $reverse("foobar")
+echo '# ANCHOR_END: reverse'
+echo '# ANCHOR: to_lowercase'
+echo $to_lowercase("FOOBAR")
+echo '# ANCHOR_END: to_lowercase'
+echo '# ANCHOR: to_uppercase'
+echo $to_uppercase("foobar")
+echo '# ANCHOR_END: to_uppercase'
+echo '# ANCHOR: escape'
+let line = " Mary   had\ta little  \n\t lamb\t"
+echo $escape($line)
+echo '# ANCHOR_END: escape'
+echo '# ANCHOR: unescape'
+let line = " Mary   had\ta little  \n\t lamb\t"
+echo $unescape($line)
+echo '# ANCHOR_END: unescape'
+echo '# ANCHOR: or'
+echo $or($unknown_variable "Fallback")
+let var = 42
+echo $or($var "Not displayed")
+echo '# ANCHOR_END: or'

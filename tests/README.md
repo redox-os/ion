@@ -1,4 +1,9 @@
-# Examples
+## Changing tests
+
+This tests are also used to generate the manual.
+Please make sure to update the manual, if you change tests.
+
+## Examples
 
 The files in this directory are simple example scripts that are used to test
 the state of the shell as it is developed. When the **run_examples.sh** script
