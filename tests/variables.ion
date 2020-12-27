@@ -4,3 +4,41 @@ let __2 = underscores
 let ___ = !
 echo $alpha_numeric_name0 $_name_with_1_leading_underscore $__2 $___
 echo -e "\n\n$alpha_numeric_name0"
+echo "variables:"
+# ANCHOR: variables
+let string_variable = "hello string"
+let array_variable = [ hello array ]
+echo $string_variable
+echo @array_variable
+# ANCHOR_END: variables
+echo "multiple_assignment:"
+# ANCHOR: multiple_assignment
+let a b = one two
+echo $a
+echo $b
+
+let a b = one [two three four]
+echo $a
+echo @b
+# ANCHOR_END: multiple_assignment
+echo "type_checked_assignment:"
+# ANCHOR: type_checked_assignment
+let a:bool = 1
+let b:bool = true
+let c:bool = n
+echo $a $b $c
+let fail:bool = ""
+
+let a:str b:[str] c:int d:[float] = one [two three] 4 [5.1 6.2 7.3]
+echo $a
+echo @b
+echo $c
+echo @d
+# ANCHOR_END: type_checked_assignment
+echo "dropping_variables:"
+# ANCHOR: dropping_variables
+let string = "hello"
+drop string
+let array = [ hello world ]
+drop array
+# ANCHOR_END: dropping_variables

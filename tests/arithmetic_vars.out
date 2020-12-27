@@ -1,0 +1,18 @@
+# ANCHOR: individual_assignments
+5
+10
+8
+16
+8
+64.0
+32.0
+# ANCHOR_END: individual_assignments
+# ANCHOR: multiple_assignments
+5 5
+10 10
+8 8
+16 16
+8 8
+64.0 64.0
+32.0 32.0
+# ANCHOR_END: multiple_assignments

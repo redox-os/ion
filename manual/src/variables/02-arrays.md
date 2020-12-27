@@ -1,100 +1,68 @@
 # Array Variables
 
-The **[]** syntax in Ion is utilized to denote that the contents within should be parsed as an
-array expression. Array variables are also created using the same `let` keyword, but `let` makes
-the distinction between a string and an array by additionally requiring that all array arguments
-are wrapped within the **[]** syntax. If an array is supplied to `let` that is not explicitly
-declared as an array, then it will be coerced into a space-separated string. This design decision
-was made due to the possibility of an expanded array with one element being interpreted as a
-string.
+The **[]** syntax in Ion denotes that the contents within should be parsed as an
+array expression. 
+On using `let` keyword for array variables, all array arguments must be wrapped within the **[]** syntax. Otherwise it will be coerced into a space-separated string.
+This design decision was made due to the possibility of an expanded array with one element 
+being interpreted as a string.
 
 Once created, you may call an array variable in the same manner as a string variable, but you
 must use the **@** sigil instead of **$**. When expanded, arrays will be expanded into multiple
-arguments, so it is possible to use arrays to set multiple arguments in commands. Do note, however,
-that if an array is double quoted, it will be coerced into a string, which is a behavior that
-is equivalent to invoking the `$join(array)` method.
+arguments. Hence it is possible to use arrays to set multiple arguments in commands. 
+
+**NOTE** If an array is double quoted, it will be coerced into a string. This behavior is equivalent to invoking the `$join(array)` method.
 
 **NOTE**: Brace expansions also create arrays.
 
 ## Create a new array
-
 Arguments enclosed within brackets are treated as elements within an array.
-
 ```sh
-let array = [ one two 'three four' ]
+{{#include ../../../tests/array_vars.ion:create_array}}
+```
+```txt
 ```
 
 ## Indexing into an array
-
 Values can be fetched from an array via their position in the array as the index.
-
 ```sh
-let array = [ 1 2 3 4 5 6 7 8 9 10 ]
-echo @array[0]
-echo @array[5..=8]
+{{#include ../../../tests/array_vars.ion:index_array}}
+```
+```txt
+{{#include ../../../tests/array_vars.out:index_array}}
 ```
 
 ## Copy array into a new array
-
 Passing an array within brackets enables performing a deep copy of that array.
-
 ```sh
-let array_copy = [ @array ]
+{{#include ../../../tests/array_vars.ion:array_copy}}
+```
+```txt
+{{#include ../../../tests/array_vars.out:array_copy}}
 ```
 
 ## Array join
-
 This will join each element of the array into a string, adding spaces between each element.
-
 ```sh
-let array = [ hello world ]
-let other_array = [ this is the ion ]
-let array = [ @array @other_array shell ]
-let as_string = @array
-echo @array
-echo $as_string
+{{#include ../../../tests/array_vars.ion:array_join}}
 ```
-
 ```txt
-hello world this is the ion shell
-hello world this is the ion shell
+{{#include ../../../tests/array_vars.out:array_join}}
 ```
 
-## Array concatenation
-
+## Array concatenation and variable stripping
 The `++=` and `::=` operators can be used to efficiently concatenate an array in-place.
-
 ```sh
-let array = [1 2 3]
-let array ++= [5 6 7]
-let array ::= 0
-echo @array
-```
-
-```txt
-0 1 2 3 5 6 7
-```
-
-## Expand array as arguments to a command
-
-Arrays are useful to pass as arguments to a command. Each element will be expanded as an
-individual argument, if any arguments exist.
-
-```sh
-let args = [-l -a --color]
-ls @args
-```
-
-## Using command output as array
-
-```sh
-mkdir -p _tmp _tmp/t1 _tmp/t2
-cd _tmp
-let res = [ @(ls) ]
-echo @res     # output the array
-cd ..
-rm -fr _tmp
+{{#include ../../../tests/array_vars.ion:array_concat_var_strip}}
 ```
 ```txt
-t1 t2
+{{#include ../../../tests/array_vars.out:array_concat_var_strip}}
+```
+
+## Practical array usage
+Passing arrays as command arguments and capturing output of commands as arrays is useful.
+```sh
+{{#include ../../../tests/array_vars.ion:practical_array}}
+```
+```txt
+{{#include ../../../tests/array_vars.out:practical_array}}
 ```

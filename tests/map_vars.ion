@@ -1,0 +1,56 @@
+echo '# ANCHOR: testing_maps'
+let map:hmap[str] = [key1=one key3=three]
+let map[key2] = two
+echo @map[key1]
+echo @map[key2]
+echo @map[key3]
+
+let map:hmap[int] = [uno=1 dos=2 tres=3]
+echo @map[uno]
+echo @map[tres]
+echo @map[dos]
+
+let map:hmap[[int]] = [key1=[1 2 3 4 5] key2=[6 7 8]]
+echo @map[key1]
+echo @map[key2]
+
+let map:bmap[str] = [key1=one key3=three]
+echo @map
+let map[key2] = two
+echo @map
+echo @map[key1]
+echo @map[key2]
+echo @map[key3]
+
+let map:bmap[float] = [ichi=1.0 ni=2.0 san=3.0]
+echo @map
+
+let map[ichi] = foo
+echo @map
+let map[ni] = bar
+echo @map
+echo '# ANCHOR_END: testing_maps'
+echo '# ANCHOR: hashmap'
+let hashmap:hmap[str] = [ blue=pc27 red=pc2 green=pc15 ]
+let x = blue
+echo @hashmap[$x] @hashmap[red] # fetch values
+let hashmap[orange] = pc22 # add new key with value
+#echo @keys(hashmap) #get keys
+#echo @values(hashmap) #get values
+#echo @hashmap #get keys and values
+#for key value in @hashmap #use keys and values
+#  echo $key: $value
+#end
+echo '# ANCHOR_END: hashmap'
+echo '# ANCHOR: btreemap'
+let btreemap:bmap[str] = [ pc2=red pc15=green pc27=blue ]
+let x = pc2
+echo @btreemap[$x] @btreemap[pc15] # fetch values
+let btreemap[orange] = pc22 # add new key with value
+echo @keys(btreemap) #get keys
+echo @values(btreemap) #get values
+echo @btreemap #get keys and values
+for key value in @btreemap #use keys and values
+  echo $key: $value
+end
+echo '# ANCHOR_END: btreemap'

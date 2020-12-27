@@ -2,3 +2,19 @@ hello leading underscores !
 
 
 hello
+variables:
+hello string
+hello array
+multiple_assignment:
+one
+two
+one
+two three four
+type_checked_assignment:
+true true false
+ion: assignment error: fail: expected bool
+one
+two three
+4
+5.1 6.2 7.3
+dropping_variables:

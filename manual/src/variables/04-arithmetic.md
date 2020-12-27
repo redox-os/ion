@@ -13,35 +13,21 @@ Operators currently supported are:
 - [x] Powers  (**\*\***)
 
 ## Individual Assignments
-
 The following examples are a demonstration of applying a mathematical operation to an individual
-variable -- first assigning `0` to the variable, then applying arithmetic operations to it.
-
+variable.
 ```sh
-let value = 0
-let value += 5
-let value -= 2
-let value *= 3
-let value //= 2
-let value **= 10
-let value /= 2
+{{#include ../../../tests/arithmetic_vars.ion:individual_assignments}}
 ```
-
+```txt
+{{#include ../../../tests/arithmetic_vars.out:individual_assignments}}
+```
 
 ## Multiple Assignments
-
 It's also possible to perform a mathematical operation to multiple variables. Each variable will be
 designated with a paired value.
-
 ```sh
-let a b = 5 5
-let a b += 3 2
-let a b -= 1 1
-echo $a $b
+{{#include ../../../tests/arithmetic_vars.ion:multiple_assignments}}
 ```
-
-This will output the following:
-
-```
-7 6
+```txt
+{{#include ../../../tests/arithmetic_vars.out:multiple_assignments}}
 ```

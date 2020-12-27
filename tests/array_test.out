@@ -1,0 +1,76 @@
+# ANCHOR: standardArrays
+
+1
+1
+2
+3
+4
+5
+6
+1
+2
+3
+4
+5
+6
+# ANCHOR_END: standardArrays
+# ANCHOR: command_substitution
+a
+b
+c
+d
+e
+a
+b
+c
+d
+e
+# ANCHOR_END: command_substitution
+# ANCHOR: concatenation
+1
+2
+3
+4
+5
+6
+a
+b
+c
+d
+e
+# ANCHOR_END: concatenation
+# ANCHOR: array_as_command_args
+1 2 3 4 5 6
+a b c d e
+1 2 3 4 5 6 a b c d e
+# ANCHOR_END: array_as_command_args
+# ANCHOR: slice_by_id
+1
+2
+3
+1
+2
+3
+1
+2
+3
+# ANCHOR_END: slice_by_id
+# ANCHOR: slice_by_range
+1
+1 2
+1 2 3
+4 5
+1 2 3 4 5
+# ANCHOR_END: slice_by_range
+# ANCHOR: slice_with_vars
+😉
+😉
+😉
+# ANCHOR_END: slice_with_vars
+# ANCHOR: convert_to_string
+1 2 3 4 5
+1 2 8 9 10
+3 4 6 7 8 9 10
+6 7 8 9 10 4 3
+6 7 8 2 3 10 3
+# ANCHOR_END: convert_to_string

@@ -1,0 +1,21 @@
+# ANCHOR: string_variables
+t1
+t2
+# ANCHOR_END: string_variables
+# ANCHOR: string_slicing
+Hello
+World
+llo, Wo
+# ANCHOR_END: string_slicing
+# ANCHOR: string_concatenation
+world
+world!
+Hello, world!
+# ANCHOR_END: string_concatenation
+# ANCHOR: string_operations
+Doctor
+order
+Doctor's
+orders
+Doctor's orders
+# ANCHOR_END: string_operations

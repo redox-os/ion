@@ -1,8 +1,0 @@
-let array = [1 2 3]
-let array[0] = 4
-echo @array
-let value = 1
-let array[$value] = 5
-echo @array
-let array[2]:int = 6
-echo @array

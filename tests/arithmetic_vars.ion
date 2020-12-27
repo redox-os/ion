@@ -1,0 +1,32 @@
+echo '# ANCHOR: individual_assignments'
+let value = 5
+echo $value
+let value += 5
+echo $value
+let value -= 2
+echo $value
+let value *= 2
+echo $value
+let value //= 2
+echo $value
+let value **= 2
+echo $value
+let value /= 2
+echo $value
+echo '# ANCHOR_END: individual_assignments'
+echo '# ANCHOR: multiple_assignments'
+let a b = 5 5
+echo $a $b
+let a b += 5 5
+echo $a $b
+let a b -= 2 2
+echo $a $b
+let a b *= 2 2
+echo $a $b
+let a b //= 2 2
+echo $a $b
+let a b **= 2 2
+echo $a $b
+let a b /= 2 2
+echo $a $b
+echo '# ANCHOR_END: multiple_assignments'

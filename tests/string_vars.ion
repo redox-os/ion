@@ -1,0 +1,35 @@
+echo '# ANCHOR: string_variables'
+mkdir -p _tmp _tmp/t1 _tmp/t2
+cd _tmp
+let filelist = $(ls ^> /dev/null)
+echo $filelist
+cd ..
+rm -fr _tmp
+echo '# ANCHOR_END: string_variables'
+echo '# ANCHOR: string_slicing'
+let foo = "Hello, World"
+echo $foo[..5]
+echo $foo[7..]
+echo $foo[2..9]
+echo '# ANCHOR_END: string_slicing'
+echo '# ANCHOR: string_concatenation'
+let string = world
+echo $string
+let string ++= !
+echo $string
+let string ::= "Hello, "
+echo $string
+echo '# ANCHOR_END: string_concatenation'
+echo '# ANCHOR: string_operations'
+let string1 = Doctor
+let string2 = order
+echo $string1
+echo $string2
+let string1 ++= "'s"
+let string2 ++= "s"
+echo $string1
+echo $string2
+let string1 ++= " "
+let string2 ::= $string1
+echo $string2
+echo '# ANCHOR_END: string_operations'

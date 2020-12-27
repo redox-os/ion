@@ -1,83 +1,70 @@
-# Standard Arrays
-
+echo '# ANCHOR: standardArrays'
 let array = []
 echo @array
-
 let array = [1]
 for i in @array
     echo $i
 end
-
 let array = [1  [2 3]  4 [5 6]]
 for i in @array
     echo $i
 end
-
 for i in [1  [2 3]  4 [5 6]]
     echo $i
 end
-
-# Array Command Substitution
-
+echo '# ANCHOR_END: standardArrays'
+echo '# ANCHOR: command_substitution'
 let array_process = [ @(echo a  b c d    e) ]
 for i in @array_process
     echo $i
 end
-
 for i in @(echo a  b c d    e)
     echo $i
 end
-
-# Array Concatenation
-
+echo '# ANCHOR_END: command_substitution'
+echo '# ANCHOR: concatenation'
 let new_array = [@array @array_process]
 for i in @new_array
     echo $i
 end
-
-# As Command Arguments
-
+echo '# ANCHOR_END: concatenation'
+echo '# ANCHOR: array_as_command_args'
 echo @array
 echo @array_process
 echo @new_array
-
-# Slice by ID
-
+echo '# ANCHOR_END: array_as_command_args'
+echo '# ANCHOR: slice_by_id'
 let array = [ 1 2 3 ]
 echo @array[0]
 echo @array[1]
 echo @array[2]
-
 echo [ 1 2 3 ][0]
 echo [ 1 2 3 ][1]
 echo [ 1 2 3 ][2]
-
 echo @(echo 1 2 3)[0]
 echo @(echo 1 2 3)[1]
 echo @(echo 1 2 3)[2]
-
-# Slice by Range
-
+echo '# ANCHOR_END: slice_by_id'
+echo '# ANCHOR: slice_by_range'
 let array = [ 1 2 3 4 5 ]
 echo @array[0..1]
 echo @array[0...1]
 echo @array[..3]
 echo @array[3..]
 echo @array[..]
-
-# Slice Syntax w/ variables
+echo '# ANCHOR_END: slice_by_range'
+echo '# ANCHOR: slice_with_vars'
 for index in 0..3
   echo $(echo 😉😉😉)[$index]
 end
-
-# Convert Array to String
-
+echo '# ANCHOR_END: slice_with_vars'
+echo '# ANCHOR: convert_to_string'
 let array = [ 1 2 3 4 5 ]
 let as_string = @array
 echo $as_string
-
 let array = [1 2 3 4 5 6 7 8 9 10]
 echo @array[0 1 7..]
 echo @array[2 3 5..]
 echo @array[5.. 3 2]
 echo @array[5..8 1..3 9 2]
+echo '# ANCHOR_END: convert_to_string'

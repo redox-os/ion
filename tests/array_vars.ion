@@ -1,0 +1,70 @@
+echo '# ANCHOR: array_assignments'
+let array = [1 2 3]
+let array[0] = 4
+echo @array
+let value = 1
+let array[$value] = 5
+echo @array
+let array[2]:int = 6
+echo @array
+echo '# ANCHOR_END: array_assignments'
+echo '# ANCHOR: array_ops'
+let array = [ 4 4 5 5 5 6 6 6 6 ]
+echo @array
+let array ++= [ 1 2 3 ]
+echo @array
+let array ::= [ 1 2 3 ]
+echo @array
+let array \\= [ 4 5 6 ]
+echo @array
+let array = [ 1 2 2 3 3 3 ]
+echo @array
+let array ++= 4
+echo @array
+let array ::= 0
+echo @array
+let array \\= 3
+echo @array
+echo '# ANCHOR_END: array_ops'
+echo '# ANCHOR: create_array'
+let array = [ one two 'three four' ]
+echo '# ANCHOR_END: create_array'
+echo '# ANCHOR: index_array'
+let array = [ 1 2 3 4 5 ]
+echo @array[0]
+echo @array[2..=4]
+echo '# ANCHOR_END: index_array'
+echo '# ANCHOR: array_copy'
+let array = [ 1 2 3 ]
+let array_copy = [ @array ]
+echo @array_copy
+echo '# ANCHOR_END: array_copy'
+echo '# ANCHOR: array_join'
+let array = [ hello world ]
+let other_array = [ this is the ion ]
+let array = [ @array @other_array shell ]
+let as_string = @array
+echo @array
+echo $as_string
+echo '# ANCHOR_END: array_join'
+echo '# ANCHOR: array_concat_var_strip'
+let array = [2 3]
+let array ++= [4 5] # append
+let array ::= [0 1] # append before beginning [0 1]
+let array \\= [2 3] # remove variables 2 and 3
+echo @array
+let array ++= 6 # same with single variables
+let array ::= -1
+let array \\= 0
+echo @array
+echo '# ANCHOR_END: array_concat_var_strip'
+echo '# ANCHOR: practical_array'
+mkdir -p _tmp _tmp/t1 _tmp/t2
+cd _tmp
+let args = [-a --file-type]
+ls @args      # use args as arguments for command ls
+let res = [ @(ls) ] # get result of ls as array res
+echo @res     # output the array res
+cd ..
+rm -fr _tmp
+echo '# ANCHOR_END: practical_array'
