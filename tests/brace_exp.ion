@@ -1,0 +1,24 @@
+echo '# ANCHOR: single_brace_expansion'
+echo filename.{ext1,ext2}
+echo '# ANCHOR_END: single_brace_expansion'
+echo '# ANCHOR: multi_brace_expansion'
+echo job_{01,02}.{ext1,ext2}
+echo '# ANCHOR_END: multi_brace_expansion'
+echo '# ANCHOR: nested_brace_expansion'
+echo job_{01_{out,err},02_{out,err}}.txt
+echo '# ANCHOR_END: nested_brace_expansion'
+echo '# ANCHOR: range_brace_expansion'
+echo {1..10}
+echo {10..1}
+echo {1...10}
+echo {10...1}
+echo {a..d}
+echo {d..a}
+echo {a...d}
+echo {d...a}
+echo '# ANCHOR_END: range_brace_expansion'
+echo '# ANCHOR: range_brace_expansion_as_array'
+for num in {1..10}
+    echo $num
+end
+echo '# ANCHOR_END: range_brace_expansion_as_array'

@@ -1,0 +1,5 @@
+# ANCHOR: process_expansion
+t1
+t2
+t1 t2
+# ANCHOR_END: process_expansion

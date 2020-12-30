@@ -1,0 +1,13 @@
+# ANCHOR: string_variables
+example string
+example string:example string
+# ANCHOR_END: string_variables
+# ANCHOR: array_variables
+one two three
+# ANCHOR_END: array_variables
+# ANCHOR: braced_variables
+hello123world
+hello 123  world
+# ANCHOR_END: braced_variables
+# ANCHOR: aliases
+# ANCHOR_END: aliases

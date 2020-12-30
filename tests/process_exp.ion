@@ -1,0 +1,10 @@
+echo '# ANCHOR: process_expansion'
+mkdir -p _tmp _tmp/t1 _tmp/t2
+cd _tmp
+let res = $(ls)
+let res2 = [ @(ls) ]
+echo $res    # output the string
+echo @res2     # output the array
+cd ..
+rm -fr _tmp
+echo '# ANCHOR_END: process_expansion'

@@ -1,0 +1,30 @@
+# ANCHOR: single_brace_expansion
+filename.ext1 filename.ext2
+# ANCHOR_END: single_brace_expansion
+# ANCHOR: multi_brace_expansion
+job_01.ext1 job_01.ext2 job_02.ext1 job_02.ext2
+# ANCHOR_END: multi_brace_expansion
+# ANCHOR: nested_brace_expansion
+job_01_out.txt job_01_err.txt job_02_out.txt job_02_err.txt
+# ANCHOR_END: nested_brace_expansion
+# ANCHOR: range_brace_expansion
+1 2 3 4 5 6 7 8 9
+10 9 8 7 6 5 4 3 2
+1 2 3 4 5 6 7 8 9 10
+10 9 8 7 6 5 4 3 2 1
+a b c
+d c b
+a b c d
+d c b a
+# ANCHOR_END: range_brace_expansion
+# ANCHOR: range_brace_expansion_as_array
+1
+2
+3
+4
+5
+6
+7
+8
+9
+# ANCHOR_END: range_brace_expansion_as_array

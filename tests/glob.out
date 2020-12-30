@@ -1,5 +1,5 @@
 Cargo.toml
-tests/braces.ion tests/braces.out tests/break.ion tests/break.out
+tests/brace_exp.ion tests/brace_exp.out tests/braces.ion tests/braces.out tests/break.ion tests/break.out
 Cargo.toml
 Cargo.toml
 Cargo.lock Cargo.toml

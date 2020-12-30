@@ -1,0 +1,20 @@
+echo '# ANCHOR: string_variables'
+let string = "example string"
+echo $string
+echo $string:$string
+echo '# ANCHOR_END: string_variables'
+echo '# ANCHOR: array_variables'
+let array = [one two three]
+echo @array
+echo '# ANCHOR_END: array_variables'
+echo '# ANCHOR: braced_variables'
+let hello = "hello123"
+echo ${hello}world
+let hello = [hello 123 ' ']
+echo @{hello}world
+echo '# ANCHOR_END: braced_variables'
+echo '# ANCHOR: aliases'
+alias ls = "ls --color"
+#echo $ls #ion: expansion error: Variable does not exist
+#aliase are stored separately
+echo '# ANCHOR_END: aliases'
