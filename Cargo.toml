@@ -98,6 +98,10 @@ errno-dragonfly = "0.1.1"
 [lib]
 path = "src/lib/lib.rs"
 
+[profile.dev]
+opt-level = 0
+debug = true
+
 [profile.release]
 lto = true
 panic = "abort"
