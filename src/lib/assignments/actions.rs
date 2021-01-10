@@ -3,29 +3,21 @@ use crate::parser::lexers::{
     assignments::{Key, KeyIterator, Operator, Primitive, TypeError},
     ArgumentSplitter,
 };
-use err_derive::Error;
+use thiserror::Error;
 
 #[derive(Debug, PartialEq, Error)]
 pub enum AssignmentError<'a> {
-    #[error(display = "expected {}, but received {}", _0, _1)]
+    #[error("expected {0}, but received {1}")]
     InvalidValue(Primitive, Primitive),
-    #[error(display = "{}", _0)]
-    TypeError(#[error(source)] TypeError),
-    #[error(
-        display = "extra values were supplied, and thus ignored. Previous assignment: '{}' = '{}'",
-        _0,
-        _1
-    )]
+    #[error("{0}")]
+    TypeError(#[source] TypeError),
+    #[error("extra values were supplied, and thus ignored. Previous assignment: '{0}' = '{1}'")]
     ExtraValues(&'a str, &'a str),
-    #[error(
-        display = "extra keys were supplied, and thus ignored. Previous assignment: '{}' = '{}'",
-        _0,
-        _1
-    )]
+    #[error("extra keys were supplied, and thus ignored. Previous assignment: '{0}' = '{1}'")]
     ExtraKeys(&'a str, &'a str),
-    #[error(display = "repeated assignment to same key, and thus ignored. Repeated key: '{}'", _0)]
+    #[error("repeated assignment to same key, and thus ignored. Repeated key: '{0}'")]
     RepeatedKey(&'a str),
-    #[error(display = "no key to assign value, thus ignored. Value: '{}'", _0)]
+    #[error("no key to assign value, thus ignored. Value: '{0}'")]
     NoKey(&'a str),
 }
 

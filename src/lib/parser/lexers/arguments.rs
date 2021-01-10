@@ -1,4 +1,4 @@
-use err_derive::Error;
+use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Comm {
@@ -33,22 +33,22 @@ pub struct Levels {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
 pub enum LevelsError {
     /// Unmatched opening parenthese
-    #[error(display = "unmatched opening parenthese")]
+    #[error("unmatched opening parenthese")]
     UnmatchedParen,
     /// Unmatched opening bracket
-    #[error(display = "unmatched opening bracket")]
+    #[error("unmatched opening bracket")]
     UnmatchedBracket,
     /// Unmatched opening brace
-    #[error(display = "unmatched opening brace")]
+    #[error("unmatched opening brace")]
     UnmatchedBrace,
     /// Extra closing parenthese(s)
-    #[error(display = "extra closing parenthese(s)")]
+    #[error("extra closing parenthese(s)")]
     ExtraParen,
     /// Extra closing bracket(s)
-    #[error(display = "extra closing bracket(s)")]
+    #[error("extra closing bracket(s)")]
     ExtraBracket,
     /// Extra closing brace(s)
-    #[error(display = "extra closing brace(s)")]
+    #[error("extra closing brace(s)")]
     ExtraBrace,
 }
 

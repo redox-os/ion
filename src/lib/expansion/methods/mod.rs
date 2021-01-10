@@ -6,7 +6,7 @@ pub use self::{arrays::ArrayMethod, strings::StringMethod};
 
 use super::Expander;
 use crate::{parser::lexers::ArgumentSplitter, types};
-use err_derive::Error;
+use thiserror::Error;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Pattern<'a> {
@@ -26,18 +26,18 @@ pub struct MethodArgs<'a, 'b, E: Expander> {
 #[derive(Debug, Clone, Error)]
 pub enum MethodError {
     /// Unknown array method
-    #[error(display = "'{}' is an unknown array method", _0)]
+    #[error("'{0}' is an unknown array method")]
     InvalidArrayMethod(String),
     /// Unknown scalar method
-    #[error(display = "'{}' is an unknown string method", _0)]
+    #[error("'{0}' is an unknown string method")]
     InvalidScalarMethod(String),
     /// A wrong argumeng was given to the method (extra, missing, or wrong type)
-    #[error(display = "{}: {}", _0, _1)]
+    #[error("{0}: {1}")]
     WrongArgument(&'static str, &'static str),
 
     /// An invalid regex was provided. This is specific to the `matches` method
-    #[error(display = "regex_replace: error in regular expression '{}': {}", _0, _1)]
-    InvalidRegex(String, #[error(source)] regex::Error),
+    #[error("regex_replace: error in regular expression '{0}': {1}")]
+    InvalidRegex(String, #[source] regex::Error),
 }
 
 impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {

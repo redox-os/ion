@@ -1,5 +1,5 @@
 use super::Primitive;
-use err_derive::Error;
+use thiserror::Error;
 
 /// Keys are used in assignments to define which variable will be set, and whether the correct
 /// types are being assigned.
@@ -25,10 +25,10 @@ pub struct KeyBuf {
 #[derive(Debug, PartialEq, Error, Eq, Hash, Clone)]
 pub enum TypeError {
     /// The value supplied is invalid
-    #[error(display = "invalid type supplied: {}", _0)]
+    #[error("invalid type supplied: {0}")]
     Invalid(String),
     /// The primitive type does not correspond to that of the function argument
-    #[error(display = "expected {}", _0)]
+    #[error("expected {0}")]
     BadValue(Primitive),
 }
 

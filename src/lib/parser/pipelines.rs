@@ -1,5 +1,5 @@
-use err_derive::Error;
 use std::iter::Peekable;
+use thiserror::Error;
 
 use crate::{
     builtins::BuiltinMap,
@@ -13,34 +13,33 @@ const ARG_DEFAULT_SIZE: usize = 10;
 
 /// An error produced during pipeline parsing
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Error)]
-#[error(no_from)]
 pub enum PipelineParsingError {
     // redirections
     /// No file was provided after the redirection output
-    #[error(display = "expected file argument after redirection for output")]
+    #[error("expected file argument after redirection for output")]
     NoRedirection,
     /// Heredocs are deprecated and were used
-    #[error(display = "heredocs are not a part of Ion. Use redirection and/or cat instead")]
+    #[error("heredocs are not a part of Ion. Use redirection and/or cat instead")]
     HeredocsDeprecated,
     /// No string was given to the herestring
-    #[error(display = "expected string argument after '<<<'")]
+    #[error("expected string argument after '<<<'")]
     NoHereStringArg,
     /// No file was provided after the input redirection
-    #[error(display = "expected file argument after redirection for input")]
+    #[error("expected file argument after redirection for input")]
     NoRedirectionArg,
 
     // quotes
     /// Unterminated double quotes
-    #[error(display = "unterminated double quote")]
+    #[error("unterminated double quote")]
     UnterminatedDoubleQuote,
     /// Unterminated single quotes
-    #[error(display = "unterminated single quote")]
+    #[error("unterminated single quote")]
     UnterminatedSingleQuote,
 
     // paired
     /// Error with paired tokens (parens, brackets & braces)
-    #[error(display = "{}", _0)]
-    Paired(#[error(source)] LevelsError),
+    #[error("{0}")]
+    Paired(#[source] LevelsError),
 }
 
 impl From<LevelsError> for PipelineParsingError {

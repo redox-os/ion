@@ -23,7 +23,6 @@ use crate::{
     expansion::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
     types,
 };
-use err_derive::Error;
 use nix::{
     sys::signal::{self, Signal},
     unistd::{self, ForkResult, Pid},
@@ -35,88 +34,88 @@ use std::{
     os::unix::process::CommandExt,
     process::{exit, Command, Stdio},
 };
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum RedirectError {
     /// Input
-    #[error(display = "failed to redirect '{}' to stdin: {}", _0, _1)]
-    File(String, #[error(source)] io::Error),
-    #[error(display = "failed to write herestring '{}': {}", _0, _1)]
-    WriteError(String, #[error(source)] io::Error),
+    #[error("failed to redirect '{0}' to stdin: {1}")]
+    File(String, #[source] io::Error),
+    #[error("failed to write herestring '{0}': {1}")]
+    WriteError(String, #[source] io::Error),
 
     /// Output
-    #[error(display = "failed to redirect {} to file '{}': {}", redirect, file, why)]
+    #[error("failed to redirect {redirect} to file '{file}': {why}")]
     Output {
         redirect: RedirectFrom,
         file:     String,
-        #[error(source)]
+        #[source]
         why:      io::Error,
     },
 }
 
 /// This is created when Ion fails to create a pipeline
 #[derive(Debug, Error)]
-#[error(no_from)]
 pub enum PipelineError {
     /// The fork failed
-    #[error(display = "failed to fork: {}", _0)]
-    Fork(#[error(source)] nix::Error),
+    #[error("failed to fork: {0}")]
+    Fork(#[source] nix::Error),
     /// Failed to setup capturing for function
-    #[error(display = "error reading stdout of child: {}", _0)]
-    CaptureFailed(#[error(source)] io::Error),
+    #[error("error reading stdout of child: {0}")]
+    CaptureFailed(#[source] io::Error),
 
     /// Failed to duplicate a file descriptor
-    #[error(display = "could not duplicate the pipe: {}", _0)]
-    CloneFdFailed(#[error(source)] nix::Error),
+    #[error("could not duplicate the pipe: {0}")]
+    CloneFdFailed(#[source] nix::Error),
 
     /// Could not clone the file
-    #[error(display = "could not clone the pipe: {}", _0)]
-    ClonePipeFailed(#[error(source)] io::Error),
+    #[error("could not clone the pipe: {0}")]
+    ClonePipeFailed(#[source] io::Error),
     /// Could not set the pipe as a redirection
-    #[error(display = "{}", _0)]
-    RedirectPipeError(#[error(source)] RedirectError),
+    #[error("{0}")]
+    RedirectPipeError(#[source] RedirectError),
     /// Failed to create a pipe
-    #[error(display = "could not create pipe: {}", _0)]
-    CreatePipeError(#[error(source)] nix::Error),
+    #[error("could not create pipe: {0}")]
+    CreatePipeError(#[source] nix::Error),
     /// Failed to create a fork
-    #[error(display = "could not fork: {}", _0)]
-    CreateForkError(#[error(source)] nix::Error),
+    #[error("could not fork: {0}")]
+    CreateForkError(#[source] nix::Error),
     /// Failed to terminate the jobs after a termination
-    #[error(display = "failed to terminate foreground jobs: {}", _0)]
-    TerminateJobsError(#[error(source)] nix::Error),
+    #[error("failed to terminate foreground jobs: {0}")]
+    TerminateJobsError(#[source] nix::Error),
     /// Could not execute the command
-    #[error(display = "command exec error: {}", _0)]
-    CommandExecError(#[error(source)] io::Error, types::Args),
+    #[error("command exec error: {0}")]
+    CommandExecError(#[source] io::Error, types::Args),
     /// Could not expand the alias
-    #[error(display = "unable to pipe outputs of alias: '{} = {}'", _0, _1)]
+    #[error("unable to pipe outputs of alias: '{0} = {1}'")]
     InvalidAlias(String, String),
 
     /// A signal interrupted a child process
-    #[error(display = "process ({}) ended by signal {}", _0, _1)]
+    #[error("process ({0}) ended by signal {1}")]
     Interrupted(Pid, Signal),
     /// A subprocess had a core dump
-    #[error(display = "process ({}) had a core dump", _0)]
+    #[error("process ({0}) had a core dump")]
     CoreDump(Pid),
     /// WaitPID errored
-    #[error(display = "waitpid error: {}", _0)]
+    #[error("waitpid error: {0}")]
     WaitPid(nix::Error),
 
     /// This will stop execution when the exit_on_error option is set
-    #[error(display = "early exit: pipeline failed")]
+    #[error("early exit: pipeline failed")]
     EarlyExit,
 
     /// A command could not be found in the pipeline
-    #[error(display = "command not found: {}", _0)]
+    #[error("command not found: {0}")]
     CommandNotFound(types::Str),
 
     /// Failed to grab the tty
-    #[error(display = "could not grab the terminal: {}", _0)]
-    TerminalGrabFailed(#[error(source)] nix::Error),
+    #[error("could not grab the terminal: {0}")]
+    TerminalGrabFailed(#[source] nix::Error),
 
     /// Failed to send signal to a process group. This typically happens when trying to start the
     /// pipeline after it's creation
-    #[error(display = "could not kill the processes: {}", _0)]
-    KillFailed(#[error(source)] nix::Error),
+    #[error("could not kill the processes: {0}")]
+    KillFailed(#[source] nix::Error),
 }
 
 impl From<RedirectError> for PipelineError {

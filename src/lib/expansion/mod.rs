@@ -18,7 +18,6 @@ use crate::{
     types::{self, Args},
 };
 use auto_enums::auto_enum;
-use err_derive::Error;
 use glob::glob;
 use itertools::Itertools;
 use std::{
@@ -26,69 +25,69 @@ use std::{
     fmt::{self, Write},
     str,
 };
+use thiserror::Error;
 use unicode_segmentation::UnicodeSegmentation;
 
 /// Expansion errored
 #[derive(Debug, Error)]
-#[error(no_from)]
 pub enum Error<T: fmt::Debug + error::Error + fmt::Display + 'static> {
     /// Error during method expansion
-    #[error(display = "{}", _0)]
-    MethodError(#[error(source)] MethodError),
+    #[error("{0}")]
+    MethodError(#[source] MethodError),
     /// Wrong type was given
-    #[error(display = "{}", _0)]
-    TypeError(#[error(source)] TypeError),
+    #[error("{0}")]
+    TypeError(#[source] TypeError),
     /// Indexed out of the array bounds
-    #[error(display = "invalid index")] // TODO: Add more info
+    #[error("invalid index")] // TODO: Add more info
     OutOfBound,
     /// A string key was taken as index for an array
-    #[error(display = "can't use key '{}' on array", _0)] // TODO: Add more info
+    #[error("can't use key '{0}' on array")] // TODO: Add more info
     KeyOnArray(String),
 
     /// Unsupported variable namespace
-    #[error(display = "namespace '{}' is unsupported", _0)]
+    #[error("namespace '{0}' is unsupported")]
     UnsupportedNamespace(String),
     /// Failed to parse a value as an hexadecimal value
-    #[error(display = "could not parse '{}' as hexadecimal value: {}", _0, _1)]
-    InvalidHex(String, #[error(source)] std::num::ParseIntError),
+    #[error("could not parse '{0}' as hexadecimal value: {1}")]
+    InvalidHex(String, #[source] std::num::ParseIntError),
     /// Could not parse as a valid color
-    #[error(display = "could not parse '{}' as a color", _0)]
+    #[error("could not parse '{0}' as a color")]
     ColorError(String),
     /// No properties given for color
-    #[error(display = "no properties given to color")]
+    #[error("no properties given to color")]
     EmptyColor,
     /// The environment variable is not set
-    #[error(display = "environment variable '{}' is not set", _0)]
+    #[error("environment variable '{0}' is not set")]
     UnknownEnv(String),
     /// Variable is not defined
-    #[error(display = "Variable does not exist")]
+    #[error("Variable does not exist")]
     VarNotFound,
 
     /// Failed to fetch the user home directory
-    #[error(display = "Could not fetch the user home directory")]
+    #[error("Could not fetch the user home directory")]
     HomeNotFound,
     /// Tilde expansion tried to access an index out of the directory stack size
-    #[error(display = "Can't expand tilde: {} is out of bound for directory stack", _0)]
+    #[error("Can't expand tilde: {0} is out of bound for directory stack")]
     OutOfStack(usize),
 
     /// Subprocess error
-    #[error(display = "Could not expand subprocess: {}", _0)]
-    Subprocess(#[error(source)] Box<T>),
+    #[error("Could not expand subprocess: {0}")]
+    Subprocess(#[source] Box<T>),
 
     /// Could not parse the index for array or map-like variable
-    #[error(display = "Can't parse '{}' as a valid index for variable", _0)]
+    #[error("Can't parse '{0}' as a valid index for variable")]
     IndexParsingError(String),
 
     /// Tried to mix types between scalar and array-like variables
-    #[error(display = "can't expand a scalar value '{}' as an array-like", _0)]
+    #[error("can't expand a scalar value '{0}' as an array-like")]
     ScalarAsArray(String),
 
     /// A wrong index was given for indexing variable
-    #[error(display = "index '{:?}' is not valid for {} variable '{}'", _0, _1, _2)]
+    #[error("index '{0:?}' is not valid for {1} variable '{2}'")]
     InvalidIndex(Select<types::Str>, &'static str, String),
 
     /// Mixed types between maps and scalar/array value
-    #[error(display = "variable '{}' is not a map-like value", _0)]
+    #[error("variable '{0}' is not a map-like value")]
     NotAMap(String),
 }
 

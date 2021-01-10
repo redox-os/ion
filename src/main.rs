@@ -14,8 +14,8 @@ use std::{
 };
 
 use crate::binary::MAN_ION;
-use err_derive::Error;
 use std::env;
+use thiserror::Error;
 
 mod binary;
 
@@ -48,9 +48,9 @@ struct CommandLineArgs {
 
 #[derive(Debug, Error)]
 pub enum ParsingError {
-    #[error(display = "flag or option set twice, see --help")]
+    #[error("flag or option set twice, see --help")]
     ArgTwiceSet,
-    #[error(display = "invalid keybinding, see --help")]
+    #[error("invalid keybinding, see --help")]
     InvalidKeybinding,
 }
 

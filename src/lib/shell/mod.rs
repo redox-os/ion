@@ -40,7 +40,6 @@ use crate::{
         Error as ParseError, Terminator,
     },
 };
-use err_derive::Error;
 use itertools::Itertools;
 use nix::{
     sys::signal::{self, SigHandler},
@@ -55,29 +54,29 @@ use std::{
     sync::{atomic::Ordering, Arc, Mutex},
     time::SystemTime,
 };
+use thiserror::Error;
 
 /// Errors from execution
 #[derive(Debug, Error)]
-#[error(no_from)]
 pub enum IonError {
     // Parse-time error
     /// Parsing failed
-    #[error(display = "syntax error: {}", _0)]
-    InvalidSyntax(#[error(source)] ParseError),
+    #[error("syntax error: {0}")]
+    InvalidSyntax(#[source] ParseError),
     /// Incorrect order of blocks
-    #[error(display = "block error: {}", _0)]
-    StatementFlowError(#[error(source)] BlockError),
+    #[error("block error: {0}")]
+    StatementFlowError(#[source] BlockError),
 
     // Run time errors
     /// Function execution error
-    #[error(display = "function error: {}", _0)]
-    Function(#[error(source)] FunctionError),
+    #[error("function error: {0}")]
+    Function(#[source] FunctionError),
     /// Failed to run a pipeline
-    #[error(display = "pipeline execution error: {}", _0)]
-    PipelineExecutionError(#[error(source)] PipelineError),
+    #[error("pipeline execution error: {0}")]
+    PipelineExecutionError(#[source] PipelineError),
     /// Could not properly expand to a pipeline
-    #[error(display = "expansion error: {}", _0)]
-    ExpansionError(#[error(source)] ExpansionError<IonError>),
+    #[error("expansion error: {0}")]
+    ExpansionError(#[source] ExpansionError<IonError>),
 }
 
 impl From<ParseError> for IonError {

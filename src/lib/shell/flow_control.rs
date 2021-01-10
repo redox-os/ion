@@ -5,9 +5,9 @@ use crate::{
     shell::{IonError, Job, Shell},
     types,
 };
-use err_derive::Error;
 use smallvec::SmallVec;
 use std::fmt;
+use thiserror::Error;
 
 /// Represents a single branch in a match statement. For example, in the expression
 /// ```ignore
@@ -238,10 +238,10 @@ pub struct Function {
 #[derive(Debug, PartialEq, Clone, Error)]
 pub enum FunctionError {
     /// The wrong number of arguments were supplied
-    #[error(display = "invalid number of arguments supplied")]
+    #[error("invalid number of arguments supplied")]
     InvalidArgumentCount,
     /// The argument had an invalid type
-    #[error(display = "argument has invalid type: expected {}, found value '{}'", _0, _1)]
+    #[error("argument has invalid type: expected {0}, found value '{1}'")]
     InvalidArgumentType(Primitive, String),
 }
 

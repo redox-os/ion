@@ -1,16 +1,16 @@
 use crate::{parser::lexers::ArgumentSplitter, shell::flow_control::Case};
-use err_derive::Error;
 use std::str::FromStr;
+use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Error)]
 pub enum Error {
-    #[error(display = "no bind variable was supplied")]
+    #[error("no bind variable was supplied")]
     NoBindVariable,
-    #[error(display = "no conditional statement was given")]
+    #[error("no conditional statement was given")]
     NoConditional,
-    #[error(display = "extra value, '{}', was given to bind", _0)]
+    #[error("extra value, '{0}', was given to bind")]
     ExtraBind(String),
-    #[error(display = "extra variable, '{}', was given to case", _0)]
+    #[error("extra variable, '{0}', was given to case")]
     ExtraVar(String),
 }
 

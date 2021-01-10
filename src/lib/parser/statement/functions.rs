@@ -1,12 +1,12 @@
 use crate::parser::lexers::assignments::{KeyBuf, KeyIterator, TypeError};
-use err_derive::Error;
+use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Error)]
 pub enum FunctionParseError {
-    #[error(display = "repeated argument name: '{}'", _0)]
+    #[error("repeated argument name: '{0}'")]
     RepeatedArgument(String),
-    #[error(display = "{}", _0)]
-    TypeError(#[error(source)] TypeError),
+    #[error("{0}")]
+    TypeError(#[source] TypeError),
 }
 
 /// The arguments expression given to a function declaration goes into here, which will be

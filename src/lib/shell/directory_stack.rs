@@ -1,4 +1,3 @@
-use err_derive::Error;
 #[cfg(target_os = "redox")]
 use redox_users::All;
 use std::{
@@ -7,22 +6,23 @@ use std::{
     io,
     path::{Component, Path, PathBuf},
 };
+use thiserror::Error;
 #[cfg(not(target_os = "redox"))]
 use users::os::unix::UserExt;
 
 #[derive(Debug, Error)]
 pub enum DirStackError {
-    #[error(display = "index '{}' out of range", index)]
+    #[error("index '{index}' out of range")]
     OutOfRange { index: usize },
-    #[error(display = "failed to get home directory")]
+    #[error("failed to get home directory")]
     FailedFetchHome,
-    #[error(display = "failed to convert home directory to str")]
+    #[error("failed to convert home directory to str")]
     PathConversionFailed,
-    #[error(display = "failed to set current dir to {}: {}", dir, cause)]
+    #[error("failed to set current dir to {dir}: {cause}")]
     DirChangeFailure { dir: String, cause: io::Error },
-    #[error(display = "no previous directory to switch to")]
+    #[error("no previous directory to switch to")]
     NoPreviousDir,
-    #[error(display = "no directory to switch with")]
+    #[error("no directory to switch with")]
     NoOtherDir,
 }
 

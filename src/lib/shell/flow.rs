@@ -14,10 +14,10 @@ use crate::{
     shell::{IonError, Job, Value},
     types,
 };
-use err_derive::Error;
 use itertools::Itertools;
 use nix::unistd::Pid;
 use std::{rc::Rc, time::SystemTime};
+use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Condition {
@@ -33,37 +33,37 @@ type Result = std::result::Result<Condition, IonError>;
 #[derive(Debug, Error, PartialEq, Eq, Hash)]
 pub enum BlockError {
     /// A case block was found outside a match block
-    #[error(display = "Case found outside of Match block")]
+    #[error("Case found outside of Match block")]
     LoneCase,
     /// A statement was found outside a case block in a match
-    #[error(display = "statement found outside of Case block in Match")]
+    #[error("statement found outside of Case block in Match")]
     StatementOutsideMatch,
 
     /// End found, but there is no block to close
-    #[error(display = "End found but no block to close")]
+    #[error("End found but no block to close")]
     UnmatchedEnd,
     /// An elseif was found without a corresponding if block
-    #[error(display = "found ElseIf without If block")]
+    #[error("found ElseIf without If block")]
     LoneElseIf,
     /// A else block was found without its corresponding if block
-    #[error(display = "found Else without If block")]
+    #[error("found Else without If block")]
     LoneElse,
     /// Multiple else were found for the same if
-    #[error(display = "Else block already exists")]
+    #[error("Else block already exists")]
     MultipleElse,
     /// Elseif block found after else
-    #[error(display = "ElseIf found after Else")]
+    #[error("ElseIf found after Else")]
     ElseWrongOrder,
 
     /// Found a break outside a loop
-    #[error(display = "found Break without loop body")]
+    #[error("found Break without loop body")]
     UnmatchedBreak,
     /// Found a continue outside a loop
-    #[error(display = "found Continue without loop body")]
+    #[error("found Continue without loop body")]
     UnmatchedContinue,
 
     /// Unclosed block
-    #[error(display = "expected end block for `{}`", _0)]
+    #[error("expected end block for `{0}`")]
     UnclosedBlock(String),
 }
 
