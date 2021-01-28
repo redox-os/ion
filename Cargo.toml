@@ -77,7 +77,7 @@ auto_enums = "0.7"
 atty = "0.2"
 permutate = "0.3"
 xdg = "2.2"
-nix = { git = "https://github.com/AdminXVII/nix", branch = "add-redox-support-bis" }
+nix = "0.20"
 mktemp = "0.4"
 
 

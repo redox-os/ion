@@ -574,7 +574,7 @@ fn fork_exec_internal<F>(
 where
     F: FnMut(Option<File>, Option<File>, Option<File>) -> Status,
 {
-    match unistd::fork().map_err(PipelineError::CreateForkError)? {
+    match unsafe { unistd::fork().map_err(PipelineError::CreateForkError)? } {
         ForkResult::Child => {
             unsafe {
                 signal::signal(signal::Signal::SIGINT, signal::SigHandler::SigIgn).unwrap();

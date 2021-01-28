@@ -296,7 +296,7 @@ impl<'a> Shell<'a> {
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.
     pub fn wait_for_background(&mut self) -> Result<(), PipelineError> {
-        while { self.background_jobs().iter().any(BackgroundProcess::is_running) } {
+        while self.background_jobs().iter().any(BackgroundProcess::is_running) {
             if let Some(signal) = signals::SignalHandler.find(|&s| s != Signal::SIGTSTP) {
                 self.background_send(signal).map_err(PipelineError::KillFailed)?;
                 return Err(PipelineError::Interrupted(Pid::this(), signal));

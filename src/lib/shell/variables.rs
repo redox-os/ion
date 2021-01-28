@@ -109,7 +109,7 @@ impl Variables {
     pub fn set<T: Into<Value<Rc<Function>>>>(&mut self, name: &str, value: T) {
         let value = value.into();
         if let Some(val) = self.0.get_mut(name) {
-            std::mem::replace(val, value);
+            let _ = std::mem::replace(val, value);
         } else {
             self.0.set(name, value);
         }

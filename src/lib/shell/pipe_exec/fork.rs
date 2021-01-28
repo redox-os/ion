@@ -21,7 +21,7 @@ impl<'a> Shell<'a> {
         pipeline: Pipeline<RefinedJob<'a>>,
         state: ProcessState,
     ) -> Status {
-        match unistd::fork() {
+        match unsafe { unistd::fork() } {
             Ok(ForkResult::Child) => {
                 self.opts_mut().grab_tty = false;
                 unsafe {

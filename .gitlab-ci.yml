@@ -9,6 +9,7 @@ before_script:
 format:
   image: 'rustlang/rust:nightly'
   cache:
+    key: format
     paths:
       - cargo/
       - target/
@@ -20,6 +21,7 @@ format:
 linux:
   image: 'rust:1.43.0'
   cache:
+    key: linux
     paths:
       - cargo/
       - target/
@@ -29,6 +31,7 @@ linux:
 
 linux:stable:
   cache:
+    key: linuxstable
     paths:
       - cargo/
       - target/
@@ -37,19 +40,21 @@ linux:stable:
     - TOOLCHAIN= make tests
 
 redox:
+  cache:
+    key: redox
+    paths:
+      - cargo/
+      - target/
   before_script:
     - apt-get update -qq
     - apt-get install -qq build-essential curl git
-    - git clone --single-branch --branch=add-redox-support --depth=1 https://github.com/AdminXVII/nix
-    - mkdir .cargo
-    - echo 'paths = [ "nix" ]' >> .cargo/config
-    - cargo clean
   script:
     - redoxer test
 
 link-check:
   image: hrektts/mdbook
   cache:
+    key: linkcheck
     paths:
       - cargo/
       - cargo/bin
