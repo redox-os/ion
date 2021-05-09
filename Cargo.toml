@@ -72,7 +72,7 @@ types-rs = { version = "0.1", path = "members/types-rs" }
 builtins-proc = { version = "0.1", path = "members/builtins-proc" }
 itertools = "0.9"
 lexical = "5.2"
-object-pool = "0.5"
+object-pool = { git = "https://github.com/CJP10/object-pool.git", rev = "b7461b6ad6dcc93e69c3eee378895ea8593d880e" }
 auto_enums = "0.7"
 atty = "0.2"
 permutate = "0.3"
@@ -83,14 +83,14 @@ mktemp = "0.4"
 
 # window example
 piston-ai_behavior = { version = "0.31", optional = true }
-piston_window = { version = "0.105", optional = true }
+piston_window = { version = "0.120", optional = true }
 piston2d-sprite = { version = "0.58", optional = true }
 
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
 users = "0.10"
 
 [target."cfg(target_os = \"redox\")".dependencies]
-redox_users = "0.3"
+redox_users = "0.4"
 
 [target."cfg(target_os = \"dragonfly\")".dependencies]
 errno-dragonfly = "0.1.1"

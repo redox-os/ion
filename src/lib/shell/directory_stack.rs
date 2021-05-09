@@ -155,7 +155,7 @@ impl DirectoryStack {
                 }),
             #[cfg(target_os = "redox")]
             None => {
-                if let Ok(users) = redox_users::AllUsers::new(redox_users::Config::default()) {
+                if let Ok(users) = redox_users::AllUsers::basic(redox_users::Config::default()) {
                     redox_users::get_uid()
                         .ok()
                         .and_then(|id| users.get_by_id(id))

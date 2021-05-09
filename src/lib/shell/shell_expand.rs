@@ -252,7 +252,7 @@ impl<'a, 'b> Expander for Shell<'b> {
                     #[cfg(target_os = "redox")]
                     {
                         if let Ok(users) =
-                            redox_users::AllUsers::new(redox_users::Config::default())
+                            redox_users::AllUsers::basic(redox_users::Config::default())
                         {
                             let user = if tilde_prefix.is_empty() {
                                 redox_users::get_uid().ok().and_then(|id| users.get_by_id(id))
