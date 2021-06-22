@@ -12,6 +12,6 @@ reorder_impl_items = true
 struct_field_align_threshold = 30
 use_field_init_shorthand = true
 wrap_comments = true
-merge_imports = true
+imports_granularity = "Crate"
 force_multiline_blocks = false
 use_small_heuristics = "Max"
