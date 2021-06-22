@@ -1,10 +1,10 @@
 echo '# ANCHOR: string_variables'
+# The CI can not handle deletions properly.
 mkdir -p _tmp _tmp/t1 _tmp/t2
 cd _tmp
-let filelist = $(ls ^> /dev/null)
+let filelist = *
 echo $filelist
 cd ..
-rm -fr _tmp
 echo '# ANCHOR_END: string_variables'
 echo '# ANCHOR: string_slicing'
 let foo = "Hello, World"

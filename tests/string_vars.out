@@ -1,6 +1,5 @@
 # ANCHOR: string_variables
-t1
-t2
+t1 t2
 # ANCHOR_END: string_variables
 # ANCHOR: string_slicing
 Hello
