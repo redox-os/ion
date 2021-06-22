@@ -70,7 +70,15 @@ link-check:
 pages:
   image: hrektts/mdbook
   stage: deploy
+  cache:
+    key: linkcheck
+    paths:
+      - cargo/
+      - cargo/bin
+  before_script:
+    - test -x $CARGO_HOME/bin/mdbook-linkcheck || cargo install mdbook-linkcheck
   script:
+  - PATH=$PATH:$CARGO_HOME/bin
   - make manual
   - mdbook build manual
   - mv manual/book/html public
