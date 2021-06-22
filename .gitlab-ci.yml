@@ -71,11 +71,13 @@ pages:
   image: hrektts/mdbook
   stage: deploy
   cache:
-    key: linkcheck
+    key: book
     paths:
       - cargo/
       - cargo/bin
   before_script:
+    - apt-get update -qq
+    - apt-get install -qq libssl-dev pkg-config build-essential curl git
     - test -x $CARGO_HOME/bin/mdbook-linkcheck || cargo install mdbook-linkcheck
   script:
   - PATH=$PATH:$CARGO_HOME/bin
