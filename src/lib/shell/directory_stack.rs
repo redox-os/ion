@@ -97,8 +97,7 @@ impl DirectoryStack {
 
     // sets current_dir to the element referred by index
     pub fn set_current_dir_by_index(&self, index: usize) -> Result<(), DirStackError> {
-        let dir = self.dirs.get(index).ok_or_else(|| DirStackError::OutOfRange { index })?;
-
+        let dir = self.dirs.get(index).ok_or(DirStackError::OutOfRange { index })?;
         set_current_dir_ion(dir)
     }
 

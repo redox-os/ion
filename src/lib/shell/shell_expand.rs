@@ -8,7 +8,7 @@ use crate::{
 use nix::unistd::{tcsetpgrp, Pid};
 #[cfg(target_os = "redox")]
 use redox_users::All;
-use std::{env, fs::File, io::Read, iter::FromIterator};
+use std::{env, fs::File, io::Read};
 #[cfg(not(target_os = "redox"))]
 use users::os::unix::UserExt;
 
@@ -71,9 +71,7 @@ impl<'a, 'b> Expander for Shell<'b> {
     ) -> Result<types::Args, Self::Error> {
         match self.variables.get(name) {
             Some(Value::Array(array)) => match selection {
-                Select::All => {
-                    Ok(types::Args::from_iter(array.iter().map(|x| format!("{}", x).into())))
-                }
+                Select::All => Ok(array.iter().map(|x| format!("{}", x).into()).collect()),
                 Select::Index(ref id) => id
                     .resolve(array.len())
                     .and_then(|n| array.get(n))
@@ -220,10 +218,10 @@ impl<'a, 'b> Expander for Shell<'b> {
             "+" => Ok(env::var("PWD").unwrap_or_else(|_| "?".into()).into()),
             "-" => Ok(self.variables.get_str("OLDPWD")?),
             _ => {
-                let (neg, tilde_num) = if tilde_prefix.starts_with('+') {
-                    (false, &tilde_prefix[1..])
-                } else if tilde_prefix.starts_with('-') {
-                    (true, &tilde_prefix[1..])
+                let (neg, tilde_num) = if let Some(prefstripped) = tilde_prefix.strip_prefix('+') {
+                    (false, prefstripped)
+                } else if let Some(prefstripped) = tilde_prefix.strip_prefix('-') {
+                    (true, prefstripped)
                 } else {
                     (false, tilde_prefix)
                 };
@@ -235,7 +233,7 @@ impl<'a, 'b> Expander for Shell<'b> {
                         self.directory_stack.dir_from_bottom(num)
                     }
                     .map(|path| path.to_str().unwrap().into())
-                    .ok_or_else(|| Error::OutOfStack(num))
+                    .ok_or(Error::OutOfStack(num))
                 } else {
                     #[cfg(not(target_os = "redox"))]
                     {

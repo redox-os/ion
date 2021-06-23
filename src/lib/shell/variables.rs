@@ -87,10 +87,10 @@ impl Variables {
     /// Exit the current scope
     pub fn pop_scope(&mut self) { self.0.pop_scope() }
 
-    pub(crate) fn pop_scopes<'b>(
-        &'b mut self,
+    pub(crate) fn pop_scopes(
+        &mut self,
         index: usize,
-    ) -> impl Iterator<Item = Scope<types::Str, Value<Rc<Function>>>> + 'b {
+    ) -> impl Iterator<Item = Scope<types::Str, Value<Rc<Function>>>> + '_ {
         self.0.pop_scopes(index)
     }
 
@@ -273,7 +273,7 @@ impl Default for Variables {
                 .as_ref(),
         );
 
-        Variables(map)
+        Self(map)
     }
 }
 

@@ -2,7 +2,11 @@ use auto_enums::auto_enum;
 use glob::{glob_with, MatchOptions};
 use ion_shell::{expansion::Expander, Shell};
 use liner::{Completer, CursorPosition, Event, EventKind};
-use std::{env, iter, path::PathBuf, str};
+use std::{
+    env, iter,
+    path::{Path, PathBuf},
+    str,
+};
 
 pub struct IonCompleter<'a, 'b> {
     shell:      &'b Shell<'a>,
@@ -256,7 +260,7 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
 }
 
 #[auto_enum]
-fn filename_completion<'a>(start: &'a str, path: &'a PathBuf) -> impl Iterator<Item = String> + 'a {
+fn filename_completion<'a>(start: &'a str, path: &Path) -> impl Iterator<Item = String> + 'a {
     let unescaped_start = unescape(start);
 
     let mut split_start = unescaped_start.split('/');

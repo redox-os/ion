@@ -124,15 +124,16 @@ impl Colors {
     /// decimals.
     fn parse_colors(&mut self, variable: &str) -> Result<(), ()> {
         // First, determine which field we will write to.
-        let (field, variable) = if variable.ends_with("bg") {
-            (&mut self.background, &variable[..variable.len() - 2])
+        let (field, variable) = if let Some(varsuffixstrip) = variable.strip_suffix("bg") {
+            (&mut self.background, varsuffixstrip)
         } else {
             (&mut self.foreground, variable)
         };
 
         // Then, check if the value is a hexadecimal value
-        if variable.starts_with("0x") {
-            let variable = &variable[2..];
+        //
+        if let Some(varprefstrip) = variable.strip_prefix("0x") {
+            let variable = varprefstrip;
 
             match variable.len() {
                 // 256 colors: 0xF | 0xFF
@@ -208,7 +209,7 @@ impl Colors {
 }
 
 fn hex_char_to_u8_range(character: char) -> Option<u8> {
-    if character >= '0' && character <= '9' {
+    if ('0'..='9').contains(&character) {
         Some((character as u8 - b'0') * 16)
     } else {
         // Convert the character to uppercase, if it isn't already.

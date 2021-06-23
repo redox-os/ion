@@ -207,18 +207,18 @@ impl fmt::Display for Statement {
 impl Statement {
     /// Check if the statement is a block-based statement
     #[must_use]
-    pub fn is_block(&self) -> bool {
-        match *self {
+    pub const fn is_block(&self) -> bool {
+        matches!(
+            *self,
             Statement::Case(_)
-            | Statement::If { .. }
-            | Statement::ElseIf(_)
-            | Statement::Function { .. }
-            | Statement::For { .. }
-            | Statement::While { .. }
-            | Statement::Match { .. }
-            | Statement::Else => true,
-            _ => false,
-        }
+                | Statement::If { .. }
+                | Statement::ElseIf(_)
+                | Statement::Function { .. }
+                | Statement::For { .. }
+                | Statement::While { .. }
+                | Statement::Match { .. }
+                | Statement::Else
+        )
     }
 }
 
@@ -295,7 +295,7 @@ impl Function {
 
     /// Get the function's description
     #[must_use]
-    pub fn description(&self) -> Option<&types::Str> { self.description.as_ref() }
+    pub const fn description(&self) -> Option<&types::Str> { self.description.as_ref() }
 
     /// Create a new function
     #[must_use]

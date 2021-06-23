@@ -473,15 +473,12 @@ impl<'a> Shell<'a> {
     /// Simply executes all supplied statements.
     pub fn execute_statements(&mut self, statements: &[Statement]) -> Result {
         self.variables.new_scope(false);
-
         let condition = statements
             .iter()
             .map(|statement| self.execute_statement(statement))
-            .find(|condition| if let Ok(Condition::NoOp) = condition { false } else { true })
+            .find(|condition| !matches!(condition, Ok(Condition::NoOp)))
             .unwrap_or(Ok(Condition::NoOp));
-
         self.variables.pop_scope();
-
         condition
     }
 
@@ -503,9 +500,7 @@ impl<'a> Shell<'a> {
                 let v = self.expand_string(v)?;
                 // Anchor to start and end
                 let v = v.into_iter().map(|v| format!("^{}$", v));
-                RegexSet::new(v)
-                    .ok()
-                    .map_or(false, |regex| value.iter().all(|v| regex.is_match(&v)))
+                RegexSet::new(v).ok().map_or(false, |regex| value.iter().all(|v| regex.is_match(v)))
             } else {
                 true
             };

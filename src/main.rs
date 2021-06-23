@@ -73,37 +73,37 @@ fn parse_args() -> Result<CommandLineArgs, ParsingError> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-v" | "--version" => {
-                if version == true {
+                if version {
                     arg_twice_set = true;
                 }
                 version = true;
             }
             "-h" | "--help" => {
-                if help == true {
+                if help {
                     arg_twice_set = true;
                 }
                 help = true;
             }
             "-n" | "--no-execute" => {
-                if no_execute == true {
+                if no_execute {
                     arg_twice_set = true;
                 }
                 no_execute = true;
             }
             "-f" | "--fake-interactive" => {
-                if fake_interactive == true {
+                if fake_interactive {
                     arg_twice_set = true;
                 }
                 fake_interactive = true;
             }
             "-i" | "--interactive" => {
-                if interactive == true {
+                if interactive {
                     arg_twice_set = true;
                 }
                 interactive = true;
             }
             "-x" => {
-                if print_commands == true {
+                if print_commands {
                     arg_twice_set = true;
                 }
                 print_commands = true;
@@ -114,7 +114,7 @@ fn parse_args() -> Result<CommandLineArgs, ParsingError> {
                     Some(KeyBindingsWrapper(KeyBindings::Emacs)) => arg_twice_set = true,
                     None => (),
                 }
-                key_bindings = match args.next().as_ref().map(|s| s.as_str()) {
+                key_bindings = match args.next().as_deref() {
                     Some("vi") => Some(KeyBindingsWrapper(KeyBindings::Vi)),
                     Some("emacs") => Some(KeyBindingsWrapper(KeyBindings::Emacs)),
                     Some(_) => {
@@ -129,9 +129,8 @@ fn parse_args() -> Result<CommandLineArgs, ParsingError> {
             }
             "-c" => {
                 // convert Option<String< to Option<&str> due to type system limitation
-                match command.as_deref() {
-                    Some(_p) => arg_twice_set = true,
-                    None => (),
+                if let Some(_p) = command.as_deref() {
+                    arg_twice_set = true
                 }
                 command = args.next();
             }
@@ -194,7 +193,7 @@ fn main() {
         println!("{}", version());
         return;
     }
-    if command_line_args.command.is_some() && (command_line_args.args.len() != 0) {
+    if command_line_args.command.is_some() && !command_line_args.args.is_empty() {
         eprintln!("either execute command or file(s)");
         process::exit(1);
     }

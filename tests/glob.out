@@ -11,9 +11,9 @@ tests/else_if.ion tests/empty_loop_test.ion tests/exists.ion tests/fail.ion test
 one three two
 three two
 three two
-Cargo.lock Cargo.toml rustfmt.toml
+Cargo.lock Cargo.toml clippy.toml rustfmt.toml
 LICENSE README.md
-Cargo.lock Cargo.toml rustfmt.toml
+Cargo.lock Cargo.toml clippy.toml rustfmt.toml
 LICENSE
 Cargo.toml
 Cargo.toml

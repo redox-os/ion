@@ -1,10 +1,13 @@
 [package]
-name = "ion-ranges"
-version = "0.1.0"
 authors = ["Michael Murphy <mmstickman@gmail.com>"]
-edition = "2018"
+categories = ["development-tools"]
 description = "extra traits to parse the stdlib's range"
+edition = "2018"
+keywords = ["shell", "range"]
 license = "MIT"
+name = "ion-ranges"
+readme = "README.md"
 repository = "https://gitlab.redox-os.org/redox-os/ion"
+version = "0.1.0"
 
 [dependencies]

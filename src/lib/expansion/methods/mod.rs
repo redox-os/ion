@@ -41,7 +41,7 @@ pub enum MethodError {
 }
 
 impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
-    pub fn array<'c>(&'c mut self) -> impl Iterator<Item = types::Str> + 'c {
+    pub fn array(&mut self) -> impl Iterator<Item = types::Str> + '_ {
         let expand = &mut (*self.expand);
         ArgumentSplitter::new(self.args)
             .flat_map(move |x| expand.expand_string(x).unwrap_or_else(|_| types::Args::new()))

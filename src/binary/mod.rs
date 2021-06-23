@@ -195,10 +195,7 @@ impl<'a> InteractiveShell<'a> {
 
         let huponexit = self.huponexit.clone();
         let set_huponexit: BuiltinFunction = &move |args, _shell| {
-            huponexit.set(match args.get(1).map(AsRef::as_ref) {
-                Some("false") | Some("off") => false,
-                _ => true,
-            });
+            huponexit.set(!matches!(args.get(1).map(AsRef::as_ref), Some("false") | Some("off")));
             Status::SUCCESS
         };
 

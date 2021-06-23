@@ -27,7 +27,7 @@ pub fn status(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let mut interactive = false;
     let mut filename = false;
 
-    let is_login = env::args().nth(0).unwrap().chars().nth(0).unwrap() == '-';
+    let is_login = env::args().next().unwrap().starts_with('-');
 
     match args.len() {
         1 => {

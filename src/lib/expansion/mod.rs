@@ -92,11 +92,11 @@ pub enum Error<T: fmt::Debug + error::Error + fmt::Display + 'static> {
 }
 
 impl<T: fmt::Display + fmt::Debug + error::Error> From<TypeError> for Error<T> {
-    fn from(cause: TypeError) -> Self { Error::TypeError(cause) }
+    fn from(cause: TypeError) -> Self { Self::TypeError(cause) }
 }
 
 impl<T: fmt::Display + fmt::Debug + error::Error> From<MethodError> for Error<T> {
-    fn from(cause: MethodError) -> Self { Error::MethodError(cause) }
+    fn from(cause: MethodError) -> Self { Self::MethodError(cause) }
 }
 
 /// The result of expansion with a given expander

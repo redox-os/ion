@@ -94,7 +94,7 @@ pub enum PipeType {
 }
 
 impl Default for PipeType {
-    fn default() -> Self { PipeType::Normal }
+    fn default() -> Self { Self::Normal }
 }
 
 #[derive(Default, Debug, PartialEq, Clone)]
@@ -199,7 +199,7 @@ impl<'a> Pipeline<RefinedJob<'a>> {
 
 impl<'a> Pipeline<Job> {
     /// A useless, empty pipeline
-    pub const fn new() -> Self { Pipeline { pipe: PipeType::Normal, items: Vec::new() } }
+    pub const fn new() -> Self { Self { pipe: PipeType::Normal, items: Vec::new() } }
 
     /// Expand the pipeline to a set of arguments for execution
     pub fn expand(

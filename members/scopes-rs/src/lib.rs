@@ -60,7 +60,7 @@ impl<K: Hash + Eq, V: Clone> Scopes<K, V> {
         self.current -= 1;
     }
 
-    pub fn pop_scopes<'a>(&'a mut self, index: usize) -> impl Iterator<Item = Scope<K, V>> + 'a {
+    pub fn pop_scopes(&mut self, index: usize) -> impl Iterator<Item = Scope<K, V>> + '_ {
         self.current = index;
         self.scopes.drain(index + 1..)
     }
@@ -126,7 +126,7 @@ impl<K: Hash + Eq, V: Clone> Scopes<K, V> {
 
                 None
             }
-            Namespace::Any => self.scopes().filter_map(|scope| scope.get(name)).next(),
+            Namespace::Any => self.scopes().find_map(|scope| scope.get(name)),
         }
     }
 

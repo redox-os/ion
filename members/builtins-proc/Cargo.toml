@@ -1,8 +1,14 @@
 [package]
-name = "builtins-proc"
-version = "0.1.0"
 authors = ["Xavier L'Heureux <xavier.lheureux@icloud.com>"]
+categories = ["development-tools::procedural-macro-helpers"]
+description = "Expose author list of Ion Shell as macro"
 edition = "2018"
+keywords = ["ion", "shell", "builtin"]
+license = "MIT"
+name = "builtins-proc"
+readme = "README.md"
+repository = "https://gitlab.redox-os.org/redox-os/ion"
+version = "0.1.0"
 
 [dependencies]
 quote = "1.0"

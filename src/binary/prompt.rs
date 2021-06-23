@@ -79,7 +79,7 @@ fn vi_indicator_variable(mode: ViPromptMode) -> &'static str {
     }
 }
 
-fn vi_prompt_indicator<'a>(shell: &mut Shell<'a>, mode: ViPromptMode) -> String {
+fn vi_prompt_indicator(shell: &mut Shell, mode: ViPromptMode) -> String {
     shell
         .variables()
         .get_str(vi_indicator_variable(mode))

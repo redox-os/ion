@@ -239,7 +239,7 @@ impl<'a> Shell<'a> {
             .filter(filter)
             .map(|p| signal::killpg(p.pid(), signal))
             .find(Result::is_err)
-            .unwrap_or_else(|| Ok(()))
+            .unwrap_or(Ok(()))
     }
 
     /// Resumes all stopped background jobs

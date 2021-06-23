@@ -1,6 +1,6 @@
 use ion_shell::{builtin, builtins::Status, types::Str, Shell, Signal};
 use nix::{sys::signal, unistd::Pid};
-use std::{error::Error, os::unix::process::CommandExt, process::Command};
+use std::{os::unix::process::CommandExt, process::Command};
 
 #[builtin(
     desc = "suspend the current shell",
@@ -92,7 +92,7 @@ pub fn exec(args: &[Str], _shell: &mut Shell<'_>) -> Status {
             if clear_env {
                 command.env_clear();
             }
-            Status::error(format!("ion: exec: {}", command.exec().description()))
+            Status::error(format!("ion: exec: {}", command.exec().to_string()))
         }
         None => Status::error("ion: exec: no command provided"),
     }

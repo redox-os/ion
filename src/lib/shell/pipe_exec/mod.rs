@@ -426,8 +426,7 @@ impl<'b> Shell<'b> {
                     // If parent is a RefindJob::External, then we need to keep track of the
                     // output pipes, so we can properly close them after the job has been
                     // spawned.
-                    let is_external =
-                        if let Variant::External { .. } = parent.var { true } else { false };
+                    let is_external = matches!(parent.var, Variant::External { .. });
 
                     // TODO: Refactor this part
                     // If we need to tee both stdout and stderr, we directly connect pipes to

@@ -68,7 +68,7 @@ impl<'a> KeyIterator<'a> {
                 };
                 self.read += 1;
 
-                break Ok(Key { name, kind });
+                break Ok(Key { kind, name });
             } else if self.data.as_bytes()[self.read] == b']'
                 && self.data.as_bytes()[self.read + 1] == b':'
             {
@@ -93,7 +93,7 @@ impl<'a> KeyIterator<'a> {
                     },
                 };
 
-                break Ok(Key { name, kind });
+                break Ok(Key { kind, name });
             } else if eol {
                 break Err(TypeError::Invalid(self.data[self.read..].into()));
             } else {

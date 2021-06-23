@@ -1,3 +1,4 @@
+#![allow(unused_braces)]
 /// helpers for creating help
 pub mod man_pages;
 
@@ -65,7 +66,7 @@ pub type BuiltinFunction<'a> = &'a dyn Fn(&[types::Str], &mut Shell<'_>) -> Stat
 // parses -N or +N patterns
 // required for popd, pushd, dirs
 fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
-    let b = match arg.chars().nth(0) {
+    let b = match arg.chars().next() {
         Some('+') => Some(true),
         Some('-') => Some(false),
         _ => None,
@@ -423,9 +424,9 @@ DESCRIPTION
 )]
 pub fn dirs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     // converts pbuf to an absolute path if possible
-    fn try_abs_path(pbuf: &PathBuf) -> Cow<'_, str> {
+    fn try_abs_path(pbuf: &Path) -> Cow<'_, str> {
         Cow::Owned(
-            pbuf.canonicalize().unwrap_or_else(|_| pbuf.clone()).to_string_lossy().to_string(),
+            pbuf.canonicalize().unwrap_or_else(|_| pbuf.to_owned()).to_string_lossy().to_string(),
         )
     }
 

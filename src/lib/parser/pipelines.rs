@@ -43,7 +43,7 @@ pub enum PipelineParsingError {
 }
 
 impl From<LevelsError> for PipelineParsingError {
-    fn from(cause: LevelsError) -> Self { PipelineParsingError::Paired(cause) }
+    fn from(cause: LevelsError) -> Self { Self::Paired(cause) }
 }
 
 trait AddItem<'a> {
@@ -65,7 +65,6 @@ impl<'a> AddItem<'a> for Pipeline<Job> {
         inputs: Vec<Input>,
     ) {
         if !args.is_empty() {
-            //            let builtin = builtins.contains(&args[0]);
             self.items.push(PipeItem::new(Job::new(args, redirection), outputs, inputs));
         }
     }
@@ -114,7 +113,7 @@ impl<'a> Collector<'a> {
             .map(|file| outputs.push(Redirection { from, file: file.into(), append }))
     }
 
-    fn parse<'builtins>(&self) -> Result<Pipeline<Job>, PipelineParsingError> {
+    fn parse(&self) -> Result<Pipeline<Job>, PipelineParsingError> {
         let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Args::with_capacity(ARG_DEFAULT_SIZE);
         let mut pipeline = Pipeline::new();
@@ -142,8 +141,8 @@ impl<'a> Collector<'a> {
                             pipeline.add_item(
                                 RedirectFrom::Both,
                                 std::mem::replace(&mut args, Args::with_capacity(ARG_DEFAULT_SIZE)),
-                                std::mem::replace(&mut outputs, Vec::new()),
-                                std::mem::replace(&mut inputs, Vec::new()),
+                                std::mem::take(&mut outputs),
+                                std::mem::take(&mut inputs),
                             );
                         }
                         Some(&(_, b'!')) => {
@@ -176,8 +175,8 @@ impl<'a> Collector<'a> {
                             pipeline.add_item(
                                 RedirectFrom::Stderr,
                                 std::mem::replace(&mut args, Args::with_capacity(ARG_DEFAULT_SIZE)),
-                                std::mem::replace(&mut outputs, Vec::new()),
-                                std::mem::replace(&mut inputs, Vec::new()),
+                                std::mem::take(&mut outputs),
+                                std::mem::take(&mut inputs),
                             );
                         }
                         Some(_) | None => self.push_arg(&mut args, &mut bytes)?,
@@ -188,8 +187,8 @@ impl<'a> Collector<'a> {
                     pipeline.add_item(
                         RedirectFrom::Stdout,
                         std::mem::replace(&mut args, Args::with_capacity(ARG_DEFAULT_SIZE)),
-                        std::mem::replace(&mut outputs, Vec::new()),
-                        std::mem::replace(&mut inputs, Vec::new()),
+                        std::mem::take(&mut outputs),
+                        std::mem::take(&mut inputs),
                     );
                 }
                 b'>' => {
@@ -397,7 +396,7 @@ impl<'a> Collector<'a> {
         Err(PipelineParsingError::UnterminatedSingleQuote)
     }
 
-    fn peek(&self, index: usize) -> Option<u8> {
+    const fn peek(&self, index: usize) -> Option<u8> {
         if index < self.data.len() {
             Some(self.data.as_bytes()[index])
         } else {

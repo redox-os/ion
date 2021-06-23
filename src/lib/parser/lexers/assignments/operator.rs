@@ -28,24 +28,24 @@ pub enum Operator {
 }
 
 impl Operator {
-    pub(crate) fn parse_single(data: u8) -> Option<Self> {
+    pub(crate) const fn parse_single(data: u8) -> Option<Self> {
         match data {
-            b'+' => Some(Operator::Add),
-            b'-' => Some(Operator::Subtract),
-            b'/' => Some(Operator::Divide),
-            b'*' => Some(Operator::Multiply),
-            b'?' => Some(Operator::OptionalEqual),
+            b'+' => Some(Self::Add),
+            b'-' => Some(Self::Subtract),
+            b'/' => Some(Self::Divide),
+            b'*' => Some(Self::Multiply),
+            b'?' => Some(Self::OptionalEqual),
             _ => None,
         }
     }
 
-    pub(crate) fn parse_double(data: &[u8]) -> Option<Self> {
+    pub(crate) const fn parse_double(data: &[u8]) -> Option<Self> {
         match data {
-            b"//" => Some(Operator::IntegerDivide),
-            b"**" => Some(Operator::Exponent),
-            b"++" => Some(Operator::Concatenate),
-            b"::" => Some(Operator::ConcatenateHead),
-            b"\\\\" => Some(Operator::Filter),
+            b"//" => Some(Self::IntegerDivide),
+            b"**" => Some(Self::Exponent),
+            b"++" => Some(Self::Concatenate),
+            b"::" => Some(Self::ConcatenateHead),
+            b"\\\\" => Some(Self::Filter),
             _ => None,
         }
     }

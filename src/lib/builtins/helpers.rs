@@ -59,7 +59,7 @@ impl Status {
 }
 
 impl From<Status> for Value<Rc<types::Function>> {
-    fn from(status: Status) -> Self { Value::Str(status.into()) }
+    fn from(status: Status) -> Self { Self::Str(status.into()) }
 }
 
 impl From<Status> for types::Str {

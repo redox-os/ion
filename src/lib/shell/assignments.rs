@@ -204,7 +204,7 @@ impl<'b> Shell<'b> {
 // This should logically be a method over operator, but Value is only accessible in the main repo
 // TODO: too much allocations occur over here. We need to expand variables before they get
 // parsed
-fn apply<'a>(
+fn apply(
     op: Operator,
     lhs: &Value<Rc<Function>>,
     rhs: Value<Rc<Function>>,

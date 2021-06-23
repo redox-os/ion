@@ -48,7 +48,7 @@ fn eval_arg(arg: &str, shell: &mut Shell<'_>) -> types::Str {
 
 // On error returns an empty String.
 fn get_var_string(name: &str, shell: &mut Shell<'_>) -> Option<types::Str> {
-    if name.chars().nth(0)? != '$' {
+    if name.chars().next()? != '$' {
         return None;
     }
 

@@ -19,7 +19,7 @@ impl FromStr for Case {
 
     fn from_str(data: &str) -> Result<Self, Self::Err> {
         if data == "_" {
-            return Ok(Case::default());
+            return Ok(Self::default());
         }
         let mut splitter = ArgumentSplitter::new(data);
         // let argument = splitter.next().ok_or(CaseError::Empty)?;
@@ -72,7 +72,7 @@ impl FromStr for Case {
                 Some(inner) => return Err(Error::ExtraVar(inner.into())),
                 None => (),
             }
-            return Ok(Case {
+            return Ok(Self {
                 value: argument.filter(|&val| val != "_").map(Into::into),
                 binding: binding.map(Into::into),
                 conditional,

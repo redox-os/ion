@@ -80,10 +80,12 @@ impl Levels {
     }
 
     /// Check if all parens where matched
-    pub fn are_rooted(self) -> bool { self.parens == 0 && self.array == 0 && self.braces == 0 }
+    pub const fn are_rooted(self) -> bool {
+        self.parens == 0 && self.array == 0 && self.braces == 0
+    }
 
     /// Check if all is ok
-    pub fn check(self) -> Result<(), LevelsError> {
+    pub const fn check(self) -> Result<(), LevelsError> {
         if self.parens > 0 {
             Err(LevelsError::UnmatchedParen)
         } else if self.array > 0 {

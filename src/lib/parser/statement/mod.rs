@@ -77,15 +77,15 @@ pub enum Error {
 }
 
 impl From<FunctionParseError> for Error {
-    fn from(cause: FunctionParseError) -> Self { Error::InvalidFunctionArgument(cause) }
+    fn from(cause: FunctionParseError) -> Self { Self::InvalidFunctionArgument(cause) }
 }
 
 impl From<CaseError> for Error {
-    fn from(cause: CaseError) -> Self { Error::Case(cause) }
+    fn from(cause: CaseError) -> Self { Self::Case(cause) }
 }
 
 impl From<PipelineParsingError> for Error {
-    fn from(cause: PipelineParsingError) -> Self { Error::Pipeline(cause) }
+    fn from(cause: PipelineParsingError) -> Self { Self::Pipeline(cause) }
 }
 
 /// Parses a given statement string and return's the corresponding mapped

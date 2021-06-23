@@ -183,11 +183,7 @@ fn string_var_is_not_empty(stringvar: &str, shell: &Shell<'_>) -> bool {
 
 /// Returns true if a function with the given name is defined
 fn function_is_defined(function: &str, shell: &Shell<'_>) -> bool {
-    if let Some(Value::Function(_)) = shell.variables().get(function) {
-        true
-    } else {
-        false
-    }
+    matches!(shell.variables().get(function), Some(Value::Function(_)))
 }
 #[cfg(test)]
 mod tests {

@@ -23,13 +23,13 @@ impl ForValueExpression {
         }
 
         Ok(if output.is_empty() {
-            ForValueExpression::Multiple(output)
+            Self::Multiple(output)
         } else if let (Some(range), true) = (ranges::parse_range(&output[0]), output.len() == 1) {
-            ForValueExpression::Range(range)
+            Self::Range(range)
         } else if output.len() > 1 {
-            ForValueExpression::Multiple(output)
+            Self::Multiple(output)
         } else {
-            ForValueExpression::Normal(output[0].clone())
+            Self::Normal(output[0].clone())
         })
     }
 }

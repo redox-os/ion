@@ -8,11 +8,10 @@ mod job;
 mod pipe_exec;
 mod shell_expand;
 mod signals;
-pub(crate) mod sys;
+pub mod sys;
 /// Variables for the shell
 pub mod variables;
 
-pub(crate) use self::job::{Job, RefinedJob};
 use self::{
     directory_stack::DirectoryStack,
     flow_control::{Block, Function, FunctionError, Statement},
@@ -22,6 +21,7 @@ use self::{
 };
 pub use self::{
     flow::BlockError,
+    job::{Job, RefinedJob},
     pipe_exec::{
         job_control::{BackgroundEvent, BackgroundProcess},
         PipelineError,
@@ -99,7 +99,7 @@ impl From<PipelineError> for IonError {
     fn from(cause: PipelineError) -> Self { Self::PipelineExecutionError(cause) }
 }
 
-impl From<ExpansionError<IonError>> for IonError {
+impl From<ExpansionError<Self>> for IonError {
     #[must_use]
     fn from(cause: ExpansionError<Self>) -> Self { Self::ExpansionError(cause) }
 }
@@ -357,7 +357,7 @@ impl<'a> Shell<'a> {
 
     /// Get the pid of the last executed job
     #[must_use]
-    pub fn previous_job(&self) -> Option<usize> {
+    pub const fn previous_job(&self) -> Option<usize> {
         if self.previous_job == !0 {
             None
         } else {
@@ -425,16 +425,12 @@ impl<'a> Shell<'a> {
 
     /// Access to the variables
     #[must_use]
-    pub fn background_jobs<'mutex>(
-        &'mutex self,
-    ) -> impl Deref<Target = Vec<BackgroundProcess>> + 'mutex {
+    pub fn background_jobs(&self) -> impl Deref<Target = Vec<BackgroundProcess>> + '_ {
         self.background.lock().expect("Could not lock the mutex")
     }
 
     /// Mutable access to the variables
-    pub fn background_jobs_mut<'mutex>(
-        &'mutex mut self,
-    ) -> impl DerefMut<Target = Vec<BackgroundProcess>> + 'mutex {
+    pub fn background_jobs_mut(&mut self) -> impl DerefMut<Target = Vec<BackgroundProcess>> + '_ {
         self.background.lock().expect("Could not lock the mutex")
     }
 

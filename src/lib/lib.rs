@@ -71,8 +71,9 @@
 
 #![allow(unknown_lints)]
 #![deny(missing_docs)]
-#![warn(clippy::all, clippy::nursery, clippy::cargo)]
+#![warn(clippy::nursery, clippy::cargo)]
 #![allow(clippy::cast_possible_wrap, clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+#![allow(clippy::needless_doctest_main)]
 use ion_ranges as ranges;
 
 /// The various types used for storing values

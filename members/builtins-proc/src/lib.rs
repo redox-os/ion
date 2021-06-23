@@ -3,7 +3,6 @@ use darling::{util::Flag, FromMeta};
 use proc_macro::TokenStream;
 use quote::quote;
 use std::{fs::File, io::Write};
-use syn;
 
 #[derive(Debug, FromMeta)]
 struct MacroArgs {
@@ -39,12 +38,11 @@ pub fn builtin(attr: TokenStream, item: TokenStream) -> TokenStream {
     Please report all bugs at https://gitlab.redox-os.org/redox-os/ion/issues.
     Ion is still in active development and help in finding bugs is much appreciated!";
 
-    let extra = format!(
-        "
+    let extra = "
 
 AUTHORS
     The Ion developers, under the Redox OS organisation"
-    );
+        .to_string();
     let man = format!(
         "NAME\n    {names} - {short_description}\n\n{help}\n\n{bugs}{extra}",
         names = names,
@@ -57,7 +55,7 @@ AUTHORS
 
     if cfg!(feature = "man") {
         let mut man = File::create(format!("manual/builtins/{}.1", &ident)).unwrap();
-        man.write(help.as_bytes()).unwrap();
+        man.write_all(help.as_bytes()).unwrap();
     }
 
     let result = quote! {

@@ -7,8 +7,11 @@ use crate::{
 use std::{fmt, fs::File, str};
 
 #[derive(Clone)]
+/// A shell job
 pub struct Job {
+    /// Job Arguments
     pub args:        types::Args,
+    /// Redirection of the job (stdout |, stderr ^|, both &|, None)
     pub redirection: RedirectFrom,
 }
 
@@ -33,11 +36,12 @@ impl Job {
         })
     }
 
-    pub fn new(args: types::Args, redirection: RedirectFrom) -> Self { Job { args, redirection } }
+    /// Create new shell job
+    pub fn new(args: types::Args, redirection: RedirectFrom) -> Self { Self { args, redirection } }
 }
 
 impl PartialEq for Job {
-    fn eq(&self, other: &Job) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         self.args == other.args && self.redirection == other.redirection
     }
 }
@@ -65,11 +69,17 @@ fn expand_arg(arg: &str, shell: &mut Shell<'_>) -> expansion::Result<types::Args
 /// This represents a job that has been processed and expanded to be run
 /// as part of some pipeline
 pub struct RefinedJob<'a> {
+    /// Standard in
     pub stdin:       Option<File>,
+    /// Standard out
     pub stdout:      Option<File>,
+    /// Standard error
     pub stderr:      Option<File>,
+    /// Arguments for spawning command
     pub args:        types::Args,
+    /// Variant (external, builtin, function, cat, tee)
     pub var:         Variant<'a>,
+    /// Redirection (stdout |, stderr ^|, both &|, None)
     pub redirection: RedirectFrom,
 }
 
@@ -153,10 +163,13 @@ impl TeeItem {
 }
 
 impl<'a> RefinedJob<'a> {
+    /// What gets executed
     pub fn command(&self) -> &types::Str { &self.args[0] }
 
+    /// What the arguments are
     pub const fn args(&self) -> &types::Args { &self.args }
 
+    /// Redirect stderr to file
     pub fn stderr(&mut self, file: File) {
         if let Variant::Cat { .. } = self.var {
             return;
@@ -165,17 +178,18 @@ impl<'a> RefinedJob<'a> {
         self.stderr = Some(file);
     }
 
-    pub fn needs_forking(&self) -> bool {
-        match self.var {
-            Variant::Function | Variant::Builtin { .. } => false,
-            _ => true,
-        }
+    /// We must fork on a function and builtin
+    pub const fn needs_forking(&self) -> bool {
+        !matches!(self.var, Variant::Function | Variant::Builtin { .. })
     }
 
+    /// Redirect stdout to file
     pub fn stdout(&mut self, file: File) { self.stdout = Some(file); }
 
+    /// Redirect stdin to some file
     pub fn stdin(&mut self, file: File) { self.stdin = Some(file); }
 
+    /// Apply tee to redirect out and err
     pub fn tee(
         tee_out: Option<TeeItem>,
         tee_err: Option<TeeItem>,
@@ -191,6 +205,7 @@ impl<'a> RefinedJob<'a> {
         }
     }
 
+    /// Apply cat on source files
     pub fn cat(sources: Vec<File>, redirection: RedirectFrom) -> Self {
         Self {
             stdin: None,
@@ -202,10 +217,12 @@ impl<'a> RefinedJob<'a> {
         }
     }
 
+    /// Apply function
     pub const fn function(args: types::Args, redirection: RedirectFrom) -> Self {
         Self { stdin: None, stdout: None, stderr: None, args, var: Variant::Function, redirection }
     }
 
+    /// Apply builtin
     pub fn builtin(
         main: BuiltinFunction<'a>,
         args: types::Args,
@@ -221,6 +238,7 @@ impl<'a> RefinedJob<'a> {
         }
     }
 
+    /// Apply external program executed by this shell
     pub const fn external(args: types::Args, redirection: RedirectFrom) -> Self {
         Self { stdin: None, stdout: None, stderr: None, args, var: Variant::External, redirection }
     }

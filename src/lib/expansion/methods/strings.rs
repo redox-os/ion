@@ -60,12 +60,10 @@ fn escape(input: &str) -> String {
             12 => output.push_str("\\f"),
             13 => output.push_str("\\r"),
             27 => output.push_str("\\e"),
-            n if n != 59
-                && n != 95
-                && ((n >= 33 && n < 48)
-                    || (n >= 58 && n < 65)
-                    || (n >= 91 && n < 97)
-                    || (n >= 123 && n < 127)) =>
+            n if n != 59 && n != 95 && (33..48).contains(&n)
+                || (58..65).contains(&n)
+                || (91..97).contains(&n)
+                || (123..127).contains(&n) =>
             {
                 output.push('\\');
                 output.push(n as char);
@@ -349,9 +347,7 @@ impl<'a> StringMethod<'a> {
                 };
             }
             _ => {
-                return Err(
-                    Error::from(MethodError::InvalidScalarMethod(self.method.to_string())).into()
-                )
+                return Err(Error::from(MethodError::InvalidScalarMethod(self.method.to_string())))
             }
         }
         Ok(())
