@@ -1,0 +1,10 @@
+# ANCHOR: math_non_interactive
+-42
+42
+# ANCHOR_END: math_non_interactive
+# ANCHOR: math_interactive
+Ion's integrated calculator
+# ANCHOR_END: math_interactive
+# ANCHOR: math_interactive_quiet
+
+# ANCHOR_END: math_interactive_quiet

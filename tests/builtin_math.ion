@@ -1,0 +1,10 @@
+echo '# ANCHOR: math_non_interactive'
+math -6*7
+math - 50 8
+echo '# ANCHOR_END: math_non_interactive'
+echo '# ANCHOR: math_interactive'
+echo $(math) | sed -n '1p'
+echo '# ANCHOR_END: math_interactive'
+echo '# ANCHOR: math_interactive_quiet'
+echo $(math -q)
+echo '# ANCHOR_END: math_interactive_quiet'
