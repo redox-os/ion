@@ -3,8 +3,8 @@
 Ion is a modern system shell that features a simple, yet powerful, syntax. It is written entirely
 in Rust, which greatly increases the overall quality and security of the shell, eliminating the
 possibilities of a [ShellShock](https://en.wikipedia.org/wiki/Shellshock_(software_bug))-like vulnerability, and making development easier. It also
-offers a level of performance that exceeds that of Dash, when taking advantage of Ion's features.
-While it is developed alongside, and primarily for, RedoxOS, it is a fully capable on other *nix
+offers a level of performance that exceeds that of Dash, while taking advantage of Ion's features.
+While it is developed alongside, and primarily for, RedoxOS, it is fully capable of running on other *nix
 platforms, and we are currently searching for a Windows developer to port it to Windows.
 
 # Goals
@@ -12,17 +12,17 @@ platforms, and we are currently searching for a Windows developer to port it to 
 Syntax and feature decisions for Ion are made based upon three measurements: 
  1. Is the feature useful?
  2. Is it simple to use?
- 3. Will it's implementation be efficient to parse and execute? 
+ 3. Will its implementation be efficient to parse and execute? 
 
-A feature is considered useful if there's a valid use case for it, in the concept of a shell language. The
+A feature is considered useful if there's a valid use case for it, in the context of a shell language. The
 syntax for the feature should be simple for a human to read and write, with extra emphasis on
-readability, given that **most time is spent reading scripts** than writing them. The implementation
+readability, given that **more time is spent reading scripts** than writing them. The implementation
 should require *minimal to zero heap allocations*, and be implemented in a manner that requires
 *minimal CPU cycles* (so long as it's also **fully documented** and **easy to maintain**!).
 
 It should also be taken into consideration that *shells operate entirely upon strings*, and therefore
 should be fully equipped for all manner of string manipulation capabilities. That means that users
-of a shell should not immediately need to grasp for tools like **cut**, **sed**, and **awk**. Ion
+of a shell should not immediately need to reach for tools like **cut**, **sed**, and **awk**. Ion
 offers a great deal of control over slicing and manipulating text. Arrays are treated as first
 class variables with their own unique **@** sigil. Strings are also treated as first class
 variables with their own unique **$** sigil. Both support being sliced with **[range]**, and they
