@@ -77,7 +77,9 @@ auto_enums = "0.7"
 atty = "0.2"
 permutate = "0.3"
 xdg = "2.2"
-nix = "0.20"
+#nix = "0.23"
+# FIXME: Needed because of https://github.com/nix-rust/nix/commit/ff6f8b8a26c8d61f4341e441acf405402b46a430
+nix = { git = "https://github.com/nix-rust/nix.git", rev = "ff6f8b8a" }
 mktemp = "0.4"
 
 
