@@ -352,7 +352,7 @@ impl<'a> InteractiveShell<'a> {
             .write(true)
             .open(if cfg!(target_os = "redox") { "null:" } else { "/dev/null" })
             .map_err(|err| {
-                nix::Error::from_errno(nix::errno::Errno::from_i32(err.raw_os_error().unwrap()))
+                nix::errno::Errno::from_i32(err.raw_os_error().unwrap())
             })?
             .into_raw_fd();
 

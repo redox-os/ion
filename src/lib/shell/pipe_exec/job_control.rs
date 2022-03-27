@@ -146,7 +146,7 @@ impl<'a> Shell<'a> {
             opts.insert(WaitPidFlag::WCONTINUED);
             opts.insert(WaitPidFlag::WNOHANG);
             match wait::waitpid(Pid::from_raw(-pgid.as_raw()), Some(opts)) {
-                Err(nix::Error::Sys(nix::errno::Errno::ECHILD)) => {
+                Err(nix::errno::Errno::ECHILD) => {
                     if !fg_was_grabbed {
                         if let Some(ref callback) = &background_event {
                             callback(njob, pgid, BackgroundEvent::Exited(exit_status));
@@ -257,7 +257,7 @@ impl<'a> Shell<'a> {
         loop {
             match wait::waitpid(Pid::from_raw(-group.as_raw()), Some(WaitPidFlag::WUNTRACED)) {
                 Err(err) => match err {
-                    nix::Error::Sys(nix::errno::Errno::ECHILD) => {
+                    nix::errno::Errno::ECHILD => {
                         if let Some(signal) = signaled {
                             break Err(signal);
                         } else {
