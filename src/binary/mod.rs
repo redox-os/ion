@@ -231,7 +231,7 @@ impl<'a> InteractiveShell<'a> {
                 Self::exec_init_file(&project_dir, &mut shell);
                 Self::load_history(&project_dir, &mut shell, &mut context.borrow_mut());
             }
-            Err(err) => eprintln!("ion: unable to get xdg base directory: {}", err),
+            Err(err) => eprintln!("ion: unable to get xdg base directory: {:?}", err),
         }
 
         InteractiveShell { context, shell: RefCell::new(shell), terminated, huponexit }
