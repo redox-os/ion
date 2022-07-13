@@ -25,7 +25,7 @@ yet to be written into the specification.
 # Ion Manual
 
 
-[The Ion manual online](https://doc.redox-os.org/ion-manual/html) 
+[The Ion manual online](https://doc.redox-os.org/ion-manual/) 
 is generated automatically on each commit via [mdBook](https://github.com/azerupi/mdBook) and hosted on Redox OS's website.
 
 **Building the manual for local reference**
