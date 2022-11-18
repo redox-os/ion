@@ -50,13 +50,15 @@ impl<'a> StatementSplitter<'a> {
         }
     }
 
-    fn get_statement(&self, start: usize, end: usize) -> StatementVariant<'a> {
-        if self.logical == LogicalOp::And {
-            StatementVariant::And(self.data[start + 1..end].trim())
+    fn get_statement(&self, start: usize, end: usize) -> Result<StatementVariant<'a>, Error> {
+        if start + 1 > end {
+            Err(Error::ExpectedCommandButFound(""))
+        } else if self.logical == LogicalOp::And {
+            Ok(StatementVariant::And(self.data[start + 1..end].trim()))
         } else if self.logical == LogicalOp::Or {
-            StatementVariant::Or(self.data[start + 1..end].trim())
+            Ok(StatementVariant::Or(self.data[start + 1..end].trim()))
         } else {
-            StatementVariant::Default(self.data[start..end].trim())
+            Ok(StatementVariant::Default(self.data[start..end].trim()))
         }
     }
 
@@ -157,10 +159,12 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     }
                 }
                 b';' if self.paren_level == 0 => {
-                    let statement = self.get_statement(start, i);
-                    self.logical = LogicalOp::None;
-
                     self.read = i + 1;
+                    let statement = match self.get_statement(start, i) {
+                        Ok(cmd) => cmd,
+                        Err(_) => return Some(Err(Error::ExpectedCommandButFound(";"))),
+                    };
+                    self.logical = LogicalOp::None;
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(statement)),
@@ -168,9 +172,20 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 b'&' | b'|' if self.paren_level == 0 && last == Some(character) => {
                     // Detecting if there is a 2nd `&` character
-                    let statement = self.get_statement(start, i - 1);
-                    self.logical = if character == b'&' { LogicalOp::And } else { LogicalOp::Or };
                     self.read = i + 1;
+                    let statement = match self.get_statement(start, i - 1) {
+                        Ok(cmd) => cmd,
+                        Err(_) => {
+                            return {
+                                if character == b'&' {
+                                    Some(Err(Error::ExpectedCommandButFound("&")))
+                                } else {
+                                    Some(Err(Error::ExpectedCommandButFound("|")))
+                                }
+                            };
+                        }
+                    };
+                    self.logical = if character == b'&' { LogicalOp::And } else { LogicalOp::Or };
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(statement)),
@@ -232,6 +247,34 @@ fn syntax_errors() {
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results[0], Err(Error::UnterminatedArithmetic));
     assert_eq!(results.len(), 1);
+
+    let command = "ls &&||";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
+    assert_eq!(results[1], Err(Error::ExpectedCommandButFound("|")));
+
+    let command = "ls ||&&";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
+    assert_eq!(results[1], Err(Error::ExpectedCommandButFound("&")));
+    assert_eq!(results.len(), 2);
+
+    let command = "ls ;;";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
+    assert_eq!(results[1], Err(Error::ExpectedCommandButFound(";")));
+    assert_eq!(results.len(), 2);
+
+    let command = "ls ; ls ; && ls; ls || ls && |";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
+    assert_eq!(results[1], Ok(StatementVariant::Default("ls")));
+    assert_eq!(results[2], Ok(StatementVariant::Default("")));
+    assert_eq!(results[3], Ok(StatementVariant::And("ls")));
+    assert_eq!(results[4], Ok(StatementVariant::Default("ls")));
+    assert_eq!(results[5], Ok(StatementVariant::Or("ls")));
+    assert_eq!(results[6], Err(Error::ExpectedCommandButFound("pipe")));
+    assert_eq!(results.len(), 7);
 }
 
 #[test]
