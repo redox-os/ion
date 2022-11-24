@@ -50,25 +50,11 @@ impl<'a> StatementSplitter<'a> {
         }
     }
 
-    fn get_statement(&self, start: usize, end: usize) -> Result<StatementVariant<'a>, Error> {
-        if start + 1 > end {
-            Err(Error::ExpectedCommandButFound(""))
-        } else if self.logical == LogicalOp::And {
-            Ok(StatementVariant::And(self.data[start + 1..end].trim()))
-        } else if self.logical == LogicalOp::Or {
-            Ok(StatementVariant::Or(self.data[start + 1..end].trim()))
-        } else {
-            Ok(StatementVariant::Default(self.data[start..end].trim()))
-        }
-    }
-
-    fn get_statement_from(&self, input: &'a str) -> StatementVariant<'a> {
-        if self.logical == LogicalOp::And {
-            StatementVariant::And(input)
-        } else if self.logical == LogicalOp::Or {
-            StatementVariant::Or(input)
-        } else {
-            StatementVariant::Default(input)
+    fn get_statement(&self, statement: &'a str) -> StatementVariant<'a> {
+        match self.logical {
+            LogicalOp::And  => StatementVariant::And(statement.trim()),
+            LogicalOp::Or   => StatementVariant::Or(statement.trim()),
+            LogicalOp::None => StatementVariant::Default(statement.trim())
         }
     }
 }
@@ -96,13 +82,21 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     bytes.find(|&(_, c)| c == b'\'');
                 }
                 b'\\' => self.skip = true,
-                // [^A-Za-z0-9_:,}]
-                0..=43 | 45..=47 | 59..=64 | 91..=94 | 96 | 123..=124 | 126..=127
-                    if self.vbrace =>
-                {
-                    // If we are just ending the braced section continue as normal
-                    if error.is_none() {
-                        error = Some(Error::InvalidCharacter(character as char, i + 1))
+                _ if self.vbrace => {
+                    // We are in `${}` or `@{}` block, variable must use
+                    // the following charset : [^A-Za-z0-9_:,}]
+                    match character {
+                        b'A'..=b'Z' | b'a'..=b'z' |
+                        b'0'..=b'9' | b'_' | b':' |
+                        b',' => (),
+                        b'}' => {
+                                self.vbrace = false;
+                        },
+                        _    => {
+                            if error.is_none() {
+                                error = Some(Error::InvalidCharacter(character as char, i + 1))
+                            }
+                        }
                     }
                 }
                 // Toggle quotes and stop matching variables.
@@ -144,7 +138,6 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.variable = false;
                 }
                 b')' => self.paren_level -= 1,
-                b'}' if self.vbrace => self.vbrace = false,
                 // [^A-Za-z0-9_]
                 0..=37 | 39..=47 | 58 | 60..=64 | 91..=94 | 96 | 126..=127 => self.variable = false,
                 _ if self.quotes => {}
@@ -160,31 +153,29 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 b';' if self.paren_level == 0 => {
                     self.read = i + 1;
-                    let statement = match self.get_statement(start, i) {
-                        Ok(cmd) => cmd,
-                        Err(_) => return Some(Err(Error::ExpectedCommandButFound(";"))),
-                    };
+                    if start == i {
+                        return Some(Err(Error::ExpectedCommandButFound(";")))
+                    }
+                    let statement = self.get_statement(&self.data[start..i]);
                     self.logical = LogicalOp::None;
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(statement)),
                     };
                 }
+                // Detecting if there is a 2nd `&` character
                 b'&' | b'|' if self.paren_level == 0 && last == Some(character) => {
-                    // Detecting if there is a 2nd `&` character
                     self.read = i + 1;
-                    let statement = match self.get_statement(start, i - 1) {
-                        Ok(cmd) => cmd,
-                        Err(_) => {
-                            return {
-                                if character == b'&' {
-                                    Some(Err(Error::ExpectedCommandButFound("&")))
-                                } else {
-                                    Some(Err(Error::ExpectedCommandButFound("|")))
-                                }
-                            };
+                    if start == i - 1 {
+                        return {
+                            if character == b'&' {
+                                Some(Err(Error::ExpectedCommandButFound("&")))
+                            } else {
+                                Some(Err(Error::ExpectedCommandButFound("|")))
+                            }
                         }
-                    };
+                    }
+                    let statement = self.get_statement(&self.data[start..i - 1]);
                     self.logical = if character == b'&' { LogicalOp::And } else { LogicalOp::Or };
                     return match error {
                         Some(error) => Some(Err(error)),
@@ -218,7 +209,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         Err(Error::IllegalCommandName(String::from(output)))
                     }
                     _ => {
-                        let stmt = self.get_statement_from(output);
+                        let stmt = self.get_statement(&self.data[start..]);
                         self.logical = LogicalOp::None;
                         Ok(stmt)
                     }
@@ -238,6 +229,11 @@ fn syntax_errors() {
     assert_eq!(results[3], Err(Error::UnterminatedSubshell));
     assert_eq!(results.len(), 4);
 
+    let command = "${+}";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Err(Error::InvalidCharacter('+', 3)));
+    assert_eq!(results.len(), 1);
+
     let command = ">echo";
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results[0], Err(Error::ExpectedCommandButFound("redirection")));
@@ -247,6 +243,16 @@ fn syntax_errors() {
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results[0], Err(Error::UnterminatedArithmetic));
     assert_eq!(results.len(), 1);
+
+    let command = "&&";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0], Err(Error::ExpectedCommandButFound("&")));
+
+    let command = "||";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0], Err(Error::ExpectedCommandButFound("|")));
 
     let command = "ls &&||";
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
@@ -284,6 +290,19 @@ fn methods() {
     assert_eq!(statements[0], Ok(StatementVariant::Default("echo $join(array, ', ')")));
     assert_eq!(statements[1], Ok(StatementVariant::Default("echo @join(var, ', ')")));
     assert_eq!(statements.len(), 2);
+}
+
+#[test]
+fn escaped_sequences() {
+    let command = "ls \\&\\&";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0], Ok(StatementVariant::Default("ls \\&\\&")));
+
+    let command = "\\@\\{ls\\}";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0], Ok(StatementVariant::Default("\\@\\{ls\\}")));
 }
 
 #[test]
@@ -351,6 +370,33 @@ fn braced_variables() {
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], Ok(StatementVariant::Default(command)));
+}
+
+#[test]
+fn logical_operators() {
+    let command = "ls && ls";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
+    assert_eq!(results[1], Ok(StatementVariant::And("ls")));
+
+    let command = "ls &&";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
+
+
+    let command = "ls || ls";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
+    assert_eq!(results[1], Ok(StatementVariant::Or("ls")));
+
+    let command = "ls ||";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
+
 }
 
 #[test]
