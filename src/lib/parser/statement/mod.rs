@@ -30,10 +30,10 @@ pub enum Error {
     #[error("syntax error: unterminated subshell")]
     UnterminatedSubshell,
     /// Unterminated namespaced variable
-    #[error("syntax error: unterminated brace")]
+    #[error("syntax error: unterminated brace var")]
     UnterminatedBracedVar,
     /// Unterminated brace expansion
-    #[error("syntax error: unterminated braced var")]
+    #[error("syntax error: unterminated braced")]
     UnterminatedBrace,
     /// Unterminated method
     #[error("syntax error: unterminated method")]
