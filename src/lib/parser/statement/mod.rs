@@ -32,6 +32,15 @@ pub enum Error {
     /// Unterminated namespaced variable
     #[error("syntax error: unterminated brace var")]
     UnterminatedBracedVar,
+    /// Unterminated square bracket
+    #[error("syntax error: unterminated square bracket")]
+    UnterminatedSquareBracket,
+    /// Unterminated single quotes
+    #[error("syntax error: unterminated single quotes")]
+    UnterminatedSingleQuotes,
+    /// Unterminated double quotes 
+    #[error("syntax error: unterminated double quotes")]
+    UnterminatedDoubleQuotes,
     /// Unterminated brace expansion
     #[error("syntax error: unterminated braced")]
     UnterminatedBrace,
