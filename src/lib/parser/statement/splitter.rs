@@ -28,7 +28,6 @@ pub struct StatementSplitter<'a> {
     square_bracket_level: i8,
     math_paren_level:     i8,
     logical:              LogicalOp,
-    skip:                 bool,
     vbrace:               bool,
     variable:             bool,
     single_quotes:        bool,
@@ -46,7 +45,6 @@ impl<'a> StatementSplitter<'a> {
             square_bracket_level: 0,
             math_paren_level: 0,
             logical: LogicalOp::None,
-            skip: false,
             vbrace: false,
             variable: false,
             single_quotes: false,
@@ -73,18 +71,19 @@ impl<'a> Iterator for StatementSplitter<'a> {
         let start = self.read;
         let mut error = None;
         let mut bytes = self.data.bytes().enumerate().skip(self.read).peekable();
+        let mut skip = false;
         let mut last = None;
 
         bytes.peek()?;
 
         while let Some((i, character)) = bytes.next() {
             match character {
-                _ if self.skip => {
-                    self.skip = false;
+                _ if skip => {
+                    skip = false;
                     last = None;
                     continue;
                 }
-                b'\\' => self.skip = true,
+                b'\\' => skip = true,
                 _ if self.vbrace => {
                     // We are in `${}` or `@{}` block, variable must use
                     // the following charset : [^A-Za-z0-9_:,}]
@@ -133,7 +132,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b')' if self.math_paren_level == 1 => match bytes.peek() {
                     Some(&(_, b')')) => {
                         self.math_paren_level = 0;
-                        self.skip = true;
+                        skip = true;
                     }
                     Some(&(_, next)) if error.is_none() => {
                         error = Some(Error::InvalidCharacter(next as char, i + 2));
@@ -224,9 +223,6 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     b'>' | b'<' | b'^' => Err(Error::ExpectedCommandButFound("redirection")),
                     b'|' => Err(Error::ExpectedCommandButFound("|")),
                     b'&' => Err(Error::ExpectedCommandButFound("&")),
-                    b'*' | b'%' | b'?' | b'{' | b'}' => {
-                        Err(Error::IllegalCommandName(String::from(output)))
-                    }
                     _ => {
                         let stmt = self.get_statement(&self.data[start..]);
                         self.logical = LogicalOp::None;
@@ -336,6 +332,36 @@ fn syntax_errors() {
     assert_eq!(results[5], Ok(StatementVariant::Or("ls")));
     assert_eq!(results[6], Err(Error::ExpectedCommandButFound("|")));
     assert_eq!(results.len(), 7);
+
+    let command = "ls ; ls ; && ls; ls || ls && &";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
+    assert_eq!(results[1], Ok(StatementVariant::Default("ls")));
+    assert_eq!(results[2], Ok(StatementVariant::Default("")));
+    assert_eq!(results[3], Ok(StatementVariant::And("ls")));
+    assert_eq!(results[4], Ok(StatementVariant::Default("ls")));
+    assert_eq!(results[5], Ok(StatementVariant::Or("ls")));
+    assert_eq!(results[6], Err(Error::ExpectedCommandButFound("&")));
+
+    let command = "let a b = one [two three four";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Err(Error::UnterminatedSquareBracket));
+    assert_eq!(results.len(), 1);
+
+    let command = "let a b = one [two three four]]";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Err(Error::UnterminatedSquareBracket));
+    assert_eq!(results.len(), 1);
+
+    let command = "echo '\"one\"' 'two''";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Err(Error::UnterminatedSingleQuotes));
+    assert_eq!(results.len(), 1);
+
+    let command = "echo '\"one\"' 'two\"'\"";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Err(Error::UnterminatedDoubleQuotes));
+    assert_eq!(results.len(), 1);
 }
 
 #[test]
