@@ -351,9 +351,7 @@ impl<'a> InteractiveShell<'a> {
         let null = OpenOptions::new()
             .write(true)
             .open(if cfg!(target_os = "redox") { "null:" } else { "/dev/null" })
-            .map_err(|err| {
-                nix::errno::Errno::from_i32(err.raw_os_error().unwrap())
-            })?
+            .map_err(|err| nix::errno::Errno::from_i32(err.raw_os_error().unwrap()))?
             .into_raw_fd();
 
         let fd = io::stderr().as_raw_fd();

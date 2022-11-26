@@ -38,7 +38,7 @@ pub enum Error {
     /// Unterminated single quotes
     #[error("syntax error: unterminated single quotes")]
     UnterminatedSingleQuotes,
-    /// Unterminated double quotes 
+    /// Unterminated double quotes
     #[error("syntax error: unterminated double quotes")]
     UnterminatedDoubleQuotes,
     /// Unterminated brace expansion

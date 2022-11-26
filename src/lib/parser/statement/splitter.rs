@@ -51,15 +51,14 @@ impl<'a> StatementSplitter<'a> {
             double_quotes: false,
         }
     }
-    fn inside_quotes(&self) -> bool {
-        return self.single_quotes || self.double_quotes
-    }
+
+    fn inside_quotes(&self) -> bool { return self.single_quotes || self.double_quotes }
 
     fn get_statement(&self, statement: &'a str) -> StatementVariant<'a> {
         match self.logical {
-            LogicalOp::And  => StatementVariant::And(statement.trim()),
-            LogicalOp::Or   => StatementVariant::Or(statement.trim()),
-            LogicalOp::None => StatementVariant::Default(statement.trim())
+            LogicalOp::And => StatementVariant::And(statement.trim()),
+            LogicalOp::Or => StatementVariant::Or(statement.trim()),
+            LogicalOp::None => StatementVariant::Default(statement.trim()),
         }
     }
 }
@@ -88,13 +87,11 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     // We are in `${}` or `@{}` block, variable must use
                     // the following charset : [^A-Za-z0-9_:,}]
                     match character {
-                        b'A'..=b'Z' | b'a'..=b'z' |
-                        b'0'..=b'9' | b'_' | b':' |
-                        b',' => (),
+                        b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b':' | b',' => (),
                         b'}' => {
-                                self.vbrace = false;
-                        },
-                        _    => {
+                            self.vbrace = false;
+                        }
+                        _ => {
                             if error.is_none() {
                                 error = Some(Error::InvalidCharacter(character as char, i + 1))
                             }
@@ -110,7 +107,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.double_quotes = !self.double_quotes;
                     self.variable = false;
                 }
-                // square brackets 
+                // square brackets
                 b'[' if !self.inside_quotes() => {
                     self.square_bracket_level += 1;
                 }
@@ -162,11 +159,11 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     } else {
                         self.brace_level -= 1;
                     }
-                },
+                }
                 b';' if self.paren_level == 0 => {
                     self.read = i + 1;
                     if start == i {
-                        return Some(Err(Error::ExpectedCommandButFound(";")))
+                        return Some(Err(Error::ExpectedCommandButFound(";")));
                     }
                     let statement = self.get_statement(&self.data[start..i]);
                     self.logical = LogicalOp::None;
@@ -185,7 +182,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                             } else {
                                 Some(Err(Error::ExpectedCommandButFound("|")))
                             }
-                        }
+                        };
                     }
                     let statement = self.get_statement(&self.data[start..i - 1]);
                     self.logical = if character == b'&' { LogicalOp::And } else { LogicalOp::Or };
@@ -474,7 +471,6 @@ fn logical_operators() {
     assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
     assert_eq!(results.len(), 1);
 
-
     let command = "ls || ls";
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
@@ -485,7 +481,6 @@ fn logical_operators() {
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results[0], Ok(StatementVariant::Default("ls")));
     assert_eq!(results.len(), 1);
-
 }
 
 #[test]
