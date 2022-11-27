@@ -42,7 +42,7 @@ pub enum Error {
     #[error("syntax error: unterminated double quotes")]
     UnterminatedDoubleQuotes,
     /// Unterminated brace expansion
-    #[error("syntax error: unterminated braced")]
+    #[error("syntax error: unterminated brace")]
     UnterminatedBrace,
     /// Unterminated method
     #[error("syntax error: unterminated method")]
