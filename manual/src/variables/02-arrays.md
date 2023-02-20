@@ -20,6 +20,7 @@ Arguments enclosed within brackets are treated as elements within an array.
 {{#include ../../../tests/array_vars.ion:create_array}}
 ```
 ```txt
+{{#include ../../../tests/array_vars.out:create_array}}
 ```
 
 ## Indexing into an array

@@ -28,6 +28,7 @@ echo @array
 echo '# ANCHOR_END: array_ops'
 echo '# ANCHOR: create_array'
 let array = [ one two 'three four' ]
+echo @array
 echo '# ANCHOR_END: create_array'
 echo '# ANCHOR: index_array'
 let array = [ 1 2 3 4 5 ]
