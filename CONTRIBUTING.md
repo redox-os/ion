@@ -92,8 +92,8 @@ Submitting your work on the Redox OS GitLab server can be done by creating a [me
 
 ## Chatroom
 
-Send an email to [info@redox-os.org](mailto:info@redox-os.org) to request invitation for joining
-the developer chatroom for Ion. Experience with Rust is not required for contributing to Ion. There
+You can join the chat of redox on maxtrix under https://matrix.to/#/#redox:matrix.org which is used by the developers too. 
+Experience with Rust is not required for contributing to Ion. There
 are ways to contribute to Ion at all levels of experience, from writing scripts in Ion and reporting
 issues, to seeking mentorship on how to implement solutions for specific issues on the issue board.
 
