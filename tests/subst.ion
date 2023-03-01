@@ -1,0 +1,19 @@
+let array = []
+
+# Inline array in the method
+echo @subst(@array [foo bar])
+
+# single value
+echo @subst(@array [baz])
+
+# variable expansion
+let default = [foobar] 
+echo @subst(@array @default)
+
+# method would not trigger
+let array ++= faz
+echo @subst(@array @default)
+
+for number in  @subst([] [2 3]) 
+  echo $number
+end

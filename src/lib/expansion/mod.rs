@@ -106,12 +106,12 @@ pub type Result<T, E> = std::result::Result<T, Error<E>>;
 /// bare word. For example, strings starting with '"', '\'', '@', or '$' are
 /// all expressions
 pub fn is_expression(s: &str) -> bool {
-    s.starts_with('@')
-        || s.starts_with('[')
-        || s.starts_with('$')
-        || s.starts_with('"')
-        || s.starts_with('\'')
+    is_array_expression(s) || s.starts_with('$') || s.starts_with('"') || s.starts_with('\'')
 }
+
+/// Determines whether an input string is expression-like and results in array as compared to a
+/// bare word. For example, strings starting with '@' or '['
+pub fn is_array_expression(s: &str) -> bool { s.starts_with('@') || s.starts_with('[') }
 
 // TODO: Make array expansions iterators instead of arrays.
 // TODO: Use Cow<'a, types::Str> for hashmap values.

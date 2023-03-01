@@ -3,7 +3,10 @@ use super::{
     strings::unescape,
     MethodError, Pattern,
 };
-use crate::types::{self, Args};
+use crate::{
+    expansion::is_array_expression,
+    types::{self, Args},
+};
 use std::char;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -105,12 +108,64 @@ impl<'a> ArrayMethod<'a> {
         }
     }
 
+    fn subst<E: Expander>(&self, expand_func: &mut E) -> Result<Args, Error<E::Error>> {
+        let variable = self.resolve_var(expand_func)?;
+
+        if !is_array_expression(&self.variable) {
+            return Err(MethodError::WrongArgument(
+                stringify!(subst),
+                "1. argument must be an array",
+            )
+            .into());
+        }
+        let default_over_empty = match self.pattern {
+            Pattern::StringPattern(pattern) => {
+                if !is_array_expression(pattern) {
+                    return Err(MethodError::WrongArgument(
+                        stringify!(subst),
+                        "2. argument must be an array",
+                    )
+                    .into());
+                }
+                Self::resolve_arg_array(expand_func, pattern)
+            }
+            Pattern::Whitespace => {
+                Err(MethodError::WrongArgument(stringify!(subst), "requires a 2. argument").into())
+            }
+        }?;
+
+        let elements = variable.split(char::is_whitespace);
+
+        let array = expand_func.slice_array(elements, &self.selection)?;
+
+        if array.is_empty()
+            || array.get(0).expect("Unexpected: array was checked if it was empty").is_empty()
+        {
+            Ok(default_over_empty)
+        } else {
+            Ok(array)
+        }
+    }
+
     #[inline]
     fn resolve_array<E: Expander>(&self, expand_func: &mut E) -> Result<Args, Error<E::Error>> {
         match expand_func.array(self.variable, &Select::All) {
             Ok(array) => Ok(array),
             Err(Error::VarNotFound) if is_expression(self.variable) => {
                 expand_func.expand_string(self.variable)
+            }
+            Err(why) => Err(why),
+        }
+    }
+
+    fn resolve_arg_array<E: Expander>(
+        expand_func: &mut E,
+        to_resolve: &str,
+    ) -> Result<Args, Error<E::Error>> {
+        match expand_func.array(to_resolve, &Select::All) {
+            Ok(array) => Ok(array),
+            Err(Error::VarNotFound) if is_expression(to_resolve) => {
+                expand_func.expand_string(to_resolve)
             }
             Err(why) => Err(why),
         }
@@ -141,6 +196,7 @@ impl<'a> ArrayMethod<'a> {
             "split_at" => self.split_at(expand_func),
             "split" => self.split(expand_func),
             "values" => self.map_values(expand_func).map_err(Error::from),
+            "subst" => self.subst(expand_func),
             _ => Err(MethodError::InvalidArrayMethod(self.method.to_string()).into()),
         }
     }
@@ -299,5 +355,33 @@ mod test {
     fn test_reverse() {
         let method = ArrayMethod::new("reverse", "@ARRAY", Pattern::StringPattern("3"), None);
         assert_eq!(method.handle_as_array(&mut DummyExpander).unwrap(), args!["c", "b", "a"]);
+    }
+
+    #[test]
+    fn test_subst_variable_over_default() {
+        let method = ArrayMethod::new("subst", "@ARRAY", Pattern::StringPattern("[2, 3]"), None);
+        assert_eq!(method.handle_as_array(&mut DummyExpander).unwrap(), args!["a", "b", "c"]);
+    }
+    #[test]
+    fn test_subst_default_over_empty_array() {
+        let method = ArrayMethod::new("subst", "[]", Pattern::StringPattern("[2 3]"), None);
+        assert_eq!(method.handle_as_array(&mut DummyExpander).unwrap(), args!["2", "3"]);
+    }
+
+    #[test]
+    fn test_subst_fail_no_array_variable() {
+        let method =
+            ArrayMethod::new("subst", "not an array", Pattern::StringPattern("[2 3]"), None);
+        assert!(method.handle_as_array(&mut DummyExpander).is_err());
+    }
+    #[test]
+    fn test_subst_fail_default_is_no_array() {
+        let method = ArrayMethod::new("subst", "[]", Pattern::StringPattern("not an array"), None);
+        assert!(method.handle_as_array(&mut DummyExpander).is_err());
+    }
+    #[test]
+    fn test_subst_fail_default_missing() {
+        let method = ArrayMethod::new("subst", "[]", Pattern::Whitespace, None);
+        assert!(method.handle_as_array(&mut DummyExpander).is_err());
     }
 }
