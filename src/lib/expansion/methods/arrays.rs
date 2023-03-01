@@ -139,6 +139,8 @@ impl<'a> ArrayMethod<'a> {
         let array = expand_func.slice_array(elements, &self.selection)?;
 
         if array.is_empty()
+            // returned slice_array array can still have one element with nothing it even the
+            // variable was an empty array.
             || array.get(0).expect("Unexpected: array was checked if it was empty").is_empty()
         {
             Ok(default_over_empty)

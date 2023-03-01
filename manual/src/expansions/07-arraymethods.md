@@ -7,6 +7,7 @@ The following are the currently-supported array methods.
 - [chars](#chars)
 - [graphemes](#graphemes)
 - [reverse](#reverse)
+- [subst](#subst)
 
 ### lines
 Defaults to string variables. The supplied string will be split into one string per line in the input argument.
@@ -74,3 +75,26 @@ Defaults to array variables. Returns a reversed copy of the input array.
 ```txt
 {{#include ../../../tests/array_methods.out:reverse}}
 ```
+### subst
+
+Returns the 1. argument if the 1. argument as an array has at least on element. 
+
+Returns the 2. argument as the default array if the 1. argument is an empty array. 
+
+This methods raises an error 
+
+- if no 2 arguments is provided
+- if the 1. argument is not an array
+- if the 2. argument is not an array
+
+**Note:**
+If you want to use this method with an string, use [$or](./06-stringmethods.md#or) method instead 
+or split the string method via [@split](#split) before using that method. 
+
+```sh
+{{#include ../../../tests/array_methods.ion:subst}}
+```
+```txt
+{{#include ../../../tests/array_methods.out:subst}}
+```
+

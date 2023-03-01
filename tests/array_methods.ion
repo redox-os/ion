@@ -42,3 +42,9 @@ echo @reverse(["a"])
 let foo = [1 2 3]
 echo @reverse(@foo)
 echo '# ANCHOR_END: reverse'
+echo '# ANCHOR: subst'
+let empty = []
+for number in @subst(@empty [1 2 3]) 
+  echo $number
+end
+echo '# ANCHOR_END: subst'

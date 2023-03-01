@@ -44,3 +44,8 @@ r
 a
 3 2 1
 # ANCHOR_END: reverse
+# ANCHOR: subst
+1
+2
+3
+# ANCHOR_END: subst
