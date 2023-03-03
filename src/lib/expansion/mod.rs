@@ -21,6 +21,7 @@ use auto_enums::auto_enum;
 use glob::glob;
 use itertools::Itertools;
 use std::{
+    borrow::Cow,
     error,
     fmt::{self, Write},
     str,
@@ -486,7 +487,7 @@ trait ExpanderInternal: Expander {
         let expanded: types::Str = if tilde { self.tilde(&concat)? } else { concat };
 
         if do_glob {
-            match glob(&expanded) {
+            match glob_for_os(&expanded) {
                 Ok(var) => {
                     let prev_size = expanded_words.len();
                     expanded_words
@@ -498,7 +499,7 @@ trait ExpanderInternal: Expander {
                 Err(_) => expanded_words.push(expanded),
             }
         } else {
-            output.push_str(&expanded);
+            output.push_str(prepare_path_for_os(&expanded).as_ref());
         }
         Ok(())
     }
@@ -602,7 +603,7 @@ trait ExpanderInternal: Expander {
 
             Ok(expanded_words.into_iter().fold(Args::new(), |mut array, word| {
                 if word.find('*').is_some() {
-                    if let Ok(paths) = glob(&word) {
+                    if let Ok(paths) = glob_for_os(&word) {
                         array.extend(paths.map(|path| {
                             if let Ok(path_buf) = path {
                                 (*path_buf.to_string_lossy()).into()
@@ -611,10 +612,10 @@ trait ExpanderInternal: Expander {
                             }
                         }))
                     } else {
-                        array.push(word);
+                        array.push(prepare_path_for_os(&word).as_ref().into());
                     }
                 } else {
-                    array.push(word);
+                    array.push(prepare_path_for_os(&word).as_ref().into());
                 }
                 array
             }))
@@ -663,6 +664,36 @@ trait ExpanderInternal: Expander {
                 });
             });
         });
+    }
+}
+
+/// Resolveds glob pattern like '*'. On redox os it resolves the prefix **file:/** as schemes for
+/// files.
+fn glob_for_os(pattern: &str) -> core::result::Result<glob::Paths, glob::PatternError> {
+    glob(prepare_path_for_os(pattern).as_ref())
+}
+
+fn prepare_path_for_os<'a>(to_trim_away: &'a str) -> Cow<'a, str> {
+    if cfg!(target_os = "redox") {
+        trim_url_schemes_for_redox_path(to_trim_away)
+    } else {
+        to_trim_away.into()
+    }
+}
+
+fn trim_url_schemes_for_redox_path<'a>(to_trim_away: &'a str) -> Cow<'a, str> {
+    if let Some(trimmed) = to_trim_away.strip_prefix("file:") {
+        if !trimmed.starts_with("/") {
+            let mut prefixed_with_slash = String::with_capacity(trimmed.len() + 1);
+            prefixed_with_slash.push('/');
+            prefixed_with_slash.push_str(trimmed);
+
+            Cow::Owned(prefixed_with_slash)
+        } else {
+            trimmed.into()
+        }
+    } else {
+        to_trim_away.into()
     }
 }
 
@@ -838,6 +869,19 @@ pub(crate) mod test {
             vec![(args!["5"], "$len([0 1 2 3 4])"), (args!["FxOxO"], "$join(@chars('FOO') 'x')")];
         for (expected, input) in cases {
             assert_eq!(expected, DummyExpander.expand_string(input).unwrap());
+        }
+    }
+
+    #[test]
+    fn trim_for_redox_os_file_scheme() {
+        assert_case("file:*", Cow::Owned("/*".to_owned()));
+        assert_case("file:/*", Cow::Borrowed("/*"));
+        assert_case("/*", Cow::Borrowed("/*"));
+        assert_case("*", Cow::Borrowed("*"));
+
+        fn assert_case<'a>(given: &'a str, expected: Cow<'a, str>) {
+            let actual = trim_url_schemes_for_redox_path(given);
+            assert_eq!(expected, actual);
         }
     }
 }
