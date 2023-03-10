@@ -75,6 +75,11 @@ sudo make update-shells prefix=/usr
 
 > To compile in DEBUG mode, pass `DEBUG=1` as an argument to `make`
 
+# Ion plugins
+
+There are plugins for ion. These plugins are additional aliases and function definitions written in 
+Ion for Ion. They can be found under this [repository](https://gitlab.redox-os.org/redox-os/ion-plugins).
+
 # Vim/NeoVim Syntax Highlighting Plugin
 
 For vim/nvim users there is an [officially-supported syntax highlighting plugin](https://gitlab.redox-os.org/redox-os/ion-vim).
