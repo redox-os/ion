@@ -115,6 +115,14 @@ impl Variables {
         }
     }
 
+    /// Set a variable to a value in the top scope.
+    /// If a variable already exists in any scope, it is updated and is put in the global scope.
+    pub fn set_global<T: Into<Value<Rc<Function>>>>(&mut self, name: &str, value: T) {
+        let value = value.into();
+        self.0.remove_variable(name);
+        self.0.set_global(name, value);
+    }
+
     /// Obtains the value for the **MWD** variable.
     ///
     /// Further minimizes the directory path in the same manner that Fish does by default.

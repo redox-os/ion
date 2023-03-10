@@ -77,7 +77,7 @@ pub fn builtin_alias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             return Status::error(format!("ion: alias name, '{}', is invalid", key));
         }
         Binding::KeyValue(key, value) => {
-            shell.variables_mut().set(&key, types::Alias(value));
+            shell.variables_mut().set_global(&key, types::Alias(value));
         }
         Binding::ListEntries => print_list(shell.variables()),
         Binding::KeyOnly(key) => {

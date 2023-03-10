@@ -99,6 +99,10 @@ impl<K: Hash + Eq, V: Clone> Scopes<K, V> {
         self.scopes[self.current].insert(name.into(), value.into())
     }
 
+    pub fn set_global<T: Into<K>, S: Into<V>>(&mut self, name: T, value: S) -> Option<V> {
+        self.scopes[0].insert(name.into(), value.into())
+    }
+
     pub fn get<Q: ?Sized>(&self, name: &Q, namespace: Namespace) -> Option<&V>
     where
         K: Borrow<Q>,
