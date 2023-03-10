@@ -341,6 +341,8 @@ DESCRIPTION
     Evaluates arithmetic expressions
 
 SPECIAL EXPRESSIONS
+    -q (only in non-interactive mode)
+
     help (only in interactive mode)
         prints this help text
 
