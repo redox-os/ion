@@ -55,7 +55,10 @@ to create tests -- unit tests come second after the integration tests.
 Regression tests are both integration and unit tests, depending on the bug.
 
 Integration tests are much more useful in general, as they cover real world use cases and
-stress larger portions of the code base at once. Yet unit tests still have their place, as
+stress larger portions of the code base at once. 
+See [this section][integration test] on how integration tests are done for Ion.
+
+Yet unit tests still have their place, as
 they are able to test bits of functionality which may not necessarily be covered by existing
 integration tests.
 
@@ -64,13 +67,16 @@ integration tests.
 > tests can pass dummy types and environments into your functions for the purpose of testing
 > the function, whereas in practice the function is hooked up to it's appropriate types.
 
+
 ## Test your code
 
 Before submitting a merge request (MR) on GitLab, ensure that you've run your tests locally and that they
-pass. This can be done by running the following two commands:
+pass.
+
+You can all tests via this command.
 
 ```sh
-cargo +nightly test --lib && bash tests/run_examples.sh
+make tests
 ```
 
 ## Format your code
@@ -84,7 +90,7 @@ cargo +nightly fmt
 
 Now you're ready to submit your work for review!
 
-## Sumbitting your work for review
+## Submitting your work for review
 
 Submitting your work on the Redox OS GitLab server can be done by creating a [merge request (MR)](https://gitlab.redox-os.org/help/user/project/merge_requests/index.md).
 
@@ -102,3 +108,68 @@ issues, to seeking mentorship on how to implement solutions for specific issues 
 In addition to the chatroom, there's a [thread in the Redox forums](https://discourse.redox-os.org/t/ion-shell-development-discussion/682)
 that can be used for discussions relating to Ion and Ion shell development. These are mostly served
 by the GitHub issue board, but general discussions can take place there instead.
+
+## How integration tests work in Ion
+
+Integration tests are located at the folder named "tests" which is relative to the project root. 
+This is usual for rust projects. 
+Ion however does integration test via Ion/parameter input and expected output files.
+
+- An input is just an Ion or parameter file which is executed by the Ion shell. 
+  Such a file has the file extension "ion" or "params".
+- The expected output file is a normal text file 
+  which contains the expected content of the integration test.
+  Such a file has the file extension "out". 
+
+This [bash script] executes all the Ion input files with the Ion shell and compares
+their output with their corresponding output files.
+
+---
+
+### How to create an integration test in general
+
+There 2 ways of integration tests.
+
+1. Ion executes an Ion script file
+2. Ion is executed with arguments
+
+You need to create an input file and an expected output file under the folder "tests".
+The base name of the input file and its respective expected output file needs to be same.
+Only the file extension of the both files should differ. 
+Example: integration test "example_method" would have an input file "example_method.ion" 
+and an expected output file "example_method.out" under the folder "tests".
+
+---
+
+### How to create integration test where Ion executes an Ion file
+
+To create an integration test which is named "first_integration_test" 
+and is conducted by executing an Ion script file.
+
+1. Create a file named "first_integration_test.ion" 
+   with the content which Ion shell should execute
+2. Create a file named "first_integration_test.out" 
+   with the expected output 
+
+--- 
+
+### How to create integration test where Ion is executed with arguments
+
+To create an integration test which is named "first_integration_test" 
+and is conducted by executing the Ion shell with certain arguments.
+
+1. Create a file named "first_integration_test.params"
+   with the arguments which the Ion shell should be executed with.
+2. Create a file named "first_integration_test.out"
+   with the expected output
+
+Every option and value for an option goes into a new line. 
+See [params file](./tests/keybinding_fail.params) as an example.
+This example corresponds to the following command which is executed for the integration test
+
+```sh
+ion -o viemacs -c "echo 1"
+```
+
+[bash script]:./tests/run_examples.sh
+[integration test]:#how-integration-tests-work-in-ion
