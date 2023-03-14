@@ -10,7 +10,10 @@ vendor.tar.xz
 /window-config.ion
 manual/builtins/
 
-# This file get recreated by the command "make tests" anyway
+# Command make manual overwrites this file anyway
+manual/src/builtins.md
+
+# This file gets recreated by the command "make tests" anyway
 # with home folder of the current user aka $HOME.
 # Without this line, there is a danger of contributors committing their home folder path accidentally.
 tests/fn-root-vars.out

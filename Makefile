@@ -48,7 +48,8 @@ manual:
 	cargo build --features man
 	echo -n "# Builtin commands" > manual/src/builtins.md
 	for man in manual/builtins/*; do \
-		echo -n "\n\n## " >> manual/src/builtins.md; \
+		echo "" >> manual/src/builtins.md; \
+		echo -n "## " >> manual/src/builtins.md; \
 		cat $$man >> manual/src/builtins.md; \
 	done
 
