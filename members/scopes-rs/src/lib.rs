@@ -14,7 +14,6 @@ pub enum Namespace {
 
 #[derive(Clone, Debug)]
 pub struct Scopes<K: Hash + Eq, V> {
-    flags:   u8,
     scopes:  Vec<Scope<K, V>>,
     current: usize,
 }
@@ -40,7 +39,6 @@ impl<K: Hash + Eq, V> DerefMut for Scope<K, V> {
 impl<K: Hash + Eq, V: Clone> Scopes<K, V> {
     pub fn with_capacity(cap: usize) -> Self {
         Self {
-            flags:   0,
             scopes:  vec![Scope { vars: HashMap::with_capacity(cap), namespace: false }],
             current: 0,
         }
