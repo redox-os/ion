@@ -24,7 +24,6 @@ yet to be written into the specification.
 
 # Ion Manual
 
-
 [The Ion manual online](https://doc.redox-os.org/ion-manual) 
 is generated automatically on each commit via [mdBook](https://github.com/azerupi/mdBook) and hosted on Redox OS's website.
 
@@ -32,13 +31,32 @@ is generated automatically on each commit via [mdBook](https://github.com/azerup
 
 Sources for the manual are located in the `manual` directory.
 
-You can build the manual using
+1. Build the documentation file for the builtins 
+
 ```sh
 make manual
-mdbook build -d ../public manual
+```
+
+2. Then build the rest of the Ion manual via mdbook
+
+```sh
+mdbook build manual
+```
+
+Or you can build and open it in the your default browser via 
+
+```sh
+mdbook serve manual --open
+```
+
+Or you can build and host the manual on your localhost via
+
+```sh
+mdbook serve manual 
 ```
 
 # Ion library example
+
 See the [examples folder](https://gitlab.redox-os.org/redox-os/ion/tree/master/examples) and the [Parallelion project](https://gitlab.redox-os.org/AdminXVII/parallelion)
 
 # Packages
