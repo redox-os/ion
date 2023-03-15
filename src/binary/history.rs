@@ -1,8 +1,83 @@
 use super::InteractiveShell;
-use ion_shell::{builtins::Status, Value};
+use builtins_proc::builtin_interactive;
+use ion_shell::{
+    builtins::{man_pages, Status},
+    types, Shell, Value,
+};
+use itertools::Itertools;
 
+use liner::Context;
 use regex::Regex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+#[builtin_interactive(
+    desc = "Prints or manipulates the command history",
+    man = "
+NAME
+    history - print or manipulate the command history
+
+SYNOPSIS
+    history [option]
+
+DESCRIPTION
+    Manipulates or prints the command history. 
+    If no option is given then the command history printed instead.
+    
+OPTIONS:
+    +inc_append: Append each command to history as entered.
+    -inc_append: Default, do not append each command to history as entered.
+    +shared: Share history between shells using the same history file, implies inc_append.
+    -shared: Default, do not share shell history.
+    +duplicates: Default, allow duplicates in history.
+    -duplicates: Do not allow duplicates in history."
+)]
+//
+pub fn history(
+    context_bis: Rc<RefCell<Context>>,
+) -> impl Fn(&[types::Str], &mut Shell<'_>) -> Status {
+    move |args: &[types::Str], _shell: &mut Shell<'_>| -> Status {
+        if man_pages::check_help(args, HELP_PAGE) {
+            return Status::SUCCESS;
+        }
+
+        match args.get(1).map(|s| s.as_str()) {
+            Some("+inc_append") => {
+                context_bis.borrow_mut().history.inc_append = true;
+            }
+            Some("-inc_append") => {
+                context_bis.borrow_mut().history.inc_append = false;
+            }
+            Some("+share") => {
+                context_bis.borrow_mut().history.inc_append = true;
+                context_bis.borrow_mut().history.share = true;
+            }
+            Some("-share") => {
+                context_bis.borrow_mut().history.inc_append = false;
+                context_bis.borrow_mut().history.share = false;
+            }
+            Some("+duplicates") => {
+                context_bis.borrow_mut().history.load_duplicates = true;
+            }
+            Some("-duplicates") => {
+                context_bis.borrow_mut().history.load_duplicates = false;
+            }
+            Some(_) => {
+                Status::error(
+                    "Invalid history option. Choices are [+|-] inc_append, duplicates and share \
+                     (implies inc_append).",
+                );
+            }
+            None => {
+                print!("{}", context_bis.borrow().history.buffers.iter().format("\n"));
+            }
+        }
+        Status::SUCCESS
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct IgnoreSetting {

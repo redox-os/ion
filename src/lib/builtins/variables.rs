@@ -69,9 +69,18 @@ fn parse_alias(args: &str) -> Binding {
     }
 }
 
-/// The `alias` command will define an alias for another command, and thus may be used as a
-/// command itself.
-pub fn builtin_alias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
+#[builtin(
+    desc = "View, set or unset aliases",
+    man = "
+SYNOPSIS
+    alias [ALIAS_NAME]
+
+DESCRIPTION
+    The alias command will define an alias for another command, 
+    and thus may be used as a command itself. 
+    If no argument is given then all defined aliases and their commands are shown."
+)]
+pub fn alias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match parse_alias(&args[1..].join(" ")) {
         Binding::InvalidKey(key) => {
             return Status::error(format!("ion: alias name, '{}', is invalid", key));
@@ -91,8 +100,17 @@ pub fn builtin_alias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-/// Dropping an alias will erase it from the shell.
-pub fn builtin_unalias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
+#[builtin(
+    desc = "removes an alias from a shell",
+    man = "
+SYNOPSIS
+    unalias ALIAS_NAME
+
+DESCRIPTION
+    Dropping an alias will erase it from the shell.
+"
+)]
+pub fn unalias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if args.len() <= 1 {
         return Status::error("ion: you must specify an alias name".to_string());
     }

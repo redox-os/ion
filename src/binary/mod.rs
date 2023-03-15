@@ -3,12 +3,14 @@ pub mod builtins;
 mod completer;
 mod designators;
 mod history;
+mod huponexit;
+mod keybindings;
 mod lexer;
 mod prompt;
 mod readln;
 
 use ion_shell::{
-    builtins::{man_pages, BuiltinFunction, Status},
+    builtins::{BuiltinFunction, Status},
     expansion::Expander,
     parser::Terminator,
     types::{self, array},
@@ -48,24 +50,6 @@ OPTIONS:
 ARGS:
     <args>...    Script arguments (@args). If the -c option is not specified, the first parameter is taken as a
                  filename to execute"#;
-
-pub(crate) const MAN_HISTORY: &str = r#"NAME
-    history - print command history
-
-SYNOPSIS
-    history [option]
-
-DESCRIPTION
-    Prints or manupulate the command history.
-
-OPTIONS:
-    +inc_append: Append each command to history as entered.
-    -inc_append: Default, do not append each command to history as entered.
-    +shared: Share history between shells using the same history file, implies inc_append.
-    -shared: Default, do not share shell history.
-    +duplicates: Default, allow duplicates in history.
-    -duplicates: Do not allow duplicates in history.
-"#;
 
 pub struct InteractiveShell<'a> {
     context:    Rc<RefCell<Context>>,
@@ -153,74 +137,18 @@ impl<'a> InteractiveShell<'a> {
             exec(args, shell)
         };
 
-        let context_bis = self.context.clone();
-        let history = &move |args: &[types::Str], _shell: &mut Shell<'_>| -> Status {
-            if man_pages::check_help(args, MAN_HISTORY) {
-                return Status::SUCCESS;
-            }
-
-            match args.get(1).map(|s| s.as_str()) {
-                Some("+inc_append") => {
-                    context_bis.borrow_mut().history.inc_append = true;
-                }
-                Some("-inc_append") => {
-                    context_bis.borrow_mut().history.inc_append = false;
-                }
-                Some("+share") => {
-                    context_bis.borrow_mut().history.inc_append = true;
-                    context_bis.borrow_mut().history.share = true;
-                }
-                Some("-share") => {
-                    context_bis.borrow_mut().history.inc_append = false;
-                    context_bis.borrow_mut().history.share = false;
-                }
-                Some("+duplicates") => {
-                    context_bis.borrow_mut().history.load_duplicates = true;
-                }
-                Some("-duplicates") => {
-                    context_bis.borrow_mut().history.load_duplicates = false;
-                }
-                Some(_) => {
-                    Status::error(
-                        "Invalid history option. Choices are [+|-] inc_append, duplicates and \
-                         share (implies inc_append).",
-                    );
-                }
-                None => {
-                    print!("{}", context_bis.borrow().history.buffers.iter().format("\n"));
-                }
-            }
-            Status::SUCCESS
-        };
+        let history = &history::builtin_history(self.context.clone());
+        let keybindings = &keybindings::builtin_keybindings(self.context.clone());
 
         let huponexit = self.huponexit.clone();
-        let set_huponexit: BuiltinFunction = &move |args, _shell| {
-            huponexit.set(!matches!(args.get(1).map(AsRef::as_ref), Some("false") | Some("off")));
-            Status::SUCCESS
-        };
-
-        let context_bis = self.context.clone();
-        let keybindings = &move |args: &[types::Str], _shell: &mut Shell<'_>| -> Status {
-            match args.get(1).map(|s| s.as_str()) {
-                Some("vi") => {
-                    context_bis.borrow_mut().key_bindings = KeyBindings::Vi;
-                    Status::SUCCESS
-                }
-                Some("emacs") => {
-                    context_bis.borrow_mut().key_bindings = KeyBindings::Emacs;
-                    Status::SUCCESS
-                }
-                Some(_) => Status::error("Invalid keybindings. Choices are vi and emacs"),
-                None => Status::error("keybindings need an argument"),
-            }
-        };
+        let set_huponexit: BuiltinFunction = &huponexit::builtin_huponexit(huponexit);
 
         // change the lifetime to allow adding local builtins
         let InteractiveShell { context, shell, terminated, huponexit } = self;
         let mut shell = shell.into_inner();
         shell
             .builtins_mut()
-            .add("history", history, "Display a log of all commands previously executed")
+            .add("history", history, "Prints or manipulates the command history")
             .add("keybindings", keybindings, "Change the keybindings")
             .add("exit", exit, "Exits the current session")
             .add("exec", exec, "Replace the shell with the given command.")
