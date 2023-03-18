@@ -69,6 +69,9 @@ tests:
 		cargo $(TOOLCHAIN_ARG) test $(ARGSV) --manifest-path $$crate/Cargo.toml || exit 1; \
 	done
 
+test.%:
+	TOOLCHAIN=$(TOOLCHAIN) bash tests/run_examples.sh $@
+
 install:
 	install -Dm0755 target/$(RELEASE)/ion $(DESTDIR)/$(BINARY)
 

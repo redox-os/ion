@@ -73,10 +73,22 @@ integration tests.
 Before submitting a merge request (MR) on GitLab, ensure that you've run your tests locally and that they
 pass.
 
-You can all tests via this command.
+You can run all tests via this command.
 
 ```sh
 make tests
+```
+
+You can also run just one specific integration test via
+
+```sh
+make test.<name_of_test> 
+```
+
+To run just test "comments" for example
+
+```sh
+make test.comments
 ```
 
 ## Format your code
