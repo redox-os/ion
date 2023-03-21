@@ -1,0 +1,54 @@
+let word = "hello"
+let list = [list hello]
+
+# exepcted: 5 
+let length = $len( $word  );
+echo $length
+
+# exepcted: 5 
+let length = $len( $word);
+echo $length
+
+# exepcted: 5 
+let length = $len($word  );
+echo $length
+
+# exepcted: 5 
+let length = $len(   ${word}  );
+echo $length
+
+# exepcted: 5 
+let length = $len( ${word});
+echo $length
+
+# exepcted: 
+# h 
+# llo 
+for char in @split(    ${word}    'e' );
+  echo $char
+end
+
+# exepcted: 5 
+let length = $len(${word}  );
+echo $length
+
+# exepcted: 2
+let length = $len(  @{list}  );
+echo $length
+
+# exepcted: 2
+let length = $len(   @list  );
+echo $length
+
+# exepcted: 3
+let length = $len(            "xxx");
+echo $length
+
+# exepcted: 6 
+let length = $len(    [2 4 5 89 789 3245]  );
+echo $length
+
+# exepcted: 6 
+let length = $len([2 4 5 89 789 3245]  );
+echo $length
+

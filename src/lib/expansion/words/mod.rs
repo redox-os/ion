@@ -432,19 +432,19 @@ impl<'a> WordIterator<'a> {
     }
 
     /// Contains the logic for parsing array variable syntax
-    fn array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+    fn array_variable<I>(&mut self, mut iterator: I) -> WordToken<'a>
     where
         I: Iterator<Item = u8>,
     {
         let mut method_flags = Quotes::None;
         let mut start = self.read;
-        // self.read += 1;
         while let Some(character) = iterator.next() {
             match character {
                 b'(' => {
                     let method = &self.data[start..self.read];
                     self.read += 1;
                     start = self.read;
+                    let mut iterator = self.trim_left_spaces(iterator);
                     let mut depth = 0;
                     while let Some(character) = iterator.next() {
                         match character {
@@ -471,7 +471,7 @@ impl<'a> WordIterator<'a> {
                                                     method,
                                                     variable.trim(),
                                                     Pattern::StringPattern(pattern),
-                                                    Some(self.read_selection(iterator)),
+                                                    Some(self.read_selection(&mut iterator)),
                                                 ),
                                                 self.quotes == Quotes::Double,
                                             )
@@ -502,7 +502,7 @@ impl<'a> WordIterator<'a> {
                                             method,
                                             variable.trim(),
                                             Pattern::Whitespace,
-                                            Some(self.read_selection(iterator)),
+                                            Some(self.read_selection(&mut iterator)),
                                         ),
                                         self.quotes == Quotes::Double,
                                     )
@@ -531,7 +531,7 @@ impl<'a> WordIterator<'a> {
                     return WordToken::ArrayVariable(
                         &self.data[start..self.read],
                         self.quotes == Quotes::Double,
-                        Some(self.read_selection(iterator)),
+                        Some(self.read_selection(&mut iterator)),
                     );
                 }
                 // Only alphanumerical and underscores are allowed in variable names
@@ -568,12 +568,30 @@ impl<'a> WordIterator<'a> {
         panic!()
     }
 
+    /// Skips all found spaces until a non white space byte is encountered.
+    /// Returns an iterator pointing to the 1. element which is not a
+    /// white space
+    fn trim_left_spaces(&mut self, iterator: impl Iterator<Item = u8>) -> impl Iterator<Item = u8> {
+        let mut peek_for_space = iterator.peekable();
+        while let Some(maybe_space) = peek_for_space.peek() {
+            if *maybe_space != b' ' {
+                break;
+            } else {
+                let _ = peek_for_space.next();
+                self.read += 1;
+            }
+        }
+
+        peek_for_space
+    }
+
     /// Contains the logic for parsing variable syntax
-    fn variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+    fn variable<I>(&mut self, mut iterator: I) -> WordToken<'a>
     where
         I: Iterator<Item = u8>,
     {
         let mut method_flags = Quotes::None;
+
         let mut start = self.read;
         while let Some(character) = iterator.next() {
             match character {
@@ -581,6 +599,8 @@ impl<'a> WordIterator<'a> {
                     let method = &self.data[start..self.read];
                     self.read += 1;
                     start = self.read;
+
+                    let mut iterator = self.trim_left_spaces(iterator);
                     let mut depth = 0;
                     while let Some(character) = iterator.next() {
                         match character {
@@ -610,7 +630,7 @@ impl<'a> WordIterator<'a> {
                                                 method,
                                                 variable: variable.trim(),
                                                 pattern,
-                                                selection: Some(self.read_selection(iterator)),
+                                                selection: Some(self.read_selection(&mut iterator)),
                                             })
                                         } else {
                                             WordToken::StringMethod(StringMethod {
@@ -640,7 +660,7 @@ impl<'a> WordIterator<'a> {
                                         method,
                                         variable: variable.trim(),
                                         pattern: " ",
-                                        selection: Some(self.read_selection(iterator)),
+                                        selection: Some(self.read_selection(&mut iterator)),
                                     })
                                 } else {
                                     WordToken::StringMethod(StringMethod {
@@ -665,7 +685,7 @@ impl<'a> WordIterator<'a> {
                     let variable = &self.data[start..self.read];
 
                     return if character == b'[' {
-                        WordToken::Variable(variable, Some(self.read_selection(iterator)))
+                        WordToken::Variable(variable, Some(self.read_selection(&mut iterator)))
                     } else {
                         WordToken::Variable(variable, None)
                     };
