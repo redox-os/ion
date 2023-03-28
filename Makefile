@@ -53,15 +53,6 @@ manual:
 		cat $$man >> manual/src/builtins.md; \
 	done
 
-clean:
-	cargo clean
-
-distclean: clean
-	rm -rf vendor vendor.tar.xz .cargo git_revision.txt
-
-format:
-	cargo +nightly fmt --all
-
 tests:
 	cargo $(TOOLCHAIN_ARG) test $(ARGSV)
 	TOOLCHAIN=$(TOOLCHAIN) bash tests/run_examples.sh
@@ -72,18 +63,7 @@ tests:
 test.%:
 	TOOLCHAIN=$(TOOLCHAIN) bash tests/run_examples.sh $@
 
-install:
-	install -Dm0755 target/$(RELEASE)/ion $(DESTDIR)/$(BINARY)
-
-uninstall:
-	rm $(DESTDIR)/$(BINARY)
-
 vendor: $(VENDOR)
-
-version: $(GIT_REVISION)
-
-$(GIT_REVISION):
-	git rev-parse HEAD > git_revision.txt
 
 $(VENDOR):
 	rm -rf .cargo vendor vendor.tar.xz

@@ -81,17 +81,38 @@ dependencies.
 Please ensure that both cargo and rustc 1.56.0 or higher is installed for your system.
 Release tarballs have not been made yet due to Ion being incomplete in a few remaining areas.
 
-# Compile instructions for distribution
+# Installation 
+
+## Installation of Ion shell for one user 
 
 ```sh
 git clone https://gitlab.redox-os.org/redox-os/ion/
 cd ion
-RUSTUP=0 make # By default RUSTUP equals 1, which is for developmental purposes
-sudo make install prefix=/usr
-sudo make update-shells prefix=/usr
+cargo install --path=. --force 
 ```
 
-> To compile in DEBUG mode, pass `DEBUG=1` as an argument to `make`
+This way the ion executable will be installed into the folder "~/.cargo/bin"
+
+As an alternative you can do it like this
+
+```sh
+git clone https://gitlab.redox-os.org/redox-os/ion/
+cd ion
+cargo build --release 
+# Install to path which is included in the $PATH enviromnent variable
+DESTDIR=~/.local/bin bash/install.sh
+```
+
+## Installation of Ion shell system wide, for all users
+
+```sh
+git clone https://gitlab.redox-os.org/redox-os/ion/
+cd ion
+cargo build --release 
+sudo DESTDIR=/usr/local/bin bash/install.sh
+# Optional: Do this if Ion shell shoulb be login shell on your system
+sudo make update-shells prefix=/usr
+```
 
 # Ion plugins
 

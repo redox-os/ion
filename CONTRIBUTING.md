@@ -97,7 +97,7 @@ In addition, format your code before submitting a MR. This will require that
 you've installed the `rustfmt` Cargo component.
 
 ```sh
-cargo +nightly fmt
+cargo +nightly fmt --all
 ```
 
 Now you're ready to submit your work for review!
