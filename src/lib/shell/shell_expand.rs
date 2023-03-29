@@ -76,7 +76,7 @@ impl<'a, 'b> Expander for Shell<'b> {
                     .resolve(array.len())
                     .and_then(|n| array.get(n))
                     .map(|x| args![types::Str::from(format!("{}", x))])
-                    .ok_or(Error::OutOfBound),
+                    .ok_or(Error::OutOfBound { length: array.len(), index: *id }),
                 Select::Range(ref range) => range
                     .bounds(array.len())
                     .and_then(|(start, length)| {
@@ -93,7 +93,7 @@ impl<'a, 'b> Expander for Shell<'b> {
                             None
                         }
                     })
-                    .ok_or(Error::OutOfBound),
+                    .ok_or(Error::InvalidRange { length: array.len(), range: *range }),
                 Select::Key(_) => Err(Error::InvalidIndex(selection.clone(), "array", name.into())),
             },
             Some(Value::HashMap(hmap)) => match selection {

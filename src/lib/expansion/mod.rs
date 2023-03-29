@@ -38,9 +38,22 @@ pub enum Error<T: fmt::Debug + error::Error + fmt::Display + 'static> {
     /// Wrong type was given
     #[error("{0}")]
     TypeError(#[source] TypeError),
-    /// Indexed out of the array bounds
-    #[error("invalid index")] // TODO: Add more info
-    OutOfBound,
+    /// Indexed out of the array bounds.
+    #[error("Invalid index {index} for sequence with length {length}")]
+    OutOfBound {
+        /// Length of array to be indexed
+        length: usize,
+        /// Invalid index
+        index:  Index,
+    },
+    /// Indexed out of the array bounds via an invalid range
+    #[error("Invalid range between {range} for sequence with length {length}")]
+    InvalidRange {
+        /// Length of array to be indexed
+        length: usize,
+        /// Invalid range
+        range:  Range,
+    },
     /// A string key was taken as index for an array
     #[error("can't use key '{0}' on array")] // TODO: Add more info
     KeyOnArray(String),
@@ -231,7 +244,7 @@ trait ExpanderInternal: Expander {
             }
             Select::Index(index) => self.array_nth(elements, index).map(|el| args![el]),
             Select::Range(range) => self.array_range(elements, range),
-            Select::Key(_) => Err(Error::OutOfBound),
+            Select::Key(key) => Err(Error::KeyOnArray(key.to_string())),
         }
     }
 
@@ -257,7 +270,7 @@ trait ExpanderInternal: Expander {
                 i -= expanded.len();
             }
         }
-        Err(Error::OutOfBound)
+        Err(Error::OutOfBound { index, length: elements.len() })
     }
 
     fn array_range(&mut self, elements: &[&str], range: Range) -> Result<Args, Self::Error> {
@@ -268,7 +281,7 @@ trait ExpanderInternal: Expander {
         if let Some((start, length)) = range.bounds(expanded.len()) {
             Ok(expanded.into_iter().skip(start).take(length).collect())
         } else {
-            Err(Error::OutOfBound)
+            Err(Error::InvalidRange { length: elements.len(), range })
         }
     }
 

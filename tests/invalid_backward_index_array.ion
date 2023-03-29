@@ -1,0 +1,2 @@
+let array = [ 2 4 ]
+echo @array[-3]

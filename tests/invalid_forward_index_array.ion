@@ -1,0 +1,2 @@
+let array = [ 1 ]
+echo @array[1]

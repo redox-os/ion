@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::Index;
 
 /// A range of values in a vector-like object
@@ -10,6 +12,12 @@ pub struct Range {
     /// Is this range inclusive? If false, this object represents a half-open
     /// range of [start, end), otherwise [start, end]
     inclusive: bool,
+}
+
+impl Display for Range {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({},{})", self.start, self.end)
+    }
 }
 
 impl Range {

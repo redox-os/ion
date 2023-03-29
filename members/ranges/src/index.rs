@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 /// Index into a vector-like object
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Index {
@@ -7,6 +9,18 @@ pub enum Index {
     /// Index starting from the end of the vector, where `Backward(0)` is the
     /// last element. `
     Backward(usize),
+}
+
+impl Display for Index {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Index::Forward(index) => write!(f, "{}", index),
+            Index::Backward(actual_index) => {
+                let minus_index = actual_index + 1;
+                write!(f, "-{}", minus_index)
+            }
+        }
+    }
 }
 
 impl Index {
