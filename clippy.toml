@@ -1,3 +1,2 @@
 cognitive-complexity-threshold = 100
 type-complexity-threshold = 1000
-msrv = "1.56.0"
