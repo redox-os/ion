@@ -174,7 +174,7 @@ impl<'a, 'b> Expander for Shell<'b> {
                     Err(Error::InvalidIndex(selection.clone(), "btreemap", name.into()))
                 }
             },
-            None => Err(Error::VarNotFound),
+            None => Err(Error::VarNotFound(name.into())),
             _ => Err(Error::ScalarAsArray(name.into())),
         }
     }
@@ -188,7 +188,7 @@ impl<'a, 'b> Expander for Shell<'b> {
                 Ok(map.keys().map(|x| x.to_string().into()).collect())
             }
             Some(_) => Err(Error::NotAMap(name.into())),
-            None => Err(Error::VarNotFound),
+            None => Err(Error::VarNotFound(name.into())),
         }
     }
 
@@ -201,7 +201,7 @@ impl<'a, 'b> Expander for Shell<'b> {
                 Ok(map.values().map(|x| x.to_string().into()).collect())
             }
             Some(_) => Err(Error::NotAMap(name.into())),
-            None => Err(Error::VarNotFound),
+            None => Err(Error::VarNotFound(name.into())),
         }
     }
 

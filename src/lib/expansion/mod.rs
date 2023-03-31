@@ -74,8 +74,8 @@ pub enum Error<T: fmt::Debug + error::Error + fmt::Display + 'static> {
     #[error("environment variable '{0}' is not set")]
     UnknownEnv(String),
     /// Variable is not defined
-    #[error("Variable does not exist")]
-    VarNotFound,
+    #[error("Variable \"{0}\" does not exist")]
+    VarNotFound(String),
 
     /// Failed to fetch the user home directory
     #[error("Could not fetch the user home directory")]
@@ -736,7 +736,7 @@ pub(crate) mod test {
                 "pkmn2" => Ok("Poke\u{0301}mon".into()),
                 "BAZ" => Ok("  BARBAZ   ".into()),
                 "EMPTY" => Ok("".into()),
-                _ => Err(Error::VarNotFound),
+                _ => Err(Error::VarNotFound(variable.into())),
             }
         }
 
@@ -747,7 +747,7 @@ pub(crate) mod test {
         ) -> Result<types::Args, Self::Error> {
             match variable {
                 "ARRAY" => Ok(args!["a", "b", "c"].to_owned()),
-                _ => Err(Error::VarNotFound),
+                _ => Err(Error::VarNotFound(variable.into())),
             }
         }
 
@@ -761,12 +761,12 @@ pub(crate) mod test {
 
         fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 
-        fn map_keys<'a>(&'a self, _name: &str) -> Result<Args, Self::Error> {
-            Err(Error::VarNotFound)
+        fn map_keys<'a>(&'a self, name: &str) -> Result<Args, Self::Error> {
+            Err(Error::VarNotFound(name.into()))
         }
 
-        fn map_values<'a>(&'a self, _name: &str) -> Result<Args, Self::Error> {
-            Err(Error::VarNotFound)
+        fn map_values<'a>(&'a self, name: &str) -> Result<Args, Self::Error> {
+            Err(Error::VarNotFound(name.into()))
         }
     }
 

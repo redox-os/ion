@@ -153,7 +153,7 @@ impl<'a> ArrayMethod<'a> {
     fn resolve_array<E: Expander>(&self, expand_func: &mut E) -> Result<Args, Error<E::Error>> {
         match expand_func.array(self.variable, &Select::All) {
             Ok(array) => Ok(array),
-            Err(Error::VarNotFound) if is_expression(self.variable) => {
+            Err(Error::VarNotFound(_)) if is_expression(self.variable) => {
                 expand_func.expand_string(self.variable)
             }
             Err(why) => Err(why),
@@ -166,7 +166,7 @@ impl<'a> ArrayMethod<'a> {
     ) -> Result<Args, Error<E::Error>> {
         match expand_func.array(to_resolve, &Select::All) {
             Ok(array) => Ok(array),
-            Err(Error::VarNotFound) if is_expression(to_resolve) => {
+            Err(Error::VarNotFound(_)) if is_expression(to_resolve) => {
                 expand_func.expand_string(to_resolve)
             }
             Err(why) => Err(why),
@@ -177,7 +177,7 @@ impl<'a> ArrayMethod<'a> {
     fn resolve_var<E: Expander>(&self, expand_func: &mut E) -> Result<types::Str, Error<E::Error>> {
         match expand_func.string(self.variable) {
             Ok(variable) => Ok(variable),
-            Err(Error::VarNotFound) if is_expression(self.variable) => {
+            Err(Error::VarNotFound(_)) if is_expression(self.variable) => {
                 Ok(types::Str::from_string(expand_func.expand_string(self.variable)?.join(" ")))
             }
             Err(why) => Err(why),

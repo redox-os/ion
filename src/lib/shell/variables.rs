@@ -209,7 +209,9 @@ impl Variables {
                 // Otherwise, it's just a simple variable name.
                 match self.get(name) {
                     Some(Value::Str(val)) => Ok(val.clone()),
-                    _ => env::var(name).map(Into::into).map_err(|_| Error::VarNotFound),
+                    _ => {
+                        env::var(name).map(Into::into).map_err(|_| Error::VarNotFound(name.into()))
+                    }
                 }
             }
             Some((..)) => Err(Error::UnsupportedNamespace(name.into())),
@@ -303,10 +305,10 @@ pub(crate) mod tests {
 
         fn array(
             &self,
-            _variable: &str,
+            variable: &str,
             _selection: &Select<types::Str>,
         ) -> Result<types::Args, Self::Error> {
-            Err(expansion::Error::VarNotFound)
+            Err(expansion::Error::VarNotFound(variable.into()))
         }
 
         fn command(
@@ -319,12 +321,12 @@ pub(crate) mod tests {
 
         fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 
-        fn map_keys(&self, _name: &str) -> Result<types::Args, Self::Error> {
-            Err(expansion::Error::VarNotFound)
+        fn map_keys(&self, name: &str) -> Result<types::Args, Self::Error> {
+            Err(expansion::Error::VarNotFound(name.into()))
         }
 
-        fn map_values(&self, _name: &str) -> Result<types::Args, Self::Error> {
-            Err(expansion::Error::VarNotFound)
+        fn map_values(&self, name: &str) -> Result<types::Args, Self::Error> {
+            Err(expansion::Error::VarNotFound(name.into()))
         }
     }
 

@@ -105,7 +105,7 @@ impl<'a> StringMethod<'a> {
                             .and_then(|os_str| os_str.to_str())
                             .unwrap_or(value.as_str()),
                     ),
-                    Err(Error::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound(_)) if is_expression(variable) => {
                         let word = expand.expand_string(variable)?.join(" ");
                         output.push_str(
                             Path::new(&word)
@@ -123,7 +123,7 @@ impl<'a> StringMethod<'a> {
             ($method:tt) => {{
                 match expand.string(variable) {
                     Ok(value) => output.push_str(value.$method().as_str()),
-                    Err(Error::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound(_)) if is_expression(variable) => {
                         let word = expand.expand_string(variable)?.join(" ");
                         output.push_str(word.$method().as_str());
                     }
@@ -137,7 +137,7 @@ impl<'a> StringMethod<'a> {
                 let string = expand.string(variable);
                 match string {
                     Ok(value) => value,
-                    Err(Error::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound(_)) if is_expression(variable) => {
                         types::Str::from(expand.expand_string(variable)?.join(" "))
                     }
                     Err(why) => return Err(why),
@@ -237,7 +237,7 @@ impl<'a> StringMethod<'a> {
                 let pattern = MethodArgs::new(self.pattern, expand).join(" ")?;
                 match expand.array(variable, &Select::All) {
                     Ok(array) => expand.slice(output, array.join(&pattern), &self.selection)?,
-                    Err(Error::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound(_)) if is_expression(variable) => {
                         let expanded = expand.expand_string(variable)?.join(&pattern);
                         expand.slice(output, expanded, &self.selection)?
                     }
@@ -255,7 +255,7 @@ impl<'a> StringMethod<'a> {
                                 UnicodeSegmentation::graphemes(value.as_str(), true).count();
                             output.push_str(&count.to_string());
                         }
-                        Err(Error::VarNotFound) if is_expression(variable) => {
+                        Err(Error::VarNotFound(_)) if is_expression(variable) => {
                             let word = expand.expand_string(variable)?.join(" ");
                             let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
                             output.push_str(&count.to_string());
@@ -266,7 +266,7 @@ impl<'a> StringMethod<'a> {
             }
             "len_bytes" => match expand.string(variable) {
                 Ok(value) => output.push_str(&value.as_bytes().len().to_string()),
-                Err(Error::VarNotFound) if is_expression(variable) => {
+                Err(Error::VarNotFound(_)) if is_expression(variable) => {
                     let word = expand.expand_string(variable)?.join(" ");
                     output.push_str(&word.as_bytes().len().to_string());
                 }
@@ -277,7 +277,7 @@ impl<'a> StringMethod<'a> {
                     let rev_graphs = UnicodeSegmentation::graphemes(value.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
                 }
-                Err(Error::VarNotFound) if is_expression(variable) => {
+                Err(Error::VarNotFound(_)) if is_expression(variable) => {
                     let word = expand.expand_string(variable)?.join(" ");
                     let rev_graphs = UnicodeSegmentation::graphemes(word.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
@@ -288,7 +288,7 @@ impl<'a> StringMethod<'a> {
                 let pattern = MethodArgs::new(self.pattern, expand).join(" ")?;
                 let out = match expand.string(variable) {
                     Ok(value) => value.find(pattern.as_str()),
-                    Err(Error::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound(_)) if is_expression(variable) => {
                         expand.expand_string(variable)?.join(" ").find(pattern.as_str())
                     }
                     Err(why) => return Err(why),
@@ -298,7 +298,7 @@ impl<'a> StringMethod<'a> {
             "unescape" => {
                 let out = match expand.string(variable) {
                     Ok(value) => value,
-                    Err(Error::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound(_)) if is_expression(variable) => {
                         expand.expand_string(variable)?.join(" ").into()
                     }
                     Err(why) => return Err(why),
@@ -308,7 +308,7 @@ impl<'a> StringMethod<'a> {
             "escape" => {
                 let word = match expand.string(variable) {
                     Ok(value) => value,
-                    Err(Error::VarNotFound) if is_expression(variable) => {
+                    Err(Error::VarNotFound(_)) if is_expression(variable) => {
                         expand.expand_string(variable)?.join(" ").into()
                     }
                     Err(why) => return Err(why),
@@ -318,7 +318,7 @@ impl<'a> StringMethod<'a> {
             "or" => {
                 let first_str = match expand.string(variable) {
                     Ok(value) => value,
-                    Err(Error::VarNotFound) if is_expression(variable) => expand
+                    Err(Error::VarNotFound(_)) if is_expression(variable) => expand
                         .expand_string(variable)
                         .map(|x| x.join(" ").into())
                         .unwrap_or_default(),
