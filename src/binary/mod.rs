@@ -212,7 +212,7 @@ impl<'a> InteractiveShell<'a> {
         self.terminated.set(true);
         {
             let mut shell = self.shell.borrow_mut();
-            match shell.on_command(&cmd, true) {
+            match shell.on_command(cmd.bytes(), true) {
                 Ok(_) => (),
                 Err(IonError::PipelineExecutionError(PipelineError::CommandNotFound(command))) => {
                     if Self::try_cd(&command, &mut shell).ok().map_or(false, |res| res.is_failure())

@@ -529,7 +529,7 @@ impl<'a> Shell<'a> {
                 });
 
                 if let Some(statement) = case.conditional.as_ref() {
-                    self.on_command(statement, true)?;
+                    self.on_command(statement.bytes(), true)?;
                     if self.previous_status.is_failure() {
                         continue;
                     }
@@ -558,12 +558,12 @@ impl<'a> Shell<'a> {
     /// Receives a command and attempts to execute the contents.
     pub fn on_command(
         &mut self,
-        command_string: &str,
+        command_to_execute: impl Iterator<Item = u8>,
         set_cmd_duration: bool,
     ) -> std::result::Result<(), IonError> {
         let command_start_time = if set_cmd_duration { Some(SystemTime::now()) } else { None };
 
-        for stmt in command_string.bytes().batching(|cmd| Terminator::new(cmd).terminate()) {
+        for stmt in command_to_execute.batching(|cmd| Terminator::new(cmd).terminate()) {
             // Go through all of the statements and build up the block stack
             // When block is done return statement for execution.
             for statement in StatementSplitter::new(&stmt) {

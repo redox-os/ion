@@ -37,10 +37,9 @@ use crate::{
     },
     parser::{
         lexers::{Key, Primitive},
-        Error as ParseError, Terminator,
+        Error as ParseError,
     },
 };
-use itertools::Itertools;
 use nix::{
     sys::signal::{self, SigHandler},
     unistd::Pid,
@@ -277,13 +276,7 @@ impl<'a> Shell<'a> {
     /// not
     /// terminated, then an error will be returned.
     pub fn execute_command<T: std::io::Read>(&mut self, command: T) -> Result<Status, IonError> {
-        for cmd in command
-            .bytes()
-            .filter_map(Result::ok)
-            .batching(|bytes| Terminator::new(bytes).terminate())
-        {
-            self.on_command(&cmd, true)?;
-        }
+        self.on_command(command.bytes().filter_map(Result::ok), true)?;
 
         if let Some(block) = self.flow_control.last().map(Statement::to_string) {
             self.previous_status = Status::from_exit_code(1);

@@ -35,7 +35,7 @@ impl<'a, 'b> Expander for Shell<'b> {
 
         // Execute the command
         let result = self
-            .on_command(command, set_cmd_duration)
+            .on_command(command.bytes(), set_cmd_duration)
             .map_err(|err| Error::Subprocess(Box::new(err)));
 
         // Reset the pipes, droping the stdout
