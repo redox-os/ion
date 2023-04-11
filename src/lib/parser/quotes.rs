@@ -8,6 +8,10 @@ enum Quotes {
 }
 
 /// Serves as a buffer for storing a string until that string can be terminated.
+/// A string terminates if
+///
+/// - It reaches the end without finding a new line
+/// - It reaches a newline without a "\\" char before it
 ///
 /// This example comes from the shell's REPL, which ensures that the user's input
 /// will only be submitted for execution once a terminated command is supplied.
@@ -107,6 +111,13 @@ impl<I: Iterator<Item = u8>> Iterator for Terminator<I> {
 impl<I: Iterator<Item = u8>> Terminator<I> {
     /// Consumes lines until a statement is formed or the iterator runs dry, and returns the
     /// underlying `String`.
+    ///
+    /// TODO: Fix strange trimming or remove inconsistent trimming
+    /// Trimming white space from left and right is strange
+    /// Trimming from left reduces to one space and trimming from right is only done if no white
+    /// spaces are found from left.
+    /// TODO: Comments and empty/white space only lines should not cause yielding an
+    /// empty/white-space line.
     pub fn terminate(&mut self) -> Option<String> {
         let stmt = self.collect::<Vec<_>>();
         let stmt = unsafe { String::from_utf8_unchecked(stmt) };
@@ -196,5 +207,74 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
             empty:      true,
             subshell:   0,
         }
+    }
+}
+
+#[cfg(test)]
+mod testing {
+    use itertools::Itertools;
+
+    use super::*;
+    #[test]
+    fn should_terminate_to_new_line() {
+        assert_case("echo hello", Some("echo hello".to_owned()));
+        assert_case("a", Some("a".to_owned()));
+        assert_case(
+            "echo hello
+             echo world",
+            Some("echo hello".to_owned()),
+        );
+        assert_case(
+            "echo hello;echo all
+             echo world",
+            Some("echo hello;echo all".to_owned()),
+        );
+        assert_case(
+            "echo hello\\
+             echo all
+             echo world",
+            Some("echo helloecho all".to_owned()),
+        );
+        assert_case(
+            "echo hello\\
+             echo all
+             echo world",
+            Some("echo helloecho all".to_owned()),
+        );
+        assert_case("", None);
+
+        fn assert_case(input: &str, expected: Option<String>) {
+            let actual = Terminator::new(input.bytes()).terminate();
+            assert_eq!(actual, expected, "Should have terminated to {:?}", expected);
+        }
+    }
+
+    #[test]
+    fn should_terminate_all_items() {
+        let left_input = "fn greet\n  echo hi there\nend\n greet  \n\n#  Some comments\n # \
+                          another comment\necho \"out there\"\n#  another comment";
+
+        let stmts = left_input
+            .bytes()
+            .batching(|lines| Terminator::new(lines).terminate())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            vec![
+                "fn greet".to_owned(),
+                // TODO: not trimming left of spaces and only one space before ?
+                " echo hi there".to_owned(),
+                // TODO: Triming from right is donw however ?
+                "end".to_owned(),
+                // TODO: is not even trimmed from right if it hases space from both sides ?
+                " greet ".to_owned(),
+                // TODO: comments and white-space/empt lines are yielded as white space only
+                // lines ?.
+                "  ".to_owned(),
+                "echo \"out there\"".to_owned(),
+                " ".to_owned(),
+            ],
+            stmts,
+        );
     }
 }
