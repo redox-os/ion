@@ -155,30 +155,6 @@ mod test {
 
     fn vec_string(args: &[&str]) -> Vec<types::Str> { args.iter().map(|s| (*s).into()).collect() }
 
-    // TODO: Rewrite tests now that let is part of the grammar.
-    // #[test]
-    // fn let_and_expand_a_variable() {
-    //     let mut shell = Shell::default();
-    //     let dir_stack = new_dir_stack();
-    //     let_(&mut variables, vec!["let", "FOO", "=", "BAR"]);
-    // let expanded = expand_string("$FOO", &variables, &dir_stack,
-    // false).join("");     assert_eq!("BAR", &expanded);
-    // }
-    //
-    // #[test]
-    // fn let_fails_if_no_value() {
-    //     let mut shell = Shell::default();
-    //     let return_status = let_(&mut variables, vec!["let", "FOO"]);
-    //     assert_eq!(FAILURE, return_status);
-    // }
-    //
-    // #[test]
-    // fn let_checks_variable_name() {
-    //     let mut shell = Shell::default();
-    // let return_status = let_(&mut variables, vec!["let", ",;!:", "=",
-    // "FOO"]);     assert_eq!(FAILURE, return_status);
-    // }
-
     #[test]
     fn drop_deletes_variable() {
         let mut shell = Shell::default();

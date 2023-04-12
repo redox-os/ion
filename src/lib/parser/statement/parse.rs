@@ -158,9 +158,79 @@ mod tests {
     use crate::{
         builtins::BuiltinMap,
         expansion::pipelines::{PipeItem, PipeType, Pipeline, RedirectFrom},
-        parser::lexers::assignments::{KeyBuf, Primitive},
+        parser::lexers::{
+            assignments::{KeyBuf, Primitive},
+            Operator,
+        },
         shell::{flow_control::Statement, Job},
     };
+
+    #[test]
+    fn parsing_let_alone() {
+        assert_eq!(parse("let", &BuiltinMap::new()).unwrap(), Statement::Let(LocalAction::List),);
+    }
+
+    #[test]
+    fn parsing_let() {
+        assert_eq!(
+            parse("let FOO = BAR", &BuiltinMap::new()).unwrap(),
+            Statement::Let(LocalAction::Assign(
+                "FOO".to_owned(),
+                Operator::Equal,
+                "BAR".to_owned()
+            )),
+        );
+        assert_eq!(
+            parse("let FooX =\"$BAR + $HI\"", &BuiltinMap::new()).unwrap(),
+            Statement::Let(LocalAction::Assign(
+                "FooX".to_owned(),
+                Operator::Equal,
+                "\"$BAR + $HI\"".to_owned()
+            )),
+        );
+        assert_eq!(
+            parse("let list = [hello world]", &BuiltinMap::new()).unwrap(),
+            Statement::Let(LocalAction::Assign(
+                "list".to_owned(),
+                Operator::Equal,
+                "[hello world]".to_owned()
+            )),
+        );
+        // Can it handle line breaks in value ?
+        assert_eq!(
+            parse("let list = [hello \n world]", &BuiltinMap::new()).unwrap(),
+            Statement::Let(LocalAction::Assign(
+                "list".to_owned(),
+                Operator::Equal,
+                "[hello \n world]".to_owned()
+            )),
+        );
+        // Can it additional spaces, new lines tabs ?
+        assert_eq!(
+            parse("let \t  list \n =     \n $(echo world)  ", &BuiltinMap::new()).unwrap(),
+            Statement::Let(LocalAction::Assign(
+                "list".to_owned(),
+                Operator::Equal,
+                "$(echo world)".to_owned()
+            )),
+        );
+    }
+
+    #[test]
+    fn parsing_let_error() {
+        let actual = parse("let Foo", &BuiltinMap::new());
+        assert!(
+            matches!(actual, Err(Error::NoOperatorSupplied)),
+            "Should return error {:?}",
+            Error::NoOperatorSupplied
+        );
+        let actual = parse("let hello =", &BuiltinMap::new());
+        assert!(
+            matches!(actual, Err(Error::NoValueSupplied)),
+            "Should return error {:?}",
+            Error::NoValueSupplied
+        );
+    }
 
     #[test]
     fn parsing_for() {
