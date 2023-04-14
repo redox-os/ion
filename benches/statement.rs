@@ -10,19 +10,15 @@ fn criterion_benchmark(c: &mut Criterion) {
         .copied()
         .batching(|lines| Terminator::new(lines).terminate())
         .collect::<Vec<_>>();
-    c.bench(
-        "statement-splitter-throughput",
-        ParameterizedBenchmark::new(
-            "statement",
-            |b, script| {
-                b.iter(|| {
-                    script.iter().flat_map(|cmd| StatementSplitter::new(cmd)).collect::<Vec<_>>()
-                })
-            },
-            vec![stmts],
-        )
-        .throughput(|script| Throughput::Bytes(script.len() as u64)),
-    );
+
+    let mut group = c.benchmark_group("statement_splitter_throughput");
+
+    group.throughput(Throughput::Bytes(stmts.len() as u64));
+    group.bench_function("statement_splitter", |b| {
+        b.iter(|| stmts.iter().flat_map(|cmd| StatementSplitter::new(cmd)).collect::<Vec<_>>())
+    });
+
+    group.finish();
 }
 
 criterion_group!(benches, criterion_benchmark);
