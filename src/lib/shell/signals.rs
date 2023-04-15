@@ -35,7 +35,7 @@ impl Iterator for SignalHandler {
     type Item = signal::Signal;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match PENDING.swap(0, Ordering::SeqCst) as u8 {
+        match PENDING.swap(0, Ordering::Relaxed) as u8 {
             0 => None,
             SIGINT => Some(signal::Signal::SIGINT),
             SIGHUP => Some(signal::Signal::SIGHUP),

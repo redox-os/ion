@@ -180,7 +180,7 @@ impl<'a> Shell<'a> {
                 _ => unreachable!(),
             };
 
-            signals::PENDING.store(signal as usize, Ordering::SeqCst);
+            signals::PENDING.store(signal as usize, Ordering::Relaxed);
         }
 
         unsafe {
