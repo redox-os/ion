@@ -4,7 +4,6 @@ use super::{
     Error,
 };
 use crate::{
-    builtins::BuiltinMap,
     parser::lexers::{assignment_lexer, ArgumentSplitter},
     shell::{
         flow_control::{Case, ElseIf, ExportAction, IfMode, LocalAction, Statement},
@@ -14,7 +13,7 @@ use crate::{
 };
 use std::char;
 
-pub fn parse(code: &str, builtins: &BuiltinMap<'_>) -> super::Result {
+pub fn parse(code: &str) -> super::Result {
     let cmd = code.trim();
     match cmd {
         "return" => Ok(Statement::Return(None)),
@@ -60,7 +59,7 @@ pub fn parse(code: &str, builtins: &BuiltinMap<'_>) -> super::Result {
             }
         }
         _ if cmd.starts_with("if ") => Ok(Statement::If {
-            expression: vec![parse(cmd[3..].trim_start(), builtins)?],
+            expression: vec![parse(cmd[3..].trim_start())?],
             success:    Vec::new(),
             else_if:    Vec::new(),
             failure:    Vec::new(),
@@ -71,7 +70,7 @@ pub fn parse(code: &str, builtins: &BuiltinMap<'_>) -> super::Result {
             let cmd = cmd[4..].trim_start();
             if !cmd.is_empty() && cmd.starts_with("if ") {
                 Ok(Statement::ElseIf(ElseIf {
-                    expression: vec![parse(cmd[3..].trim_start(), builtins)?],
+                    expression: vec![parse(cmd[3..].trim_start())?],
                     success:    Vec::new(),
                 }))
             } else {
@@ -79,7 +78,7 @@ pub fn parse(code: &str, builtins: &BuiltinMap<'_>) -> super::Result {
             }
         }
         _ if cmd.starts_with("while ") => {
-            let pipeline = pipelines::Collector::run(cmd[6..].trim_start(), builtins)?;
+            let pipeline = pipelines::Collector::run(cmd[6..].trim_start())?;
             Ok(Statement::While {
                 expression: vec![Statement::Pipeline(pipeline)],
                 statements: Vec::new(),
@@ -129,26 +128,18 @@ pub fn parse(code: &str, builtins: &BuiltinMap<'_>) -> super::Result {
             while timed.starts_with("time ") {
                 timed = timed[4..].trim_start();
             }
-            Ok(Statement::Time(Box::new(parse(timed, builtins)?)))
+            Ok(Statement::Time(Box::new(parse(timed)?)))
         }
         _ if cmd.eq("time") => Ok(Statement::Time(Box::new(Statement::Default))),
-        _ if cmd.starts_with("and ") => {
-            Ok(Statement::And(Box::new(parse(cmd[3..].trim_start(), builtins)?)))
-        }
+        _ if cmd.starts_with("and ") => Ok(Statement::And(Box::new(parse(cmd[3..].trim_start())?))),
         _ if cmd.eq("and") => Ok(Statement::And(Box::new(Statement::Default))),
-        _ if cmd.starts_with("or ") => {
-            Ok(Statement::Or(Box::new(parse(cmd[2..].trim_start(), builtins)?)))
-        }
+        _ if cmd.starts_with("or ") => Ok(Statement::Or(Box::new(parse(cmd[2..].trim_start())?))),
         _ if cmd.eq("or") => Ok(Statement::Or(Box::new(Statement::Default))),
-        _ if cmd.starts_with("not ") => {
-            Ok(Statement::Not(Box::new(parse(cmd[3..].trim_start(), builtins)?)))
-        }
-        _ if cmd.starts_with("! ") => {
-            Ok(Statement::Not(Box::new(parse(cmd[1..].trim_start(), builtins)?)))
-        }
+        _ if cmd.starts_with("not ") => Ok(Statement::Not(Box::new(parse(cmd[3..].trim_start())?))),
+        _ if cmd.starts_with("! ") => Ok(Statement::Not(Box::new(parse(cmd[1..].trim_start())?))),
         _ if cmd.eq("not") | cmd.eq("!") => Ok(Statement::Not(Box::new(Statement::Default))),
         _ if cmd.is_empty() || cmd.starts_with('#') => Ok(Statement::Default),
-        _ => Ok(Statement::Pipeline(pipelines::Collector::run(cmd, builtins)?)),
+        _ => Ok(Statement::Pipeline(pipelines::Collector::run(cmd)?)),
     }
 }
 
@@ -156,7 +147,6 @@ pub fn parse(code: &str, builtins: &BuiltinMap<'_>) -> super::Result {
 mod tests {
     use super::*;
     use crate::{
-        builtins::BuiltinMap,
         expansion::pipelines::{PipeItem, PipeType, Pipeline, RedirectFrom},
         parser::lexers::{
             assignments::{KeyBuf, Primitive},
@@ -167,13 +157,13 @@ mod tests {
 
     #[test]
     fn parsing_let_alone() {
-        assert_eq!(parse("let", &BuiltinMap::new()).unwrap(), Statement::Let(LocalAction::List),);
+        assert_eq!(parse("let").unwrap(), Statement::Let(LocalAction::List),);
     }
 
     #[test]
     fn parsing_let() {
         assert_eq!(
-            parse("let FOO = BAR", &BuiltinMap::new()).unwrap(),
+            parse("let FOO = BAR").unwrap(),
             Statement::Let(LocalAction::Assign(
                 "FOO".to_owned(),
                 Operator::Equal,
@@ -181,7 +171,7 @@ mod tests {
             )),
         );
         assert_eq!(
-            parse("let FooX =\"$BAR + $HI\"", &BuiltinMap::new()).unwrap(),
+            parse("let FooX =\"$BAR + $HI\"").unwrap(),
             Statement::Let(LocalAction::Assign(
                 "FooX".to_owned(),
                 Operator::Equal,
@@ -189,7 +179,7 @@ mod tests {
             )),
         );
         assert_eq!(
-            parse("let list = [hello world]", &BuiltinMap::new()).unwrap(),
+            parse("let list = [hello world]").unwrap(),
             Statement::Let(LocalAction::Assign(
                 "list".to_owned(),
                 Operator::Equal,
@@ -198,7 +188,7 @@ mod tests {
         );
         // Can it handle line breaks in value ?
         assert_eq!(
-            parse("let list = [hello \n world]", &BuiltinMap::new()).unwrap(),
+            parse("let list = [hello \n world]").unwrap(),
             Statement::Let(LocalAction::Assign(
                 "list".to_owned(),
                 Operator::Equal,
@@ -207,7 +197,7 @@ mod tests {
         );
         // Can it additional spaces, new lines tabs ?
         assert_eq!(
-            parse("let \t  list \n =     \n $(echo world)  ", &BuiltinMap::new()).unwrap(),
+            parse("let \t  list \n =     \n $(echo world)  ").unwrap(),
             Statement::Let(LocalAction::Assign(
                 "list".to_owned(),
                 Operator::Equal,
@@ -218,13 +208,13 @@ mod tests {
 
     #[test]
     fn parsing_let_error() {
-        let actual = parse("let Foo", &BuiltinMap::new());
+        let actual = parse("let Foo");
         assert!(
             matches!(actual, Err(Error::NoOperatorSupplied)),
             "Should return error {:?}",
             Error::NoOperatorSupplied
         );
-        let actual = parse("let hello =", &BuiltinMap::new());
+        let actual = parse("let hello =");
         assert!(
             matches!(actual, Err(Error::NoValueSupplied)),
             "Should return error {:?}",
@@ -235,7 +225,7 @@ mod tests {
     #[test]
     fn parsing_for() {
         assert_eq!(
-            parse("for x y z in 1..=10", &BuiltinMap::new()).unwrap(),
+            parse("for x y z in 1..=10").unwrap(),
             Statement::For {
                 variables:  vec!["x", "y", "z"].into_iter().map(Into::into).collect(),
                 values:     vec!["1..=10"].into_iter().map(Into::into).collect(),
@@ -244,7 +234,7 @@ mod tests {
         );
 
         assert_eq!(
-            parse("for  x  in  {1..=10} {1..=10}", &BuiltinMap::new()).unwrap(),
+            parse("for  x  in  {1..=10} {1..=10}").unwrap(),
             Statement::For {
                 variables:  vec!["x"].into_iter().map(Into::into).collect(),
                 values:     vec!["{1..=10}", "{1..=10}"].into_iter().map(Into::into).collect(),
@@ -256,7 +246,7 @@ mod tests {
     #[test]
     fn parsing_ifs() {
         // Default case where spaced normally
-        let parsed_if = parse("if test 1 -eq 2", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("if test 1 -eq 2").unwrap();
         let correct_parse = Statement::If {
             expression: vec![Statement::Pipeline(Pipeline {
                 items: vec![PipeItem {
@@ -279,40 +269,40 @@ mod tests {
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = parse("if test 1 -eq 2         ", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("if test 1 -eq 2         ").unwrap();
         assert_eq!(correct_parse, parsed_if);
     }
 
     #[test]
     fn parsing_elses() {
         // Default case where spaced normally
-        let mut parsed_if = parse("else", &BuiltinMap::new()).unwrap();
+        let mut parsed_if = parse("else").unwrap();
         let correct_parse = Statement::Else;
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        parsed_if = parse("else         ", &BuiltinMap::new()).unwrap();
+        parsed_if = parse("else         ").unwrap();
         assert_eq!(correct_parse, parsed_if);
 
         // Leading spaces after final value
-        parsed_if = parse("         else", &BuiltinMap::new()).unwrap();
+        parsed_if = parse("         else").unwrap();
         assert_eq!(correct_parse, parsed_if);
     }
 
     #[test]
     fn parsing_ends() {
         // Default case where spaced normally
-        let parsed_if = parse("end", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("end").unwrap();
         let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = parse("end         ", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("end         ").unwrap();
         let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
 
         // Leading spaces after final value
-        let parsed_if = parse("         end", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("         end").unwrap();
         let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
     }
@@ -320,7 +310,7 @@ mod tests {
     #[test]
     fn parsing_functions() {
         // Default case where spaced normally
-        let parsed_if = parse("fn bob", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("fn bob").unwrap();
         let correct_parse = Statement::Function {
             description: None,
             name:        "bob".into(),
@@ -330,15 +320,15 @@ mod tests {
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = parse("fn bob        ", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("fn bob        ").unwrap();
         assert_eq!(correct_parse, parsed_if);
 
         // Leading spaces after final value
-        let parsed_if = parse("         fn bob", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("         fn bob").unwrap();
         assert_eq!(correct_parse, parsed_if);
 
         // Default case where spaced normally
-        let parsed_if = parse("fn bob a b", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("fn bob a b").unwrap();
         let correct_parse = Statement::Function {
             description: None,
             name:        "bob".into(),
@@ -351,10 +341,10 @@ mod tests {
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = parse("fn bob a b       ", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("fn bob a b       ").unwrap();
         assert_eq!(correct_parse, parsed_if);
 
-        let parsed_if = parse("fn bob a b --bob is a nice function", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("fn bob a b --bob is a nice function").unwrap();
         let correct_parse = Statement::Function {
             description: Some("bob is a nice function".into()),
             name:        "bob".into(),
@@ -365,11 +355,9 @@ mod tests {
             statements:  vec![],
         };
         assert_eq!(correct_parse, parsed_if);
-        let parsed_if =
-            parse("fn bob a b --          bob is a nice function", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("fn bob a b --          bob is a nice function").unwrap();
         assert_eq!(correct_parse, parsed_if);
-        let parsed_if =
-            parse("fn bob a b      --bob is a nice function", &BuiltinMap::new()).unwrap();
+        let parsed_if = parse("fn bob a b      --bob is a nice function").unwrap();
         assert_eq!(correct_parse, parsed_if);
     }
 }

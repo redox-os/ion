@@ -11,7 +11,7 @@ use super::{
     pipelines::PipelineParsingError,
     statement::{case::Error as CaseError, functions::FunctionParseError},
 };
-use crate::{builtins::BuiltinMap, shell::flow_control::Statement};
+use crate::shell::flow_control::Statement;
 use std::char;
 use thiserror::Error;
 
@@ -99,12 +99,10 @@ impl From<PipelineParsingError> for Error {
 
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`
-pub fn parse_and_validate<'b>(statement: StatementVariant, builtins: &BuiltinMap<'b>) -> Result {
+pub fn parse_and_validate<'b>(statement: StatementVariant) -> Result {
     match statement {
-        StatementVariant::And(statement) => {
-            Ok(Statement::And(Box::new(parse(statement, builtins)?)))
-        }
-        StatementVariant::Or(statement) => Ok(Statement::Or(Box::new(parse(statement, builtins)?))),
-        StatementVariant::Default(statement) => parse(statement, builtins),
+        StatementVariant::And(statement) => Ok(Statement::And(Box::new(parse(statement)?))),
+        StatementVariant::Or(statement) => Ok(Statement::Or(Box::new(parse(statement)?))),
+        StatementVariant::Default(statement) => parse(statement),
     }
 }

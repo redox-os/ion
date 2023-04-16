@@ -567,7 +567,7 @@ impl<'a> Shell<'a> {
             // Go through all of the statements and build up the block stack
             // When block is done return statement for execution.
             for statement in StatementSplitter::new(&stmt) {
-                let statement = parse_and_validate(statement?, &self.builtins)?;
+                let statement = parse_and_validate(statement?)?;
                 if let Some(stm) = Self::insert_statement(&mut self.flow_control, statement)? {
                     self.execute_statement(&stm)?;
                 }
@@ -599,7 +599,7 @@ fn expand_pipeline<'a>(
     while let Some(item) = item_iter.next() {
         if let Some(Value::Alias(alias)) = shell.variables.get(&item.job.args[0]) {
             statements = StatementSplitter::new(alias.0.as_str())
-                .map(|stmt| parse_and_validate(stmt?, &shell.builtins).map_err(Into::into))
+                .map(|stmt| parse_and_validate(stmt?).map_err(Into::into))
                 .collect::<std::result::Result<_, IonError>>()?;
 
             // First item in the alias should be a pipeline item, otherwise it cannot
