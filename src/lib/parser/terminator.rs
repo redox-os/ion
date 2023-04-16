@@ -11,7 +11,10 @@ enum Quotes {
 /// A string terminates if
 ///
 /// - It reaches the end without finding a new line
-/// - It reaches a newline without a "\\" char before it
+/// - It reaches a newline without a "\\" char, not more "(" than ")" and not more "[" than "]"
+///   before it
+///
+/// Assumes that the given byte sequence is valid UTF-8
 ///
 /// This example comes from the shell's REPL, which ensures that the user's input
 /// will only be submitted for execution once a terminated command is supplied.
@@ -33,7 +36,7 @@ impl<'a> From<&'a str> for Terminator<std::str::Bytes<'a>> {
 }
 
 #[derive(Clone, Debug)]
-pub struct RearPeekable<I: Iterator> {
+struct RearPeekable<I: Iterator> {
     iter: Peekable<I>,
     now:  Option<I::Item>,
     last: Option<I::Item>,
@@ -112,6 +115,8 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
     /// Consumes lines until a statement is formed or the iterator runs dry, and returns the
     /// underlying `String`.
     ///
+    /// Panics if the processed bytes are not in valid UTF-8
+    ///
     /// TODO: Fix strange trimming or remove inconsistent trimming
     /// Trimming white space from left and right is strange
     /// Trimming from left reduces to one space and trimming from right is only done if no white
@@ -120,7 +125,9 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
     /// empty/white-space line.
     pub fn terminate(&mut self) -> Option<String> {
         let stmt = self.collect::<Vec<_>>();
-        let stmt = unsafe { String::from_utf8_unchecked(stmt) };
+        // TODO: Parsing is only concerned about UTF-8 encoding.
+        // For port to windows this can cause problems !
+        let stmt = String::from_utf8(stmt).expect("Ion shell is only dealing with utf8 content");
 
         if self.empty {
             None
@@ -250,31 +257,51 @@ mod testing {
     }
 
     #[test]
+    fn terminate_array_over_serveral_lines() {
+        let input = "let array = [2 4
+            5 7]
+            echo second line";
+        assert_serveral_terminations(input, vec!["let array = [2 4 5 7]", " echo second line"]);
+    }
+    #[test]
+    fn terminate_shell_over_serveral_lines() {
+        let input = "let shell_output = $(echo
+            hello)
+            echo second line";
+        assert_serveral_terminations(
+            input,
+            vec!["let shell_output = $(echo hello)", " echo second line"],
+        );
+    }
+
+    #[test]
     fn should_terminate_all_items() {
         let left_input = "fn greet\n  echo hi there\nend\n greet  \n\n#  Some comments\n # \
                           another comment\necho \"out there\"\n#  another comment";
 
-        let stmts = left_input
-            .bytes()
-            .batching(|lines| Terminator::new(lines).terminate())
-            .collect::<Vec<_>>();
-
-        assert_eq!(
+        assert_serveral_terminations(
+            left_input,
             vec![
-                "fn greet".to_owned(),
+                "fn greet",
                 // TODO: not trimming left of spaces and only one space before ?
-                " echo hi there".to_owned(),
+                " echo hi there",
                 // TODO: Triming from right is donw however ?
-                "end".to_owned(),
+                "end",
                 // TODO: is not even trimmed from right if it hases space from both sides ?
-                " greet ".to_owned(),
+                " greet ",
                 // TODO: comments and white-space/empt lines are yielded as white space only
                 // lines ?.
-                "  ".to_owned(),
-                "echo \"out there\"".to_owned(),
-                " ".to_owned(),
+                "  ",
+                "echo \"out there\"",
+                " ",
             ],
-            stmts,
         );
+    }
+
+    fn assert_serveral_terminations(input: &str, expected: Vec<&str>) {
+        let stmts =
+            input.bytes().batching(|lines| Terminator::new(lines).terminate()).collect::<Vec<_>>();
+
+        assert_eq!(expected, stmts);
     }
 }

@@ -8,12 +8,12 @@
 pub mod lexers;
 /// Parse the pipelines to a Pipeline struct
 pub mod pipelines;
-mod quotes;
 mod statement;
+mod terminator;
 
 pub use self::{
-    quotes::Terminator,
     statement::{parse_and_validate, Error, StatementSplitter},
+    terminator::Terminator,
 };
 
 #[cfg(fuzzing)]
