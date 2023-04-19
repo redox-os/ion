@@ -1,5 +1,5 @@
 use super::{super::types, Value};
-use std::rc::Rc;
+use std::{fmt::Display, rc::Rc};
 
 /// The exit status of a command
 ///
@@ -56,6 +56,10 @@ impl Status {
 
     /// Change true to false and false to true. Looses information
     pub fn toggle(&mut self) { self.0 = if self.is_success() { 1 } else { 0 }; }
+}
+
+impl Display for Status {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0) }
 }
 
 impl From<Status> for Value<Rc<types::Function>> {

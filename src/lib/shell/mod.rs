@@ -107,11 +107,13 @@ impl From<ExpansionError<Self>> for IonError {
 #[derive(Debug, Clone, Hash, Default)]
 pub struct Options {
     /// Exit from the shell on the first error.
-    pub err_exit: bool,
+    pub err_exit:  bool,
+    /// Activates the -p option, aka pipefail in bash
+    pub pipe_fail: bool,
     /// Do not execute any commands given to the shell.
-    pub no_exec:  bool,
+    pub no_exec:   bool,
     /// If set, denotes that this shell is running as a background job.
-    pub grab_tty: bool,
+    pub grab_tty:  bool,
 }
 
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
@@ -342,7 +344,7 @@ impl<'a> Shell<'a> {
         }
 
         if self.opts.err_exit && !exit_status.is_success() {
-            return Err(PipelineError::EarlyExit.into());
+            return Err(PipelineError::EarlyExit(exit_status).into());
         }
 
         Ok(exit_status)

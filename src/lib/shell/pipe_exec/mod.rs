@@ -101,8 +101,8 @@ pub enum PipelineError {
     WaitPid(nix::Error),
 
     /// This will stop execution when the exit_on_error option is set
-    #[error("early exit: pipeline failed")]
-    EarlyExit,
+    #[error("early exit: pipeline failed with error code {0}")]
+    EarlyExit(Status),
 
     /// A command could not be found in the pipeline
     #[error("command not found: {0}")]

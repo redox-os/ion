@@ -99,6 +99,28 @@ impl fmt::Display for BackgroundProcess {
     }
 }
 
+/// Incorporate the "pipefail" option for what error code is returned
+/// from a finished pipeline.
+enum PipeErrorPropagation {
+    /// Just propagate the error code of the last command.
+    LastCommand(Status),
+    /// No error returned from a command in the pipe yet.
+    NoErrorYet(Status),
+    /// one command returned a non-zero error code in the pipe.
+    /// Propagate this first found error for the whole pipe now.
+    FirstErrorFound(Status),
+}
+
+impl From<PipeErrorPropagation> for Status {
+    fn from(value: PipeErrorPropagation) -> Self {
+        match value {
+            PipeErrorPropagation::LastCommand(r)
+            | PipeErrorPropagation::FirstErrorFound(r)
+            | PipeErrorPropagation::NoErrorYet(r) => r,
+        }
+    }
+}
+
 impl<'a> Shell<'a> {
     /// If a SIGTERM is received, a SIGTERM will be sent to all background processes
     /// before the shell terminates itself.
@@ -252,7 +274,11 @@ impl<'a> Shell<'a> {
     /// Wait for the job in foreground
     pub fn watch_foreground(&mut self, group: Pid) -> Result<Status, PipelineError> {
         let mut signaled = None;
-        let mut exit_status = Status::SUCCESS;
+        let mut exit_status = if self.opts().pipe_fail {
+            PipeErrorPropagation::NoErrorYet(Status::SUCCESS)
+        } else {
+            PipeErrorPropagation::LastCommand(Status::SUCCESS)
+        };
 
         loop {
             match wait::waitpid(Pid::from_raw(-group.as_raw()), Some(WaitPidFlag::WUNTRACED)) {
@@ -261,12 +287,27 @@ impl<'a> Shell<'a> {
                         if let Some(signal) = signaled {
                             break Err(signal);
                         } else {
-                            break Ok(exit_status);
+                            break Ok(exit_status.into());
                         }
                     }
                     err => break Err(PipelineError::WaitPid(err)),
                 },
-                Ok(WaitStatus::Exited(_, status)) => exit_status = Status::from_exit_code(status),
+                Ok(WaitStatus::Exited(_, status)) => {
+                    let status = Status::from_exit_code(status);
+                    match exit_status {
+                        PipeErrorPropagation::LastCommand(_) => {
+                            exit_status = PipeErrorPropagation::LastCommand(status.into())
+                        }
+                        PipeErrorPropagation::NoErrorYet(_) => {
+                            exit_status = if status.is_failure() {
+                                PipeErrorPropagation::FirstErrorFound(status)
+                            } else {
+                                PipeErrorPropagation::NoErrorYet(status)
+                            };
+                        }
+                        PipeErrorPropagation::FirstErrorFound(_) => {}
+                    }
+                }
                 Ok(WaitStatus::Signaled(pid, signal, core_dumped)) => {
                     if signal == signal::Signal::SIGPIPE {
                     } else if core_dumped {

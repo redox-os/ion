@@ -17,14 +17,19 @@ enum PositionalArgs {
     desc = "Set or unset values of shell options and positional parameters.",
     man = "
 SYNOPSIS
-    set [ --help ] [-e | +e] [- | --] [STRING]...
+    set [ --help ] [-e | +e] [-p | +p] [- | --] [STRING]...
 
 DESCRIPTION
     Shell options may be set using the '-' character, and unset using the '+' character.
 
 OPTIONS
     -e  Exit immediately if a command exits with a non-zero status.
-
+    
+    -p  If any command in pipe exits with an non-zero code then pipe returns this non-zero code 
+        instead of error code of the last command.
+        It can be combined with the option -e to let a script fail 
+        if an errors occures in a pipe
+        
     --  Following arguments will be set as positional arguments in the shell.
         If no argument are supplied, arguments will be unset.
 
@@ -52,6 +57,8 @@ pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             }
             "-e" => shell.opts_mut().err_exit = true,
             "+e" => shell.opts_mut().err_exit = false,
+            "-p" => shell.opts_mut().pipe_fail = true,
+            "+p" => shell.opts_mut().pipe_fail = false,
             _ => {
                 return Status::bad_argument(format!(
                     "set: argument '{}' is not recognized. Try adding `--` before it to pass it \
