@@ -11,7 +11,7 @@ pub mod job_control;
 mod pipes;
 pub mod streams;
 
-pub use self::{job_control::BackgroundEvent, pipes::create_pipe};
+pub use self::pipes::create_pipe;
 use self::{job_control::ProcessState, pipes::TeePipe};
 use super::{
     job::{RefinedJob, TeeItem, Variant},

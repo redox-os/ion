@@ -1,0 +1,2 @@
+echo $replace("onetwo one three" "one" "1")
+echo $replace("abc" "a" "")

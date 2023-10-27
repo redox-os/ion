@@ -614,7 +614,7 @@ fn expand_pipeline<'a>(
                     first.job.args.extend(item.job.args.iter().skip(1).cloned());
                 }
                 if len == 1 {
-                    if let Some(mut last) = pline.items.last_mut() {
+                    if let Some(last) = pline.items.last_mut() {
                         last.outputs = item.outputs.clone();
                         last.job.redirection = item.job.redirection;
                     }

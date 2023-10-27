@@ -1,0 +1,3 @@
+let input = "one two one two"
+echo $replacen(input "one" "three" 0)
+echo $replacen(input "one" "" 2)

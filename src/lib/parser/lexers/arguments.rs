@@ -270,4 +270,11 @@ mod tests {
         let expected = vec!["echo", "'one two \"three four\"'", "\"five six 'seven eight'\""];
         compare(input, expected);
     }
+
+    #[test]
+    fn capture_empty_quotes() {
+        let input = "'abc' 'a' ''";
+        let expected = vec!["'abc'", "'a'", "''"];
+        compare(input, expected);
+    }
 }

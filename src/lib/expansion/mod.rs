@@ -176,7 +176,8 @@ pub trait Expander: Sized {
             token_buffer.push(word)
         }
 
-        self.expand_tokens(&token_buffer, contains_brace)
+        let expanded = self.expand_tokens(&token_buffer, contains_brace);
+        expanded
     }
 }
 

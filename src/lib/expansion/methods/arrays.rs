@@ -134,7 +134,7 @@ impl<'a> ArrayMethod<'a> {
             }
         }?;
 
-        let elements = variable.split(char::is_whitespace);
+        let elements = variable.trim().split(char::is_whitespace);
 
         let array = expand_func.slice_array(elements, &self.selection)?;
 

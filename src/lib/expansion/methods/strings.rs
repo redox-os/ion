@@ -7,6 +7,8 @@ use crate::{
 use regex::Regex;
 use std::path::Path;
 use unicode_segmentation::UnicodeSegmentation;
+const ERR_MSG_REPLACE_METHOD: &str =
+    "Two arguments required. First argument must not be an empty string";
 
 pub fn unescape(input: &str) -> types::Str {
     let mut check = false;
@@ -168,6 +170,7 @@ impl<'a> StringMethod<'a> {
             "replace" => {
                 let params = {
                     let mut args = MethodArgs::new(self.pattern, expand);
+                    args.allow_third_args_empty();
                     let mut args = args.array();
                     (args.next(), args.next())
                 };
@@ -176,17 +179,16 @@ impl<'a> StringMethod<'a> {
                         output.push_str(&get_var!().replace(replace.as_str(), &with));
                     }
                     _ => {
-                        return Err(MethodError::WrongArgument(
-                            "replace",
-                            "two arguments are required",
+                        return Err(
+                            MethodError::WrongArgument("replace", ERR_MSG_REPLACE_METHOD).into()
                         )
-                        .into())
                     }
                 }
             }
             "replacen" => {
                 let params = {
                     let mut args = MethodArgs::new(self.pattern, expand);
+                    args.allow_third_args_empty();
                     let mut args = args.array();
                     (args.next(), args.next(), args.next())
                 };
@@ -214,6 +216,7 @@ impl<'a> StringMethod<'a> {
             "regex_replace" => {
                 let params = {
                     let mut args = MethodArgs::new(self.pattern, expand);
+                    args.allow_third_args_empty();
                     let mut args = args.array();
                     (args.next(), args.next())
                 };
@@ -227,7 +230,7 @@ impl<'a> StringMethod<'a> {
                     _ => {
                         return Err(MethodError::WrongArgument(
                             "regex_replace",
-                            "two arguments required",
+                            ERR_MSG_REPLACE_METHOD,
                         )
                         .into())
                     }
