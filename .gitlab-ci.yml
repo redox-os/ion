@@ -28,16 +28,18 @@ linux:
   script:
     - cargo check --features=piston
     - FULL=1 make tests
-
-linux:stable:
-  cache:
-    key: linuxstable
-    paths:
-      - cargo/
-      - target/
-  script:
-    - cargo check --features=piston
-    - TOOLCHAIN= make tests
+ 
+# Deactiavted: job linux:stable does always fail right now 
+# For details see issue: https://gitlab.redox-os.org/redox-os/ion/-/issues/1027 
+# linux:stable:
+#   cache:
+#     key: linuxstable
+#     paths:
+#       - cargo/
+#       - target/
+#   script:
+#     - cargo check --features=piston
+#     - TOOLCHAIN= make tests
 
 redox:
   cache:
