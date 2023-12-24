@@ -328,6 +328,10 @@ impl<'a> Shell<'a> {
         loop {
             self.execute_statements(expression)?;
             if self.previous_status.is_failure() {
+                // for err_exit "fake" success when the loop condition is/turns false preventing early exit
+                if self.opts.err_exit {
+                    self.previous_status = Status::SUCCESS
+                }
                 return Ok(Condition::NoOp);
             }
 
@@ -384,7 +388,13 @@ impl<'a> Shell<'a> {
             Statement::Pipeline(pipeline) => {
                 let (pipeline, statements) = expand_pipeline(self, pipeline)?;
                 if !pipeline.items.is_empty() {
-                    let status = self.run_pipeline(&pipeline)?;
+                    // make sure we capture the status of failed pipelines even with err_exit
+                    let status = match self.run_pipeline(&pipeline) {
+                        Ok(status) => status,
+                        // actively prevent error from propagating
+                        Err(IonError::PipelineExecutionError(PipelineError::EarlyExit(status))) => status,
+                        Err(e) => return Err(e),
+                    };
 
                     // Retrieve the exit_status and set the $? variable and
                     // history.previous_status
@@ -569,8 +579,19 @@ impl<'a> Shell<'a> {
             for statement in StatementSplitter::new(&stmt) {
                 let statement = parse_and_validate(statement?)?;
                 if let Some(stm) = Self::insert_statement(&mut self.flow_control, statement)? {
-                    self.execute_statement(&stm)?;
+                    // fixes && and || statements with err_exit
+                    match self.execute_statement(&stm) {
+                        // actively prevent error from propagating
+                        Err(IonError::PipelineExecutionError(PipelineError::EarlyExit(_))) => {},
+                        Err(e) => return Err(e),
+                        Ok(_) => {},  // fallthrough
+                    }
                 }
+            }
+
+            // re-raise the error for the whole block if necessary
+            if self.opts.err_exit && self.previous_status.is_failure() {
+                return Err(PipelineError::EarlyExit(self.previous_status).into());
             }
         }
 
