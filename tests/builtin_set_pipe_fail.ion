@@ -1,0 +1,7 @@
+set -e -p
+echo 1
+if ! $(false | true)
+    echo 2
+end
+false | true
+echo 3
