@@ -41,7 +41,9 @@
 
 - [Functions](functions.md)
 
-- [Script Executions](scripts.md)
+- [Script Executions](scripts/00-scripts.md)
+    - [Sourcing](scripts/01-sourcing_another_file.md)
+    - [Initialzing File](scripts/02-init_file.md)
 
 - [Signal Handling](signals.md)
 
