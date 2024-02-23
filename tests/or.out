@@ -1,0 +1,6 @@
+false or true
+true or true
+if: or true
+# ANCHOR: or_demonstration
+Will be printed: At least one of the two commands returns successfully
+# ANCHOR_END: or_demonstration

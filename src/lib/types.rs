@@ -1,4 +1,3 @@
-use small;
 use smallvec::SmallVec;
 pub use types_rs::{array, types::*};
 

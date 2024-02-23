@@ -4,7 +4,7 @@ use crate::{
     shell::variables::Value,
     types,
 };
-use std::{iter::Iterator, rc::Rc};
+use std::rc::Rc;
 
 /// Determines if the supplied value is either an array or a string.
 ///

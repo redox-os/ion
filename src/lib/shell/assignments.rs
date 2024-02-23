@@ -12,7 +12,6 @@ use std::{
     env,
     io::{self, BufWriter, Write},
     rc::Rc,
-    result::Result,
 };
 use types_rs::{EuclDiv, Modifications, OpError, Pow};
 

@@ -1,0 +1,5 @@
+true and true
+Answer in life is 42
+# ANCHOR: and_demonstration
+Will be printed: Both commands returned successfully
+# ANCHOR_END: and_demonstration

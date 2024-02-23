@@ -85,3 +85,40 @@ test $foo = "foo" && test $bar = "bar" &&
     echo "foobar was found" ||
     echo "either foo or bar was not found"
 ```
+
+
+## Using the **and** and **or** Builtin
+
+**Or builtin**
+
+`or` builtin succeeds if the previous executed 
+or the given command returns a sussessful status.
+
+Example of `or`: 
+
+```sh
+{{#include ../../../tests/or.ion:or_demonstration}}
+```
+
+Output of example for `or`:
+
+```txt
+{{#include ../../../tests/or.out:5}}
+```
+
+**And builtin**
+
+`and` builtin succeeds if the previous executed 
+and the given command returns a sussessful status.
+
+Example of `and`: 
+
+```sh
+{{#include ../../../tests/and.ion:and_demonstration}}
+```
+
+Output of example:
+
+```txt
+{{#include ../../../tests/and.out:4:4}}
+```

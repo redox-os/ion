@@ -1,0 +1,21 @@
+false 
+or true && echo "false or true"
+
+true 
+or true && echo "true or true"
+
+false 
+or false && echo "false or false"
+
+if or true
+    echo "if: or true"
+else 
+    echo "else: or true"
+end
+
+echo '# ANCHOR: or_demonstration'
+test "42" = "4"
+or test 4 == 4 && echo "Will be printed: At least one of the two commands returns successfully"
+test "42" = "4"
+or test 4 = 2 && echo "Will not be printed: None of the two commands returns successfully"
+echo '# ANCHOR_END: or_demonstration'

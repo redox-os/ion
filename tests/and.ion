@@ -1,0 +1,20 @@
+true
+and true && echo "true and true"
+
+false 
+and true && echo "false and true"
+
+let answer = 42
+
+if or test $answer == 42
+    echo "Answer in life is $answer"
+else 
+    echo "Not expected output here"
+end
+
+echo "# ANCHOR: and_demonstration"
+test "42" == "42"
+and test 4 == 4 && echo "Will be printed: Both commands returned successfully"
+test "42" = "4"
+and test 4 == 4 && echo "Will not be printed: One of the two command did not return successfully"
+echo "# ANCHOR_END: and_demonstration"

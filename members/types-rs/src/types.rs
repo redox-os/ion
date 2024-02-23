@@ -1,6 +1,5 @@
 #![allow(clippy::from_over_into)]
 use super::Value;
-use small;
 use std::{
     collections::{BTreeMap as StdBTreeMap, HashMap as StdHashMap},
     iter::FromIterator,
