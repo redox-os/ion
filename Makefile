@@ -1,7 +1,7 @@
 prefix ?= usr/local
 BINARY = $(prefix)/bin/ion
 RELEASE = debug
-TOOLCHAIN ?= 1.56.0
+TOOLCHAIN ?= 1.65.0
 
 GIT_REVISION=git_revision.txt
 SRC=Cargo.toml Cargo.lock $(shell find src members -type f -wholename '*src/*.rs')

@@ -192,7 +192,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 [[package]]
 name = "calculate"
 version = "0.7.0"
-source = "git+https://gitlab.redox-os.org/redox-os/calc#d2719efb67ab38c4c33ab3590822114453960da5"
+source = "git+https://gitlab.redox-os.org/redox-os/calc?rev=d2719efb67ab38c4c33ab3590822114453960da5#d2719efb67ab38c4c33ab3590822114453960da5"
 dependencies = [
  "atty",
  "clap",
@@ -2990,8 +2990,3 @@ dependencies = [
  "quote",
  "syn 2.0.50",
 ]
-
-[[patch.unused]]
-name = "termion"
-version = "3.0.0"
-source = "git+https://gitlab.redox-os.org/redox-os/termion#b4ed9fad4e14ab4238d4c0dbe0ca18d67ff839bd"
