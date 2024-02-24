@@ -63,7 +63,7 @@ name = "ion"
 path = "src/main.rs"
 
 [dependencies]
-calculate = { git = "https://gitlab.redox-os.org/redox-os/calc" }
+calculate = { git = "https://gitlab.redox-os.org/redox-os/calc", commit = "d2719efb67ab38c4c33ab3590822114453960da5" }
 thiserror = "1.0"
 glob = "0.3"
 redox_liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }

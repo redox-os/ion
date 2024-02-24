@@ -26,7 +26,7 @@ Examples:
 "#;
 
 fn calc_or_polish_calc(args: &str) -> Result<Value, CalcError> {
-    let mut env = calc::parse::DefaultEnvironment::new();
+    let mut env = calc::parse::DefaultEnvironment::with_ans(None);
     eval_with_env(args, &mut env).or_else(|_| eval_polish_with_env(args, &mut env))
 }
 
