@@ -27,34 +27,34 @@ pub struct Signals {
 
 impl Signals {
     pub fn was_grabbed(&self, pid: Pid) -> bool {
-        self.grab.load(Ordering::SeqCst) == pid.as_raw() as usize
+        self.grab.load(Ordering::Relaxed) == pid.as_raw() as usize
     }
 
     pub fn was_processed(&self) -> Option<BackgroundResult> {
-        let reply = self.reply.load(Ordering::SeqCst) as u8;
-        self.reply.store(0, Ordering::SeqCst);
+        let reply = self.reply.load(Ordering::Acquire) as u8;
+        self.reply.store(0, Ordering::Relaxed);
         if reply == ERRORED {
             Some(BackgroundResult::Errored)
         } else if reply == REPLIED {
-            Some(BackgroundResult::Status(self.status.load(Ordering::SeqCst) as i32))
+            Some(BackgroundResult::Status(self.status.load(Ordering::Relaxed) as i32))
         } else {
             None
         }
     }
 
     pub fn errored(&self) {
-        self.grab.store(0, Ordering::SeqCst);
-        self.reply.store(ERRORED as usize, Ordering::SeqCst);
+        self.grab.store(0, Ordering::Relaxed);
+        self.reply.store(ERRORED as usize, Ordering::Release);
     }
 
     pub fn reply_with(&self, status: i32) {
-        self.grab.store(0, Ordering::SeqCst);
-        self.status.store(status as usize, Ordering::SeqCst);
-        self.reply.store(REPLIED as usize, Ordering::SeqCst);
+        self.grab.store(0, Ordering::Relaxed);
+        self.status.store(status as usize, Ordering::Relaxed);
+        self.reply.store(REPLIED as usize, Ordering::Release);
     }
 
     pub fn signal_to_grab(&self, pid: Pid) {
-        self.grab.store(pid.as_raw() as usize, Ordering::SeqCst);
+        self.grab.store(pid.as_raw() as usize, Ordering::Relaxed);
     }
 
     pub const fn new() -> Self {
