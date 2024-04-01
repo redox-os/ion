@@ -103,7 +103,7 @@ piston2d-sprite = { version = "0.58", optional = true }
 users = "0.10"
 
 [target."cfg(target_os = \"redox\")".dependencies]
-redox_users = "0.4.3"
+redox_users = "0.4"
 
 [target."cfg(target_os = \"dragonfly\")".dependencies]
 errno-dragonfly = "0.1.1"
