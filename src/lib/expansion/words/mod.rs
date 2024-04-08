@@ -30,8 +30,11 @@ pub fn unescape_characters<'a>(input: &'a str, characters: &[char]) -> Cow<'a, s
     let mut last_idx: usize = 0;
     let mut input: Cow<'_, str> = input.into();
 
-    while let Some(idx) = input[last_idx..].find('\\') {
-        if let Some(next_character) = input.chars().nth(last_idx + idx + 1) {
+    let escape_char = '\\';
+    while let Some(idx) = input[last_idx..].find(escape_char) {
+        if let Some(next_character) =
+            input.get(last_idx + idx + escape_char.len_utf8()..).and_then(|s| s.chars().nth(0))
+        {
             if characters.contains(&next_character) {
                 input.to_mut().remove(last_idx + idx);
             }
