@@ -142,3 +142,9 @@ For emacs users there is a [kindly-supported syntax highlighting plugin](https:/
 ```
 
 ![Emacs Syntax Highlighting](.gitlab/emacs_syntax.png)
+
+# Lsp /IDE support
+
+There is a LSP-server for the scripting language of this shell. 
+You can install the LSP-server via crates.io to get IDE support like error messages for an code editor or IDE which understands the client side of LSP. Link to LSP server on crates.io : https://crates.io/crates/ion_shell_lsp_server .
+The source code of the LSP server can be found here: https://gitlab.redox-os.org/redox-os/ion_lsp .
