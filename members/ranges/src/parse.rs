@@ -139,3 +139,14 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
         first.parse::<isize>().map(|start| Range::from(Index::new(start))).ok()
     }
 }
+
+pub fn parse_index_key_range(input: &str) -> Option<(Range, Index)> {
+    let mut parts = input.splitn(2, ",");
+
+    // Some v None tells if something is there
+    // True v false says the same?
+    let first = parse_index_range(parts.next()?)?;
+    // there is a parse index here somewhere
+    let mut end = Index::new(parts.next()?.parse::<isize>().ok()?);
+    Some((first, end))
+}

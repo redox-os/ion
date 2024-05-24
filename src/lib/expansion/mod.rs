@@ -103,6 +103,10 @@ pub enum Error<T: fmt::Debug + error::Error + fmt::Display + 'static> {
     /// Mixed types between maps and scalar/array value
     #[error("variable '{0}' is not a map-like value")]
     NotAMap(String),
+
+    /// Error when trying to convert to usize
+    #[error("value '{0}' could not be used to index array")]
+    ArrayIndexParsingError(String),
 }
 
 impl<T: fmt::Display + fmt::Debug + error::Error> From<TypeError> for Error<T> {

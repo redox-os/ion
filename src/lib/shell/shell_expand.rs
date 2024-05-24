@@ -3,12 +3,13 @@ use super::{
 };
 use crate::{
     expansion::{Error, Expander, Result, Select},
+    ranges::{parse_index_key_range, Index},
     types,
 };
 use nix::unistd::{tcsetpgrp, Pid};
 #[cfg(target_os = "redox")]
 use redox_users::All;
-use std::{env, fs::File, io::Read};
+use std::{env, fs::File, io::Read, str::FromStr};
 #[cfg(not(target_os = "redox"))]
 use users::os::unix::UserExt;
 
@@ -94,7 +95,41 @@ impl<'a, 'b> Expander for Shell<'b> {
                         }
                     })
                     .ok_or(Error::InvalidRange { length: array.len(), range: *range }),
-                Select::Key(_) => Err(Error::InvalidIndex(selection.clone(), "array", name.into())),
+                Select::Key(ref key) => {
+                    let (array_range, step) = parse_index_key_range(key)
+                        .ok_or(Error::ArrayIndexParsingError(key.to_string()))?;
+                    let mut array_iter: Result<
+                        Box<
+                            dyn std::iter::Iterator<
+                                Item = &Value<std::rc::Rc<crate::shell::Function>>,
+                            >,
+                        >,
+                        Self::Error,
+                    > = match step {
+                        Index::Forward(0) | Index::Backward(0) => {
+                            Err(Error::ArrayIndexParsingError(String::from("0")))
+                        }
+                        Index::Forward(s) => Ok(Box::new(array.iter().step_by(s))),
+                        Index::Backward(s) => Ok(Box::new(array.iter().rev().step_by(s + 1))),
+                    };
+                    array_range
+                        .bounds(array.len())
+                        .and_then(|(start, length)| {
+                            if array.len() > start {
+                                Some(
+                                    array_iter
+                                        .ok()?
+                                        .skip(start)
+                                        .take(length)
+                                        .map(|var| format!("{}", var).into())
+                                        .collect(),
+                                )
+                            } else {
+                                None
+                            }
+                        })
+                        .ok_or(Error::InvalidRange { length: array.len(), range: array_range })
+                }
             },
             Some(Value::HashMap(hmap)) => match selection {
                 Select::All => {
