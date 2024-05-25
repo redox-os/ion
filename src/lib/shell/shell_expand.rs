@@ -98,20 +98,14 @@ impl<'a, 'b> Expander for Shell<'b> {
                 Select::Key(ref key) => {
                     let (array_range, step) = parse_index_key_range(key)
                         .ok_or(Error::ArrayIndexParsingError(key.to_string()))?;
-                    let mut array_iter: Result<
-                        Box<
-                            dyn std::iter::Iterator<
-                                Item = &Value<std::rc::Rc<crate::shell::Function>>,
-                            >,
-                        >,
-                        Self::Error,
-                    > = match step {
-                        Index::Forward(0) | Index::Backward(0) => {
-                            Err(Error::ArrayIndexParsingError(String::from("0")))
-                        }
-                        Index::Forward(s) => Ok(Box::new(array.iter().step_by(s))),
-                        Index::Backward(s) => Ok(Box::new(array.iter().rev().step_by(s + 1))),
-                    };
+                    let mut array_iter: Result<Box<dyn std::iter::Iterator<Item = &Value<std::rc::Rc<crate::shell::Function>>>>, Self::Error> = 
+                        match step {
+                            Index::Forward(0) => {
+                                Err(Error::ArrayIndexParsingError(String::from("0")))
+                            }
+                            Index::Forward(s) => Ok(Box::new(array.iter().step_by(s))),
+                            Index::Backward(s) => Ok(Box::new(array.iter().rev().step_by(s + 1))),
+                        };
                     array_range
                         .bounds(array.len())
                         .and_then(|(start, length)| {
