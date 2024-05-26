@@ -84,9 +84,9 @@ impl<'a, 'b> Expander for Shell<'b> {
                         .ok_or(Error::IndexParsingError(range.to_string()))?
                         .map(|var| format!("{}", var).into())
                         .collect())
-                    },
+                }
                 Select::Key(ref key) => Err(Error::KeyOnArray(key.to_string())),
-            }
+            },
             Some(Value::HashMap(hmap)) => match selection {
                 Select::All => {
                     let mut array = types::Args::new();

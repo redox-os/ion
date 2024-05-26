@@ -121,47 +121,68 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
 
     match range_to_use {
         // should this return all?
-        RangeInput{start: None, end: None, step: None, ..} => Some(Range::inclusive(Index::new(0isize), Index::new(-1isize), None)),
-        
+        RangeInput { start: None, end: None, step: None, .. } => {
+            Some(Range::inclusive(Index::new(0isize), Index::new(-1isize), None))
+        }
+
         // --== no steps ==--
         // range from
-        RangeInput{start: Some(s), end: None, step: None, ..} => Some(Range::from(Index::new(s), None)),
+        RangeInput { start: Some(s), end: None, step: None, .. } => {
+            Some(Range::from(Index::new(s), None))
+        }
         // ranges to
-        RangeInput{start: None, end: Some(e), step: None, inclusive: true} => Some(Range::inclusive(Index::new(0), Index::new(e), None)),
-        RangeInput{start: None, end: Some(e), step: None, inclusive: false} => Some(Range::exclusive(Index::new(0), Index::new(e), None)),
+        RangeInput { start: None, end: Some(e), step: None, inclusive: true } => {
+            Some(Range::inclusive(Index::new(0), Index::new(e), None))
+        }
+        RangeInput { start: None, end: Some(e), step: None, inclusive: false } => {
+            Some(Range::exclusive(Index::new(0), Index::new(e), None))
+        }
         // complete ranges
-        RangeInput{start: Some(s), end: Some(e), step: None, inclusive: true} => Some(Range::inclusive(Index::new(s), Index::new(e), None)),
-        RangeInput{start: Some(s), end: Some(e), step: None, inclusive: false} => Some(Range::exclusive(Index::new(s), Index::new(e), None)),
-        
+        RangeInput { start: Some(s), end: Some(e), step: None, inclusive: true } => {
+            Some(Range::inclusive(Index::new(s), Index::new(e), None))
+        }
+        RangeInput { start: Some(s), end: Some(e), step: None, inclusive: false } => {
+            Some(Range::exclusive(Index::new(s), Index::new(e), None))
+        }
+
         // --== steps ==--
         // range from
-        RangeInput{start: Some(s), end: None, step: Some(step), ..} => Some(Range::from(Index::new(s), Some(Index::new(step)))),
+        RangeInput { start: Some(s), end: None, step: Some(step), .. } => {
+            Some(Range::from(Index::new(s), Some(Index::new(step))))
+        }
         // ranges to
-        RangeInput{start: None, end: Some(e), step: Some(step), inclusive: true} => Some(Range::inclusive(Index::new(0), Index::new(e), Some(Index::new(step)))),
-        RangeInput{start: None, end: Some(e), step: Some(step), inclusive: false} => Some(Range::exclusive(Index::new(0), Index::new(e), Some(Index::new(step)))),
+        RangeInput { start: None, end: Some(e), step: Some(step), inclusive: true } => {
+            Some(Range::inclusive(Index::new(0), Index::new(e), Some(Index::new(step))))
+        }
+        RangeInput { start: None, end: Some(e), step: Some(step), inclusive: false } => {
+            Some(Range::exclusive(Index::new(0), Index::new(e), Some(Index::new(step))))
+        }
         // complete ranges
-        RangeInput{start: Some(s), end: Some(e), step: Some(step), inclusive: true} => Some(Range::inclusive(Index::new(s), Index::new(e), Some(Index::new(step)))),
-        RangeInput{start: Some(s), end: Some(e), step: Some(step), inclusive: false} => Some(Range::exclusive(Index::new(s), Index::new(e), Some(Index::new(step)))),
+        RangeInput { start: Some(s), end: Some(e), step: Some(step), inclusive: true } => {
+            Some(Range::inclusive(Index::new(s), Index::new(e), Some(Index::new(step))))
+        }
+        RangeInput { start: Some(s), end: Some(e), step: Some(step), inclusive: false } => {
+            Some(Range::exclusive(Index::new(s), Index::new(e), Some(Index::new(step))))
+        }
 
-        _ => None
+        _ => None,
     }
 }
 
 #[derive(Debug)]
 struct RangeInput {
-    start: Option<isize>,
-    end: Option<isize>,
-    step: Option<isize>,
-    inclusive: bool
-
+    start:     Option<isize>,
+    end:       Option<isize>,
+    step:      Option<isize>,
+    inclusive: bool,
 }
 
 impl<'a> RangeInput {
-    fn new<T: std::iter::Iterator<Item=&'a str>>(mut parts_iter: T) -> RangeInput {
+    fn new<T: std::iter::Iterator<Item = &'a str>>(mut parts_iter: T) -> RangeInput {
         let mut inclusive = false;
         let start = match parts_iter.next() {
             Some(s) => s.parse::<isize>().ok(),
-            None => None
+            None => None,
         };
         let end = match parts_iter.next() {
             Some(e) => {
@@ -171,21 +192,14 @@ impl<'a> RangeInput {
                 } else {
                     e.parse::<isize>().ok()
                 }
-            },
-            None => None
+            }
+            None => None,
         };
         let step = match parts_iter.next() {
             Some(s) => s.parse::<isize>().ok(),
-            None => None
+            None => None,
         };
 
-        RangeInput {
-            start,
-            end,
-            step,
-            inclusive
-        }
-
+        RangeInput { start, end, step, inclusive }
     }
-
 }
