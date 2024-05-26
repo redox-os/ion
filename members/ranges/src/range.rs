@@ -61,7 +61,6 @@ impl<'a> Range {
     pub fn iter_array<T: std::fmt::Display + 'a>(&'a self, array_len: usize, array_iter: &'a mut (impl std::iter::DoubleEndedIterator<Item=T> + 'a)) 
     -> Option<impl std::iter::Iterator<Item=T> + 'a> 
     {
-        println!("{:?}", self.step.clone());
         let modified_iter: Box<dyn std::iter::Iterator<Item=T>> = match self.step {
             Some(Index::Forward(0)) => return None,
             Some(Index::Forward(s)) => Box::new(std::iter::Iterator::step_by(array_iter, s)),
