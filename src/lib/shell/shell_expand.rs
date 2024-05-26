@@ -3,7 +3,7 @@ use super::{
 };
 use crate::{
     expansion::{Error, Expander, Result, Select},
-    ranges::{parse_index_key_range, Index},
+    ranges::Index,
     types,
 };
 use nix::unistd::{tcsetpgrp, Pid};
@@ -78,53 +78,15 @@ impl<'a, 'b> Expander for Shell<'b> {
                     .and_then(|n| array.get(n))
                     .map(|x| args![types::Str::from(format!("{}", x))])
                     .ok_or(Error::OutOfBound { length: array.len(), index: *id }),
-                Select::Range(ref range) => range
-                    .bounds(array.len())
-                    .and_then(|(start, length)| {
-                        if array.len() > start {
-                            Some(
-                                array
-                                    .iter()
-                                    .skip(start)
-                                    .take(length)
-                                    .map(|var| format!("{}", var).into())
-                                    .collect(),
-                            )
-                        } else {
-                            None
-                        }
-                    })
-                    .ok_or(Error::InvalidRange { length: array.len(), range: *range }),
-                Select::Key(ref key) => {
-                    let (array_range, step) = parse_index_key_range(key)
-                        .ok_or(Error::ArrayIndexParsingError(key.to_string()))?;
-                    let mut array_iter: Result<Box<dyn std::iter::Iterator<Item = &Value<std::rc::Rc<crate::shell::Function>>>>, Self::Error> = 
-                        match step {
-                            Index::Forward(0) => {
-                                Err(Error::ArrayIndexParsingError(String::from("0")))
-                            }
-                            Index::Forward(s) => Ok(Box::new(array.iter().step_by(s))),
-                            Index::Backward(s) => Ok(Box::new(array.iter().rev().step_by(s + 1))),
-                        };
-                    array_range
-                        .bounds(array.len())
-                        .and_then(|(start, length)| {
-                            if array.len() > start {
-                                Some(
-                                    array_iter
-                                        .ok()?
-                                        .skip(start)
-                                        .take(length)
-                                        .map(|var| format!("{}", var).into())
-                                        .collect(),
-                                )
-                            } else {
-                                None
-                            }
-                        })
-                        .ok_or(Error::InvalidRange { length: array.len(), range: array_range })
-                }
-            },
+                Select::Range(ref range) => {
+                    Ok(range
+                        .iter_array(array.len(), &mut array.iter()) // members/ranges/src/range
+                        .ok_or(Error::IndexParsingError(range.to_string()))?
+                        .map(|var| format!("{}", var).into())
+                        .collect())
+                    },
+                Select::Key(ref key) => Err(Error::KeyOnArray(key.to_string())),
+            }
             Some(Value::HashMap(hmap)) => match selection {
                 Select::All => {
                     let mut array = types::Args::new();
