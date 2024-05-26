@@ -81,7 +81,7 @@ impl<'a, 'b> Expander for Shell<'b> {
                 Select::Range(ref range) => {
                     Ok(range
                         .iter_array(array.len(), &mut array.iter()) // members/ranges/src/range
-                        .ok_or(Error::IndexParsingError(range.to_string()))?
+                        .ok_or(Error::InvalidRange { length: array.len(), range: *range })?
                         .map(|var| format!("{}", var).into())
                         .collect())
                 }
