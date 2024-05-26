@@ -120,10 +120,10 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
     let range_to_use = RangeInput::new(parts);
 
     match range_to_use {
-        // should this return all?
-        RangeInput { start: None, end: None, step: None, .. } => {
-            Some(Range::inclusive(Index::new(0isize), Index::new(-1isize), None))
-        }
+        // should this return all? have to fix how this works
+        // RangeInput { start: None, end: None, step: None, .. } => {
+        // Some(Range::inclusive(Index::new(0isize), Index::new(-1isize), None))
+        // }
 
         // --== no steps ==--
         // range from
