@@ -117,7 +117,7 @@ pub fn parse_range<K: From<String>>(input: &str) -> Option<Box<dyn Iterator<Item
 
 pub fn parse_index_range(input: &str) -> Option<Range> {
     let mut parts = input.splitn(3, "..");
-    let range_to_use = RangeInput::new(parts);
+    let range_to_use = RangeInput::new(parts)?;
 
     match range_to_use {
         // should this return all? have to fix how this works
@@ -178,28 +178,34 @@ struct RangeInput {
 }
 
 impl<'a> RangeInput {
-    fn new<T: std::iter::Iterator<Item = &'a str>>(mut parts_iter: T) -> RangeInput {
+    fn new<T: std::iter::Iterator<Item = &'a str>>(mut parts_iter: T) -> Option<RangeInput> {
         let mut inclusive = false;
         let start = match parts_iter.next() {
-            Some(s) => s.parse::<isize>().ok(),
+            Some("") => Some(0isize), // handles ..end case
+            Some(s) => Some(s.parse::<isize>().ok()?),
             None => None,
         };
         let end = match parts_iter.next() {
+            Some("") => {
+                // handles start.. case
+                inclusive = true;
+                Some(-1isize)
+            }
             Some(e) => {
                 inclusive = e.starts_with('.') || e.starts_with('=');
                 if inclusive {
-                    e[1..].parse::<isize>().ok()
+                    Some(e[1..].parse::<isize>().ok()?)
                 } else {
-                    e.parse::<isize>().ok()
+                    Some(e.parse::<isize>().ok()?)
                 }
             }
             None => None,
         };
         let step = match parts_iter.next() {
-            Some(s) => s.parse::<isize>().ok(),
+            Some(s) => Some(s.parse::<isize>().ok())?,
             None => None,
         };
 
-        RangeInput { start, end, step, inclusive }
+        Some(RangeInput { start, end, step, inclusive })
     }
 }
