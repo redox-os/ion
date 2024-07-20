@@ -1,4 +1,4 @@
-## On Redox Os 
+## Redox OS
 
 ### File scheme
 

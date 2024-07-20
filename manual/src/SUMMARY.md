@@ -27,7 +27,7 @@
     - [Method Expansions](expansions/05-method.md)
     - [String Methods](expansions/06-stringmethods.md)
     - [Array Methods](expansions/07-arraymethods.md)
-    - [Redox os specific](expansions/08-on_redox_os.md)
+    - [Redox OS](expansions/08-redox-os.md)
 
 - [Slicing Syntax](slicing.md)
 
