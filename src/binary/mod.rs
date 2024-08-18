@@ -278,7 +278,7 @@ impl<'a> InteractiveShell<'a> {
         // Gag the cd output
         let null = OpenOptions::new()
             .write(true)
-            .open(if cfg!(target_os = "redox") { "null:" } else { "/dev/null" })
+            .open("/dev/null")
             .map_err(|err| nix::errno::Errno::from_i32(err.raw_os_error().unwrap()))?
             .into_raw_fd();
 
