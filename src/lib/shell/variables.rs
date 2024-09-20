@@ -163,7 +163,13 @@ impl Variables {
     #[must_use]
     fn get_simplified_directory(&self) -> types::Str {
         let home = self.get_str("HOME").unwrap_or_else(|_| "?".into());
-        env::var("PWD").unwrap().replace(&*home, "~").into()
+        let pwd = env::var("PWD").unwrap();
+
+        if pwd.starts_with(&*home) {
+            pwd.replacen(&*home, "~", 1).into()
+        } else {
+            pwd.into()
+        }
     }
 
     /// Indicates if name is valid for functions and variables
