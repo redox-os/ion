@@ -122,4 +122,3 @@ panic = "abort"
 # Required to make `cargo vendor` work
 [patch.crates-io]
 redox_liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }
-cc-11 = { git = "https://github.com/tea/cc-rs", branch="riscv-abi-arch-fix", package = "cc" }
