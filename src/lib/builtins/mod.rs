@@ -276,7 +276,12 @@ pub fn source_sh(args: &[types::Str], _shell: &mut Shell<'_>) -> Status {
     if let Ok(s) = std::fs::read_to_string(arg.as_str()) {
         arg = Cow::Owned(s.into());
     }
-    let script = format!("{}\nenv | sort > {}", arg, temp.as_path().display());
+    let script = format!(
+        "{}\nenv -0 | xargs -0 -I '{{}}' echo -ne {{}}\x03 | sed -z 's/\\n/\\\\n/g' | sed -z \
+         's/'\x03'/\\n/g' | sort > {}",
+        arg,
+        temp.as_path().display()
+    );
     match Command::new("sh")
         .args(&["-c", &script])
         .stdout(Stdio::null())
@@ -304,9 +309,10 @@ pub fn source_sh(args: &[types::Str], _shell: &mut Shell<'_>) -> Status {
                         eprintln!("Invalid environment variable '{}'. Proceeding anyway", name);
                         continue;
                     }
-                };
+                }
+                .replace("\\n", "\n");
                 let prev_val = std::env::var_os(name);
-                if prev_val.as_ref().and_then(|x| x.to_str()) != Some(val) {
+                if prev_val.as_ref().and_then(|x| x.to_str()) != Some(&val) {
                     println!("Set {} to {}", name, val);
                     std::env::set_var(name, val);
                 }
