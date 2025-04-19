@@ -27,7 +27,7 @@ impl<'a> DesignatorLexer<'a> {
         output
     }
 
-    pub fn new(data: &'a [u8]) -> DesignatorLexer {
+    pub fn new(data: &[u8]) -> DesignatorLexer {
         DesignatorLexer { data, quotes: Quotes::None, design: false }
     }
 }
