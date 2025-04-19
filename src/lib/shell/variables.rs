@@ -260,7 +260,6 @@ impl Variables {
 }
 
 impl Default for Variables {
-    #[must_use]
     fn default() -> Self {
         let mut map: Scopes<types::Str, Value<Rc<Function>>> = Scopes::with_capacity(64);
         map.set("HISTORY_SIZE", "1000");

@@ -119,7 +119,6 @@ pub enum PipelineError {
 }
 
 impl From<RedirectError> for PipelineError {
-    #[must_use]
     fn from(cause: RedirectError) -> Self { Self::RedirectPipeError(cause) }
 }
 
