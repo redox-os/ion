@@ -265,12 +265,14 @@ impl Default for Variables {
         let mut map: Scopes<types::Str, Value<Rc<Function>>> = Scopes::with_capacity(64);
         map.set("HISTORY_SIZE", "1000");
         map.set("HISTFILE_SIZE", "100000");
-        map.set(
-            "PROMPT",
-            "${x::1B}]0;${USER}: \
-             ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# \
-             ${c::reset}",
+        // # for root user, $ for other users
+        let ending = if geteuid().as_raw() == 0 { "#" } else { "$" };
+        let prompt = format!(
+            "${{x::1B}}]0;${{USER}}: \
+             ${{PWD}}${{x::07}}${{c::0x55,bold}}${{USER}}${{c::default}}:\
+             ${{c::0x4B}}${{SWD}}${{c::default}}{ending} ${{c::reset}}"
         );
+        map.set("PROMPT", prompt);
 
         // Set the PID, UID, and EUID variables.
         map.set("PID", Value::Str(getpid().to_string().into()));

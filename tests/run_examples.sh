@@ -19,7 +19,8 @@ fi
 
 # Create expected output for fn-root-vars
 echo $HOME > $EXAMPLES_DIR/fn-root-vars.out # Overwrite previous file
-echo '${x::1B}]0;${USER}: ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# ${c::reset}' >> $EXAMPLES_DIR/fn-root-vars.out
+ending=$([ "$EUID" -eq 0 ] && echo "#" || echo "$")
+echo '${x::1B}]0;${USER}: ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}'$ending' ${c::reset}' >> $EXAMPLES_DIR/fn-root-vars.out
 id -u $USER >> $EXAMPLES_DIR/fn-root-vars.out
 echo >> $EXAMPLES_DIR/fn-root-vars.out
 
