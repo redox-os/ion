@@ -156,6 +156,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
 
 [[package]]
+name = "buf_read_splitter"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4645e4b1f94aa320084c653bc616681dd8f34c8d656cdd76f7e71efde19ada10"
+
+[[package]]
 name = "builtins-proc"
 version = "0.1.0"
 dependencies = [
@@ -1000,6 +1006,7 @@ version = "1.0.0-alpha"
 dependencies = [
  "atty",
  "auto_enums",
+ "buf_read_splitter",
  "builtins-proc",
  "calculate",
  "criterion",

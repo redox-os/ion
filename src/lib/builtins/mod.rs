@@ -10,6 +10,7 @@ mod functions;
 mod helpers;
 mod is;
 mod job_control;
+mod mapfile;
 mod math;
 mod random;
 mod set;
@@ -42,6 +43,7 @@ use crate::{
 use builtins_proc::builtin;
 use itertools::Itertools;
 use liner::{Completer, Context, Prompt};
+use mapfile::builtin_mapfile;
 use mktemp::Temp;
 use std::{
     borrow::Cow,
@@ -187,7 +189,7 @@ impl<'a> BuiltinMap<'a> {
 
     /// Utilities concerning the filesystem
     ///
-    /// Contains `test`, `exists`, `popd`, `pushd`, `dirs`, `cd`
+    /// Contains `test`, `exists`, `popd`, `pushd`, `dirs`, `cd`, `mapfile`
     pub fn with_files_and_directory(&mut self) -> &mut Self {
         self.add("test", &builtin_test, "Performs tests on files and text")
             .add("exists", &builtin_exists, "Performs tests on files and text")
@@ -196,6 +198,7 @@ impl<'a> BuiltinMap<'a> {
             .add("dirs", &builtin_dirs, "Display the current directory stack")
             .add("cd", &builtin_cd, "Change the current directory\n    cd <path>")
             .add("dir_depth", &builtin_dir_depth, "Set the maximum directory depth")
+            .add("mapfile", &builtin_mapfile, "Split files/stdin according to a delimiter")
     }
 
     /// Utilities to test values
