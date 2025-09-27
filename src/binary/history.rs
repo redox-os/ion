@@ -30,8 +30,8 @@ DESCRIPTION
 OPTIONS:
     +inc_append: Append each command to history as entered.
     -inc_append: Default, do not append each command to history as entered.
-    +shared: Share history between shells using the same history file, implies inc_append.
-    -shared: Default, do not share shell history.
+    +share: Share history between shells using the same history file, implies inc_append.
+    -share: Default, do not share shell history.
     +duplicates: Default, allow duplicates in history.
     -duplicates: Do not allow duplicates in history."
 )]
