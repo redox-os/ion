@@ -39,6 +39,7 @@ FLAGS:
     -f, --fake-interactive    Use a fake interactive mode, where errors don't exit the shell
     -h, --help                Prints help information
     -i, --interactive         Force interactive mode
+    -l, --login               No-op for backwards compatability for systems that expect a "login-shell"
     -n, --no-execute          Do not execute any commands, perform only syntax checking
     -x                        Print commands before execution
     -v, --version             Print the version, platform and revision of Ion then exit

@@ -134,6 +134,12 @@ fn parse_args() -> Result<CommandLineArgs, ParsingError> {
                 }
                 command = args.next();
             }
+            "-l" | "--login" => {
+                // Intentionally left blank. For compatability for systems that
+                // runs Ion as a "login-shell" by passing the "-l" or "--login"
+                // argument. TODO Perhaps use this option to parse a "profile"
+                // file in the future?
+            }
             _ => {
                 additional_arguments.push(arg);
             }
