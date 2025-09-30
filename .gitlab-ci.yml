@@ -40,7 +40,7 @@ redox:
     - redoxer build # TODO: do test when it does not hang
 
 pages:
-  stage: build
+  stage: lint
   script:
   - curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
   - cargo binstall mdbook mdbook-linkcheck
