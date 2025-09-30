@@ -48,7 +48,7 @@ pages:
   - cargo binstall mdbook mdbook-linkcheck
   - make manual
   - mdbook build manual
-  - mv manual/book/html public
+  - mv manual/book public
   artifacts:
     paths:
     - public
