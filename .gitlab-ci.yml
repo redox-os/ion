@@ -43,6 +43,7 @@ redox:
 pages:
   stage: lint
   script:
+  - PATH=$PATH:$CARGO_HOME/bin
   - curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
   - cargo binstall mdbook mdbook-linkcheck
   - make manual
