@@ -3,6 +3,7 @@ image: "redoxos/redoxer"
 stages:
   - lint
   - test
+  - deploy
 
 variables:
     CARGO_HOME: $CI_PROJECT_DIR/cargo
