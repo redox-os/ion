@@ -60,7 +60,7 @@ compare-benchmarks:
   allow_failure: true
   except: [master]
   script:
-    - apt-get install -y ibboost-dev jq bc
+    - apt-get install -y libboost-dev jq bc
     - sh ./ci/run_benchmark.sh
   artifacts:
     reports:
