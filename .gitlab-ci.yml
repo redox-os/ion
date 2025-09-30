@@ -25,7 +25,7 @@ linux:
       - target/
   script:
     - cargo check --features=piston
-    - TOOLCHAIN= make tests
+    - FULL=1 make tests
 
 redox:
   stage: test
@@ -40,12 +40,26 @@ redox:
   script:
     - redoxer build # TODO: do test when it does not hang
 
-pages:
+link-check:
   stage: lint
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
   script:
   - PATH=$PATH:$CARGO_HOME/bin
   - curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
   - cargo binstall mdbook mdbook-linkcheck
+  - make manual
+  - mdbook build manual
+
+pages:
+  stage: deploy
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      when: never
+  script:
+  - PATH=$PATH:$CARGO_HOME/bin
+  - curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+  - cargo binstall mdbook
   - make manual
   - mdbook build manual
   - mv manual/book public
