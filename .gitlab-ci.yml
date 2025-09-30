@@ -50,8 +50,6 @@ pages:
   artifacts:
     paths:
     - public
-  only:
-  - master
 
 compare-benchmarks:
   image: rustlang/rust:nightly
