@@ -44,6 +44,7 @@ echo '# ANCHOR_END: replacen'
 echo '# ANCHOR: regex_replace'
 echo $regex_replace("bob" "^b" "B")
 echo $regex_replace("bob" 'b$' "B")
+echo $regex_replace("One Two Three Four" "\(One\) \(Two\) \(Three\) \(Four\)" '$4 $3 $2 $1')
 echo '# ANCHOR_END: regex_replace'
 echo '# ANCHOR: reverse'
 echo $reverse("foobar")

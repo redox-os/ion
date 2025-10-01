@@ -41,6 +41,7 @@ one three one three
 # ANCHOR: regex_replace
 Bob
 boB
+Four Three Two One
 # ANCHOR_END: regex_replace
 # ANCHOR: reverse
 raboof
