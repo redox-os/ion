@@ -1,25 +1,24 @@
 image: "redoxos/redoxer"
 
+stages:
+  - lint
+  - test
+  - deploy
+
 variables:
     CARGO_HOME: $CI_PROJECT_DIR/cargo
 before_script:
   - apt-get update -qq
-  - apt-get install -qq build-essential curl git
+  - apt-get install -qq libssl-dev pkg-config build-essential curl git
 
 format:
-  image: 'rustlang/rust:nightly'
-  cache:
-    key: format
-    paths:
-      - cargo/
-      - target/
+  stage: lint
   script:
-    - rustup default nightly
     - rustup component add rustfmt
-    - cargo +nightly fmt --all -- --check
+    - cargo fmt --all -- --check
 
 linux:
-  image: 'rust:1.76.0'
+  stage: test
   cache:
     key: linux
     paths:
@@ -28,20 +27,9 @@ linux:
   script:
     - cargo check --features=piston
     - FULL=1 make tests
- 
-# Deactiavted: job linux:stable does always fail right now 
-# For details see issue: https://gitlab.redox-os.org/redox-os/ion/-/issues/1027 
-# linux:stable:
-#   cache:
-#     key: linuxstable
-#     paths:
-#       - cargo/
-#       - target/
-#   script:
-#     - cargo check --features=piston
-#     - TOOLCHAIN= make tests
 
 redox:
+  stage: test
   cache:
     key: redox
     paths:
@@ -53,44 +41,32 @@ redox:
   script:
     - redoxer build # TODO: do test when it does not hang
 
-# Disabled until issues can be fixed
-# link-check:
-#   image: hrektts/mdbook
-#   cache:
-#     key: linkcheck
-#     paths:
-#       - cargo/
-#       - cargo/bin
-#   before_script:
-#     - apt-get update -qq
-#     - apt-get install -qq libssl-dev pkg-config build-essential curl git
-#     - test -x $CARGO_HOME/bin/mdbook-linkcheck || cargo install mdbook-linkcheck
-#   script:
-#   - PATH=$PATH:$CARGO_HOME/bin
-#   - make manual
-#   - mdbook build manual
-
-pages:
-  image: hrektts/mdbook
-  stage: deploy
-  cache:
-    key: book
-    paths:
-      - cargo/
-      - cargo/bin
-  before_script:
-    - apt-get update -qq
-    - apt-get install -qq libssl-dev pkg-config build-essential curl git
+link-check:
+  stage: lint
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
   script:
   - PATH=$PATH:$CARGO_HOME/bin
+  - curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+  - cargo binstall mdbook mdbook-linkcheck
   - make manual
   - mdbook build manual
-  - mv manual/book/html public
+
+pages:
+  stage: deploy
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      when: never
+  script:
+  - PATH=$PATH:$CARGO_HOME/bin
+  - curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+  - cargo binstall mdbook
+  - make manual
+  - mdbook build manual
+  - mv manual/book public
   artifacts:
     paths:
     - public
-  only:
-  - master
 
 compare-benchmarks:
   image: rustlang/rust:nightly
@@ -99,7 +75,7 @@ compare-benchmarks:
   allow_failure: true
   except: [master]
   script:
-    - apt-get update && apt-get install -y build-essential libboost-dev jq bc
+    - apt-get install -y libboost-dev jq bc
     - sh ./ci/run_benchmark.sh
   artifacts:
     reports:
