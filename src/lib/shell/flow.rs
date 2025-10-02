@@ -227,6 +227,14 @@ impl<'a> Shell<'a> {
                     Ok(Some(Statement::Time(inner)))
                 }
             }
+            Statement::LocalAssignAct { key, value, stmt } => {
+                if stmt.is_block() {
+                    block.push(Statement::LocalAssignAct { key, value, stmt });
+                    Ok(None)
+                } else {
+                    Ok(Some(Statement::LocalAssignAct { key, value, stmt }))
+                }
+            }
             _ if block.is_empty() => {
                 // Filter out toplevel statements that should produce an error
                 // otherwise return the statement for immediat execution
@@ -459,6 +467,23 @@ impl<'a> Shell<'a> {
                     }
                 }
                 return Ok(Condition::Return);
+            }
+            Statement::LocalAssignAct { key, value, stmt } => {
+                // First get the previous variable setting for key
+                let prev_var = std::env::var(&key);
+
+                // Set the enviornment variable
+                std::env::set_var(key, value);
+
+                // Execute the command
+                self.execute_statement(stmt)?;
+
+                // Restore the environment variable
+                if let Ok(prev_var) = prev_var {
+                    std::env::set_var(key, prev_var);
+                } else {
+                    std::env::remove_var(key);
+                }
             }
             _ => {}
         }
