@@ -18,3 +18,7 @@ two three
 4
 5.1 6.2 7.3
 dropping_variables:
+command_local_variables:
+test_var_value
+2025-10-01 05:00:00
+three two one

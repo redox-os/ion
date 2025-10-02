@@ -169,6 +169,15 @@ pub enum Statement {
     Or(Box<Statement>),
     /// Succeed on failure of the inner statement
     Not(Box<Statement>),
+    /// Assign an environment variable, then execute
+    LocalAssignAct {
+        /// The variable name
+        key:   String,
+        /// The variable value
+        value: String,
+        /// The statement to execute with the assigned variable
+        stmt:  Box<Statement>,
+    },
     /// An empty statement
     Default,
 }
@@ -198,6 +207,7 @@ impl fmt::Display for Statement {
                 Statement::Or(_) => "Or { .. }",
                 Statement::Not(_) => "Not { .. }",
                 Statement::Return(_) => "Return",
+                Statement::LocalAssignAct { key: _, value: _, stmt: _ } => "LocalAssignAct { .. }",
                 Statement::Default => "Default",
             }
         )

@@ -42,3 +42,12 @@ drop string
 let array = [ hello world ]
 drop array
 # ANCHOR_END: dropping_variables
+echo "command_local_variables:"
+# ANCHOR: command_local_variables
+export TEST_VAR=other_value
+TEST_VAR=test_var_value echo $TEST_VAR
+
+TZ=America/New_York date --date="2025-10-01T09:00:00+00:00" +'%Y-%m-%d %R:%S'
+
+TEST_VAR_ONE=one TEST_VAR_TWO=two TEST_VAR_THREE=three echo $TEST_VAR_THREE $TEST_VAR_TWO $TEST_VAR_ONE
+# ANCHOR_END: command_local_variables

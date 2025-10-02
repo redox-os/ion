@@ -40,6 +40,18 @@ that type.
 {{#include ../../../tests/variables.ion:dropping_variables}}
 ```
 
+## Command-line Temporary Variables
+
+A command starting with a variable assignment uses that variable for the
+duration of the command.
+
+```sh
+{{#include ../../../tests/variables.ion:command_local_variables}}
+```
+```txt
+{{#include ../../../tests/variables.out:22:24}}
+```
+
 ## Supported Primitive Types
 
 - `str`: A string, the essential primitive of a shell.
