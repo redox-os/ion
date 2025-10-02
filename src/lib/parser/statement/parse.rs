@@ -16,7 +16,7 @@ use std::char;
 pub fn parse(code: &str) -> super::Result {
     let cmd = code.trim();
     let variable_assignment_regex =
-        regex::Regex::new(r"^([a-zA-Z][^=\t\n\v\f\r ]*)=([[:^space:]]+)[[:space:]]+(.*)$")
+        regex::Regex::new(r"^([a-zA-Z][^=\t\n\v\f\r ]*)=([[:^space:]]+)[[:space:]]+(.+)$")
             .expect("Should be able to compile regex to check for variable assignment");
     let v_assign_captures = variable_assignment_regex.captures(&cmd);
     match cmd {

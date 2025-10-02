@@ -475,8 +475,8 @@ impl<'a> Shell<'a> {
                 // Set the enviornment variable
                 std::env::set_var(key, value);
 
-                // Execute the command
-                self.execute_statement(stmt)?;
+                // Execute the command, but don't return even on error just yet
+                let result = self.execute_statement(stmt);
 
                 // Restore the environment variable
                 if let Ok(prev_var) = prev_var {
@@ -484,6 +484,9 @@ impl<'a> Shell<'a> {
                 } else {
                     std::env::remove_var(key);
                 }
+
+                // Now process the result
+                result?;
             }
             _ => {}
         }
