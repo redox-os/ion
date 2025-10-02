@@ -11,14 +11,31 @@ use crate::{
     },
     types,
 };
-use std::char;
+use std::{
+    cell::RefCell,
+    char,
+    sync::{Arc, Mutex},
+};
+
+// std::sync::LazyLock only available on/after Rust 1.80.0
+// We are targeting Rust 1.76 in unit tests, thus using this alternative
+static VARIABLE_ASSIGNMENT_REGEX: Mutex<RefCell<Option<regex::Regex>>> =
+    Mutex::new(RefCell::new(None));
 
 pub fn parse(code: &str) -> super::Result {
     let cmd = code.trim();
-    let variable_assignment_regex =
-        regex::Regex::new(r"^([a-zA-Z][^=\t\n\v\f\r ]*)=([[:^space:]]+)[[:space:]]+(.+)$")
-            .expect("Should be able to compile regex to check for variable assignment");
-    let v_assign_captures = variable_assignment_regex.captures(&cmd);
+    let mut v_assign_captures: Option<regex::Captures<'_>> = None;
+    {
+        let mut locked = VARIABLE_ASSIGNMENT_REGEX.lock().unwrap();
+        if locked.borrow().is_none() {
+            // Compile Regex only once
+            locked.replace(Some(
+                regex::Regex::new(r"^([a-zA-Z][^=\t\n\v\f\r ]*)=([[:^space:]]+)[[:space:]]+(.+?)$")
+                    .expect("Should be able to compile regex to check for variable assignment"),
+            ));
+        }
+        v_assign_captures = locked.borrow().as_ref().unwrap().captures(&cmd);
+    }
     match cmd {
         "return" => Ok(Statement::Return(None)),
         _ if cmd.starts_with("return ") => {
