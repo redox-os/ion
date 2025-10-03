@@ -39,11 +39,11 @@ test() {
 }
 
 test_generic() {
-    ls -1 $@ | xargs -P $CPU_CORES -I {} bash -c "test {} {} 1"
+    ls -1 $@ | xargs -I {} bash -c "test {} {} 1"
 }
 
 test_params() {
-    ls -1 $@ | xargs -P $CPU_CORES -I {} bash -c "IFS=$'\\n'; test {} "'$(< {})'
+    ls -1 $@ | xargs -I {} bash -c "IFS=$'\\n'; test {} "'$(< {})'
 }
 
 test_single() {
@@ -81,8 +81,6 @@ export -f test
 export TAGFAIL
 export TAGPASS
 export EXAMPLES_DIR
-
-CPU_CORES=$(nproc --all)
 
 # Build debug binary
 # Check if the variable $RUSTUP is set. If yes, the $TOOLCHAIN can be choosen via cargo, otherwise cargo might not now
