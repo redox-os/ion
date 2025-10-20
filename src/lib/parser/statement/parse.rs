@@ -11,31 +11,36 @@ use crate::{
     },
     types,
 };
-use std::{
-    cell::RefCell,
-    char,
-    sync::{Arc, Mutex},
-};
+use std::{cell::RefCell, char, sync::Mutex};
 
 // std::sync::LazyLock only available on/after Rust 1.80.0
 // We are targeting Rust 1.76 in unit tests, thus using this alternative
 static VARIABLE_ASSIGNMENT_REGEX: Mutex<RefCell<Option<regex::Regex>>> =
     Mutex::new(RefCell::new(None));
 
+fn is_variable_assignment_stmt<'a>(
+    cmd: &'a str,
+    captures_out: &mut Option<regex::Captures<'a>>,
+) -> bool {
+    let locked = VARIABLE_ASSIGNMENT_REGEX.lock().unwrap();
+    if locked.borrow().is_none() {
+        // Compile Regex only once
+        locked.replace(Some(
+            regex::Regex::new(r"^([a-zA-Z][^=\t\n\v\f\r ]*)=([[:^space:]]+)[[:space:]]+(.+?)$")
+                .expect("Should be able to compile regex to check for variable assignment"),
+        ));
+    }
+    let current_captures: Option<regex::Captures<'a>> =
+        locked.borrow().as_ref().unwrap().captures(cmd);
+    if let Some(current_inner) = current_captures {
+        captures_out.replace(current_inner);
+    }
+    captures_out.is_some()
+}
+
 pub fn parse(code: &str) -> super::Result {
     let cmd = code.trim();
-    let mut v_assign_captures: Option<regex::Captures<'_>> = None;
-    {
-        let mut locked = VARIABLE_ASSIGNMENT_REGEX.lock().unwrap();
-        if locked.borrow().is_none() {
-            // Compile Regex only once
-            locked.replace(Some(
-                regex::Regex::new(r"^([a-zA-Z][^=\t\n\v\f\r ]*)=([[:^space:]]+)[[:space:]]+(.+?)$")
-                    .expect("Should be able to compile regex to check for variable assignment"),
-            ));
-        }
-        v_assign_captures = locked.borrow().as_ref().unwrap().captures(&cmd);
-    }
+    let mut va_captures: Option<regex::Captures<'_>> = None;
     match cmd {
         "return" => Ok(Statement::Return(None)),
         _ if cmd.starts_with("return ") => {
@@ -159,10 +164,10 @@ pub fn parse(code: &str) -> super::Result {
         _ if cmd.starts_with("not ") => Ok(Statement::Not(Box::new(parse(cmd[3..].trim_start())?))),
         _ if cmd.starts_with("! ") => Ok(Statement::Not(Box::new(parse(cmd[1..].trim_start())?))),
         _ if cmd.eq("not") | cmd.eq("!") => Ok(Statement::Not(Box::new(Statement::Default))),
-        _ if v_assign_captures.is_some() => Ok(Statement::LocalAssignAct {
-            key:   v_assign_captures.as_ref().unwrap().get(1).unwrap().as_str().to_owned(),
-            value: v_assign_captures.as_ref().unwrap().get(2).unwrap().as_str().to_owned(),
-            stmt:  Box::new(parse(v_assign_captures.as_ref().unwrap().get(3).unwrap().as_str())?),
+        _ if is_variable_assignment_stmt(cmd, &mut va_captures) => Ok(Statement::LocalAssignAct {
+            key:   va_captures.as_ref().unwrap().get(1).unwrap().as_str().to_owned(),
+            value: va_captures.as_ref().unwrap().get(2).unwrap().as_str().to_owned(),
+            stmt:  Box::new(parse(va_captures.as_ref().unwrap().get(3).unwrap().as_str())?),
         }),
         _ if cmd.is_empty() || cmd.starts_with('#') => Ok(Statement::Default),
         _ => Ok(Statement::Pipeline(pipelines::Collector::run(cmd)?)),
