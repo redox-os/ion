@@ -52,7 +52,7 @@ impl<'a> StatementSplitter<'a> {
         }
     }
 
-    fn inside_quotes(&self) -> bool { return self.single_quotes || self.double_quotes }
+    fn inside_quotes(&self) -> bool { return self.single_quotes || self.double_quotes; }
 
     fn get_statement(&self, statement: &'a str) -> StatementVariant<'a> {
         match self.logical {
