@@ -132,7 +132,7 @@ impl<'a> PipeItem<Job> {
     pub fn expand(
         &self,
         shell: &mut Shell<'a>,
-    ) -> super::Result<PipeItem<RefinedJob<'a>>, <Shell as Expander>::Error> {
+    ) -> super::Result<PipeItem<RefinedJob<'a>>, <Shell<'_> as Expander>::Error> {
         let job = self.job.expand(shell)?;
 
         let inputs = self
@@ -205,7 +205,7 @@ impl<'a> Pipeline<Job> {
     pub fn expand(
         &self,
         shell: &mut Shell<'a>,
-    ) -> super::Result<Pipeline<RefinedJob<'a>>, <Shell as Expander>::Error> {
+    ) -> super::Result<Pipeline<RefinedJob<'a>>, <Shell<'_> as Expander>::Error> {
         let items = self.items.iter().map(|i| i.expand(shell)).collect::<Result<_, _>>()?;
         Ok(Pipeline { items, pipe: self.pipe })
     }
