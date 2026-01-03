@@ -79,27 +79,22 @@ pub enum IonError {
 }
 
 impl From<ParseError> for IonError {
-    #[must_use]
     fn from(cause: ParseError) -> Self { Self::InvalidSyntax(cause) }
 }
 
 impl From<FunctionError> for IonError {
-    #[must_use]
     fn from(cause: FunctionError) -> Self { Self::Function(cause) }
 }
 
 impl From<BlockError> for IonError {
-    #[must_use]
     fn from(cause: BlockError) -> Self { Self::StatementFlowError(cause) }
 }
 
 impl From<PipelineError> for IonError {
-    #[must_use]
     fn from(cause: PipelineError) -> Self { Self::PipelineExecutionError(cause) }
 }
 
 impl From<ExpansionError<Self>> for IonError {
-    #[must_use]
     fn from(cause: ExpansionError<Self>) -> Self { Self::ExpansionError(cause) }
 }
 
@@ -166,7 +161,6 @@ pub type PreCommandCallback<'a> = Box<dyn Fn(&Shell<'_>, &Pipeline<RefinedJob<'_
 pub type BackgroundEventCallback = Arc<dyn Fn(usize, Pid, BackgroundEvent) + Send + Sync>;
 
 impl<'a> Default for Shell<'a> {
-    #[must_use]
     fn default() -> Self { Self::new() }
 }
 
