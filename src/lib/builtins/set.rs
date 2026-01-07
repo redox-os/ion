@@ -17,19 +17,21 @@ enum PositionalArgs {
     desc = "Set or unset values of shell options and positional parameters.",
     man = "
 SYNOPSIS
-    set [ --help ] [-e | +e] [-p | +p] [- | --] [STRING]...
+    set [ --help ] [-e | +e] [-p | +p] [-x | +x] [- | --] [STRING]...
 
 DESCRIPTION
     Shell options may be set using the '-' character, and unset using the '+' character.
 
 OPTIONS
     -e  Exit immediately if a command exits with a non-zero status.
-    
-    -p  If any command in pipe exits with an non-zero code then pipe returns this non-zero code 
+
+    -p  If any command in pipe exits with an non-zero code then pipe returns this non-zero code
         instead of error code of the last command.
-        It can be combined with the option -e to let a script fail 
+        It can be combined with the option -e to let a script fail
         if an errors occures in a pipe
-        
+
+    -x  Print commands before execution
+
     --  Following arguments will be set as positional arguments in the shell.
         If no argument are supplied, arguments will be unset.
 
@@ -59,6 +61,13 @@ pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             "+e" => shell.opts_mut().err_exit = false,
             "-p" => shell.opts_mut().pipe_fail = true,
             "+p" => shell.opts_mut().pipe_fail = false,
+            // basically the same as `debug on`
+            "-x" => shell.set_pre_command(Some(Box::new(|_shell, pipeline| {
+                // A string representing the command is stored here.
+                eprintln!("> {}", pipeline);
+            }))),
+            // basically the same as `debug off`
+            "+x" => shell.set_pre_command(None),
             _ => {
                 return Status::bad_argument(format!(
                     "set: argument '{}' is not recognized. Try adding `--` before it to pass it \
