@@ -519,6 +519,7 @@ fn spawn_proc(
             let grp = *group;
             unsafe {
                 command.pre_exec(move || {
+                    signals::unblock();
                     let _ = unistd::setpgid(Pid::this(), grp.unwrap_or_else(Pid::this));
                     Ok(())
                 })
