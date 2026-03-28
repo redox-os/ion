@@ -1,0 +1,35 @@
+set -e
+
+if false
+else
+    echo "ignore in if condition"
+end
+
+test 0 -eq 1 || echo "ignore in test condition"
+
+if not false
+    echo "ignore in if not condition"
+end
+
+false || echo "ignore in or"
+
+true && false || echo "ignore in and"
+
+if ! matches $(cat /proc/self/stat | cut -d' ' -f1) "fail"
+    echo "ignore in matches"
+end
+
+let a = 1
+while test $a -lt 3
+    echo "ignore in while loop condition"
+    let a += 1
+end
+echo "after a while ..."
+
+false | true
+echo "ignore pipes with successful last"
+
+# still fails in the normal case
+false && true
+
+echo unreachable

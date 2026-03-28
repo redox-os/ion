@@ -24,12 +24,17 @@ DESCRIPTION
 
 OPTIONS
     -e  Exit immediately if a command exits with a non-zero status.
-    
-    -p  If any command in pipe exits with an non-zero code then pipe returns this non-zero code 
+        The shell does not exit if the command that fails is
+        - part of the command list in a condition (e.g. `if`, `test`, `matches`, `while`),
+        - part of any command executed in a `&&` or `||` list except the last,
+        - any command in a pipeline but the last,
+        - or if the command's return status is being inverted with `not` or `!`.
+
+    -p  If any command in pipe exits with an non-zero code then pipe returns this non-zero code
         instead of error code of the last command.
-        It can be combined with the option -e to let a script fail 
+        It can be combined with the option -e to let a script fail
         if an errors occures in a pipe
-        
+
     --  Following arguments will be set as positional arguments in the shell.
         If no argument are supplied, arguments will be unset.
 

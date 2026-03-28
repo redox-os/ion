@@ -1,4 +1,0 @@
-set -e -p
-echo 1
-false | true
-echo 2
