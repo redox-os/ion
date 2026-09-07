@@ -10,50 +10,34 @@ use builtins_proc::builtin;
 use liner::{Context, Prompt};
 use types_rs::{types::Array, Value};
 
-const BSI_BUFFER_SIZE: usize = 128;
-
 struct BufSplitterIterator<'a, T: brs::Matcher> {
-    reader:   brs::BufReadSplitter<'a, T>,
-    buffer:   [u8; BSI_BUFFER_SIZE],
-    all_read: bool,
+    reader: brs::BufReadSplitter<'a, T>,
 }
 
 impl<'a, T: brs::Matcher> Iterator for BufSplitterIterator<'a, T> {
     type Item = std::result::Result<String, Box<dyn Error>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.all_read {
-            return None;
-        }
-        self.buffer.fill(0);
         let mut s = String::new();
 
-        loop {
-            let sz = self.reader.read(&mut self.buffer);
-            match sz {
-                Ok(sz) => match sz {
-                    0 => {
-                        self.all_read = match self.reader.next_part() {
-                            Ok(v) => v.is_none(),
-                            Err(e) => return Some(Err(e)),
-                        };
-                        return Some(Ok(s));
-                    }
-                    _ => {
-                        s.push_str(&String::from_utf8_lossy(&self.buffer[..sz]));
-                    }
-                },
-
-                Err(e) => return Some(Err(Box::new(e))),
-            }
+        match self.reader.goto_next() {
+            Ok(has_next) => match has_next {
+                true => {}
+                false => return None,
+            },
+            Err(e) => return Some(Err(e)),
         }
+
+        if let Err(e) = self.reader.read_to_string(&mut s) {
+            return Some(Err(Box::new(e)));
+        }
+
+        return Some(Ok(s));
     }
 }
 
 impl<'a, T: brs::Matcher> BufSplitterIterator<'a, T> {
-    pub fn new(reader: brs::BufReadSplitter<'a, T>) -> Self {
-        Self { reader, buffer: [0; BSI_BUFFER_SIZE], all_read: false }
-    }
+    pub fn new(reader: brs::BufReadSplitter<'a, T>) -> Self { Self { reader } }
 }
 
 #[builtin(
@@ -72,7 +56,7 @@ OPTIONS
     -d [DELIMITER]
         Split the input with the DELIMITER instead of new lines.
         The delimiter may be several characters
-    --keep-empty 
+    --keep-empty
         By default empty 'lines' are removed, this option enables the storage of empty 'lines'
     -n [COUNT]
         Read at most COUNT 'lines' from the input, default: infinite
@@ -85,7 +69,7 @@ OPTIONS
         if COUNT is greater than the number of splitted 'lines', nothing will be stored
     -u [FILENAME]
         Read from FILENAME instead of the standard input
-    
+
     "
 )]
 pub fn mapfile(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
