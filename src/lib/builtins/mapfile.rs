@@ -273,9 +273,12 @@ pub fn mapfile(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
             let stdin = std::io::stdin();
             let handle = stdin.lock();
             for line in handle.lines() {
-                if let Ok(line) = line {
-                    input.extend_from_slice(&line.as_bytes());
-                    input.push(b'\n');
+                match line {
+                    Ok(line) => {
+                        input.extend_from_slice(&line.as_bytes());
+                        input.push(b'\n');
+                    }
+                    Err(err) => return Status::error(format!("ion: Could not read line: {}", err)),
                 }
             }
         }
