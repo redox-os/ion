@@ -19,7 +19,7 @@
 //!
 //! ```rust
 //! use ion_shell::{builtins::Status, types, BuiltinFunction, BuiltinMap, Shell, Value};
-//! use std::{cell::RefCell, fs::File, rc::Rc, thread, time};
+//! use std::{cell::RefCell, fs::File, io::BufReader, rc::Rc, thread, time};
 //!
 //! enum Layout {
 //!     Simple,
@@ -48,7 +48,7 @@
 //!
 //!     // Read a file and execute it
 //!     if let Ok(file) = File::open("/home/user/.config/my-application/config.ion") {
-//!         if let Err(why) = shell.execute_command(file) {
+//!         if let Err(why) = shell.execute_command(BufReader::new(file)) {
 //!             println!("ERROR: my-application: error in config file: {}", why);
 //!         }
 //!     }

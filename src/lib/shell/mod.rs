@@ -271,7 +271,7 @@ impl<'a> Shell<'a> {
     /// the command(s) in the command line REPL interface for Ion. If the supplied command is
     /// not
     /// terminated, then an error will be returned.
-    pub fn execute_command<T: std::io::Read>(&mut self, command: T) -> Result<Status, IonError> {
+    pub fn execute_command<T: std::io::BufRead>(&mut self, command: T) -> Result<Status, IonError> {
         self.on_command(command.bytes().filter_map(Result::ok), true)?;
 
         if let Some(block) = self.flow_control.last().map(Statement::to_string) {

@@ -2,7 +2,7 @@ use super::Status;
 use crate as ion_shell;
 use crate::{shell::Shell, types};
 use builtins_proc::builtin;
-use std::fs::File;
+use std::{fs::File, io::BufReader};
 
 #[builtin(
     desc = "evaluates given file",
@@ -18,7 +18,7 @@ pub fn source(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match args.get(1) {
         Some(argument) => {
             if let Ok(file) = File::open(argument.as_str()) {
-                if let Err(why) = shell.execute_command(file) {
+                if let Err(why) = shell.execute_command(BufReader::new(file)) {
                     Status::error(format!("ion: {}", why))
                 } else {
                     Status::SUCCESS
