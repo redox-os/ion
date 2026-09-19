@@ -85,7 +85,7 @@ pub enum PipelineError {
     TerminateJobsError(#[source] nix::Error),
     /// Could not execute the command
     #[error("command exec error: {0}")]
-    CommandExecError(#[source] io::Error, types::Args),
+    CommandExecError(#[source] io::Error, Vec<small::String>),
     /// Could not expand the alias
     #[error("unable to pipe outputs of alias: '{0} = {1}'")]
     InvalidAlias(String, String),
@@ -530,7 +530,7 @@ fn spawn_proc(
                     if err.kind() == io::ErrorKind::NotFound {
                         Err(PipelineError::CommandNotFound(args.swap_remove(0)))
                     } else {
-                        Err(PipelineError::CommandExecError(err, args))
+                        Err(PipelineError::CommandExecError(err, args.into_vec()))
                     }
                 }
             }
