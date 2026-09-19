@@ -186,7 +186,7 @@ fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool
 /// Exits SUCCESS if both files have the same device and inode numbers
 fn files_have_same_device_and_inode_numbers(first: &str, second: &str) -> bool {
     // Obtain the device and inode of the first file or return FAILED
-    get_dev_and_inode(first).map_or(false, |left| {
+    get_dev_and_inode(first).is_some_and(|left| {
         // Obtain the device and inode of the second file or return FAILED
         get_dev_and_inode(second).map_or(false, |right| {
             // Compare the device and inodes of the
@@ -204,10 +204,10 @@ fn get_dev_and_inode(filename: &str) -> Option<(u64, u64)> {
 /// Exits SUCCESS if the first file is newer than the second file.
 fn file_is_newer_than(first: &str, second: &str) -> bool {
     // Obtain the modified file time of the first file or return FAILED
-    get_modified_file_time(first).map_or(false, |left| {
+    get_modified_file_time(first).is_some_and(|left| {
         // Obtain the modified file time of the second file or return
         // FAILED
-        get_modified_file_time(second).map_or(false, |right| {
+        get_modified_file_time(second).is_some_and(|right| {
             // If the first file is newer
             // than the right file,
             // return SUCCESS
@@ -269,7 +269,7 @@ fn match_flag_argument(flag: char, argument: &str) -> bool {
 
 /// Exits SUCCESS if the file size is greather than zero.
 fn file_size_is_greater_than_zero(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.len() > 0)
+    fs::metadata(filepath).ok().is_some_and(|metadata| metadata.len() > 0)
 }
 
 /// Exits SUCCESS if the file has read permissions. This function is rather low level because
@@ -286,7 +286,7 @@ fn file_has_read_permission(filepath: &str) -> bool {
         .map(|metadata| metadata.permissions().mode())
         .ok()
         // If the mode is equal to any of the above, return `SUCCESS`
-        .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
+        .is_some_and(|mode| mode & (USER + GROUP + GUEST) != 0)
 }
 
 /// Exits SUCCESS if the file has write permissions. This function is rather low level because
@@ -303,7 +303,7 @@ fn file_has_write_permission(filepath: &str) -> bool {
         .map(|metadata| metadata.permissions().mode())
         .ok()
         // If the mode is equal to any of the above, return `SUCCESS`
-        .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
+        .is_some_and(|mode| mode & (USER + GROUP + GUEST) != 0)
 }
 
 /// Exits SUCCESS if the file has execute permissions. This function is rather low level because
@@ -322,22 +322,22 @@ fn file_has_execute_permission(filepath: &str) -> bool {
         .map(|metadata| metadata.permissions().mode())
         .ok()
         // If the mode is equal to any of the above, return `SUCCESS`
-        .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
+        .is_some_and(|mode| mode & (USER + GROUP + GUEST) != 0)
 }
 
 /// Exits SUCCESS if the file argument is a socket
 fn file_is_socket(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_socket())
+    fs::metadata(filepath).ok().is_some_and(|metadata| metadata.file_type().is_socket())
 }
 
 /// Exits SUCCESS if the file argument is a block device
 fn file_is_block_device(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_block_device())
+    fs::metadata(filepath).ok().is_some_and(|metadata| metadata.file_type().is_block_device())
 }
 
 /// Exits SUCCESS if the file argument is a character device
 fn file_is_character_device(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_char_device())
+    fs::metadata(filepath).ok().is_some_and(|metadata| metadata.file_type().is_char_device())
 }
 
 /// Exits SUCCESS if the file exists
@@ -345,17 +345,17 @@ fn file_exists(filepath: &str) -> bool { Path::new(filepath).exists() }
 
 /// Exits SUCCESS if the file is a regular file
 fn file_is_regular(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_file())
+    fs::metadata(filepath).ok().is_some_and(|metadata| metadata.file_type().is_file())
 }
 
 /// Exits SUCCESS if the file is a directory
 fn file_is_directory(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_dir())
+    fs::metadata(filepath).ok().is_some_and(|metadata| metadata.file_type().is_dir())
 }
 
 /// Exits SUCCESS if the file is a symbolic link
 fn file_is_symlink(filepath: &str) -> bool {
-    fs::symlink_metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_symlink())
+    fs::symlink_metadata(filepath).ok().is_some_and(|metadata| metadata.file_type().is_symlink())
 }
 
 #[test]

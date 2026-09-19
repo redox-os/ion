@@ -173,7 +173,7 @@ impl<'a> InteractiveShell<'a> {
 
         // Here we allow to also ignore the setting of the local variable because we
         // assume the user entered the leading whitespace on purpose.
-        if ignore.whitespace && command.chars().next().map_or(false, char::is_whitespace) {
+        if ignore.whitespace && command.chars().next().is_some_and(char::is_whitespace) {
             return false;
         }
 
