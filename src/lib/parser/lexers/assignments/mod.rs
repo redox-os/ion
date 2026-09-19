@@ -27,7 +27,7 @@ pub fn assignment_lexer(statement: &str) -> (Option<&str>, Option<Operator>, Opt
 
         if is_open_delimiter(byte) {
             delimiter_stack.push(byte);
-        } else if delimiter_stack.last().map_or(false, |open| delimiters_match(*open, byte)) {
+        } else if delimiter_stack.last().is_some_and(|open| delimiters_match(*open, byte)) {
             delimiter_stack.pop();
         } else if delimiter_stack.is_empty() {
             if b'=' == byte {

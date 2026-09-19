@@ -81,7 +81,7 @@ impl<'a> InteractiveShell<'a> {
                 .borrow()
                 .tilde(cmd)
                 .ok()
-                .map_or(false, |path| Path::new(&path.as_str()).is_dir())
+                .is_some_and(|path| Path::new(&path.as_str()).is_dir())
         {
             self.save_command_in_history(&[cmd, "/"].concat());
         } else {
@@ -216,8 +216,7 @@ impl<'a> InteractiveShell<'a> {
             match shell.on_command(cmd.bytes(), true) {
                 Ok(_) => (),
                 Err(IonError::PipelineExecutionError(PipelineError::CommandNotFound(command))) => {
-                    if Self::try_cd(&command, &mut shell).ok().map_or(false, |res| res.is_failure())
-                    {
+                    if Self::try_cd(&command, &mut shell).ok().is_some_and(|res| res.is_failure()) {
                         if let Some(Value::Function(func)) =
                             shell.variables().get("COMMAND_NOT_FOUND").cloned()
                         {
@@ -236,7 +235,7 @@ impl<'a> InteractiveShell<'a> {
                 ))) if err.kind() == io::ErrorKind::PermissionDenied && command.len() == 1 => {
                     if Self::try_cd(&command[0], &mut shell)
                         .ok()
-                        .map_or(false, |res| res.is_failure())
+                        .is_some_and(|res| res.is_failure())
                     {
                         eprintln!("ion: {}", err);
                         shell.reset_flow();

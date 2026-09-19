@@ -25,7 +25,7 @@ enum Binding {
 
 fn is_valid_alias(name: &str) -> bool {
     let mut iter = name.chars();
-    iter.next().map_or(false, |c| c.is_alphabetic() || c == '_')
+    iter.next().is_some_and(|c| c.is_alphabetic() || c == '_')
         && iter.all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '!')
 }
 

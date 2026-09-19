@@ -528,7 +528,7 @@ impl<'a> Shell<'a> {
                 let v = self.expand_string(v)?;
                 // Anchor to start and end
                 let v = v.into_iter().map(|v| format!("^{}$", v));
-                RegexSet::new(v).ok().map_or(false, |regex| value.iter().all(|v| regex.is_match(v)))
+                RegexSet::new(v).ok().is_some_and(|regex| value.iter().all(|v| regex.is_match(v)))
             } else {
                 true
             };

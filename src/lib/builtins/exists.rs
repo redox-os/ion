@@ -119,12 +119,12 @@ fn match_option_argument(option: &str, argument: &str, shell: &Shell<'_>) -> boo
 
 /// Returns true if the file is a regular file
 fn path_is_file(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_file())
+    fs::metadata(filepath).ok().is_some_and(|metadata| metadata.file_type().is_file())
 }
 
 /// Returns true if the file is a directory
 fn path_is_directory(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_dir())
+    fs::metadata(filepath).ok().is_some_and(|metadata| metadata.file_type().is_dir())
 }
 
 /// Returns true if the binary is found in path (and is executable)
@@ -162,7 +162,7 @@ fn file_has_execute_permission(filepath: &str) -> bool {
         .map(|metadata| metadata.permissions().mode())
         .ok()
         // If the mode is equal to any of the above, return `SUCCESS`
-        .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
+        .is_some_and(|mode| mode & (USER + GROUP + GUEST) != 0)
 }
 
 /// Returns true if the variable is an array and the array is not empty
