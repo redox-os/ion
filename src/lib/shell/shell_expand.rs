@@ -3,12 +3,13 @@ use super::{
 };
 use crate::{
     expansion::{Error, Expander, Result, Select},
+    ranges::Index,
     types,
 };
 use nix::unistd::{tcsetpgrp, Pid};
 #[cfg(target_os = "redox")]
 use redox_users::All;
-use std::{env, fs::File, io::Read};
+use std::{env, fs::File, io::Read, str::FromStr};
 #[cfg(not(target_os = "redox"))]
 use users::os::unix::UserExt;
 
@@ -77,24 +78,14 @@ impl<'a, 'b> Expander for Shell<'b> {
                     .and_then(|n| array.get(n))
                     .map(|x| args![types::Str::from(format!("{}", x))])
                     .ok_or(Error::OutOfBound { length: array.len(), index: *id }),
-                Select::Range(ref range) => range
-                    .bounds(array.len())
-                    .and_then(|(start, length)| {
-                        if array.len() > start {
-                            Some(
-                                array
-                                    .iter()
-                                    .skip(start)
-                                    .take(length)
-                                    .map(|var| format!("{}", var).into())
-                                    .collect(),
-                            )
-                        } else {
-                            None
-                        }
-                    })
-                    .ok_or(Error::InvalidRange { length: array.len(), range: *range }),
-                Select::Key(_) => Err(Error::InvalidIndex(selection.clone(), "array", name.into())),
+                Select::Range(ref range) => {
+                    Ok(range
+                        .iter_array(array.len(), &mut array.iter()) // members/ranges/src/range
+                        .ok_or(Error::InvalidRange { length: array.len(), range: *range })?
+                        .map(|var| format!("{}", var).into())
+                        .collect())
+                }
+                Select::Key(ref key) => Err(Error::KeyOnArray(key.to_string())),
             },
             Some(Value::HashMap(hmap)) => match selection {
                 Select::All => {

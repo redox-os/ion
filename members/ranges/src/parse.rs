@@ -116,26 +116,96 @@ pub fn parse_range<K: From<String>>(input: &str) -> Option<Box<dyn Iterator<Item
 }
 
 pub fn parse_index_range(input: &str) -> Option<Range> {
-    let mut parts = input.splitn(2, "..");
-    let first = parts.next()?;
-    let mut end = parts.next()?;
+    let mut parts = input.splitn(3, "..");
+    let range_to_use = RangeInput::new(parts)?;
 
-    if first.is_empty() && !end.is_empty() {
-        end.parse::<isize>().map(|end| Range::to(Index::new(end))).ok()
-    } else if !end.is_empty() {
-        let inclusive = end.starts_with('.') || end.starts_with('=');
-        if inclusive {
-            end = &end[1..];
+    match range_to_use {
+        // should this return all? have to fix how this works
+        // RangeInput { start: None, end: None, step: None, .. } => {
+        // Some(Range::inclusive(Index::new(0isize), Index::new(-1isize), None))
+        // }
+
+        // --== no steps ==--
+        // range from
+        RangeInput { start: Some(s), end: None, step: None, .. } => {
+            Some(Range::from(Index::new(s), None))
+        }
+        // ranges to
+        RangeInput { start: None, end: Some(e), step: None, inclusive: true } => {
+            Some(Range::inclusive(Index::new(0), Index::new(e), None))
+        }
+        RangeInput { start: None, end: Some(e), step: None, inclusive: false } => {
+            Some(Range::exclusive(Index::new(0), Index::new(e), None))
+        }
+        // complete ranges
+        RangeInput { start: Some(s), end: Some(e), step: None, inclusive: true } => {
+            Some(Range::inclusive(Index::new(s), Index::new(e), None))
+        }
+        RangeInput { start: Some(s), end: Some(e), step: None, inclusive: false } => {
+            Some(Range::exclusive(Index::new(s), Index::new(e), None))
         }
 
-        let start = first.parse::<isize>().ok()?;
-        let end = end.parse::<isize>().ok()?;
-        if inclusive {
-            Some(Range::inclusive(Index::new(start), Index::new(end)))
-        } else {
-            Some(Range::exclusive(Index::new(start), Index::new(end)))
+        // --== steps ==--
+        // range from
+        RangeInput { start: Some(s), end: None, step: Some(step), .. } => {
+            Some(Range::from(Index::new(s), Some(Index::new(step))))
         }
-    } else {
-        first.parse::<isize>().map(|start| Range::from(Index::new(start))).ok()
+        // ranges to
+        RangeInput { start: None, end: Some(e), step: Some(step), inclusive: true } => {
+            Some(Range::inclusive(Index::new(0), Index::new(e), Some(Index::new(step))))
+        }
+        RangeInput { start: None, end: Some(e), step: Some(step), inclusive: false } => {
+            Some(Range::exclusive(Index::new(0), Index::new(e), Some(Index::new(step))))
+        }
+        // complete ranges
+        RangeInput { start: Some(s), end: Some(e), step: Some(step), inclusive: true } => {
+            Some(Range::inclusive(Index::new(s), Index::new(e), Some(Index::new(step))))
+        }
+        RangeInput { start: Some(s), end: Some(e), step: Some(step), inclusive: false } => {
+            Some(Range::exclusive(Index::new(s), Index::new(e), Some(Index::new(step))))
+        }
+
+        _ => None,
+    }
+}
+
+#[derive(Debug)]
+struct RangeInput {
+    start:     Option<isize>,
+    end:       Option<isize>,
+    step:      Option<isize>,
+    inclusive: bool,
+}
+
+impl<'a> RangeInput {
+    fn new<T: std::iter::Iterator<Item = &'a str>>(mut parts_iter: T) -> Option<RangeInput> {
+        let mut inclusive = false;
+        let start = match parts_iter.next() {
+            Some("") => Some(0isize), // handles ..end case
+            Some(s) => Some(s.parse::<isize>().ok()?),
+            None => None,
+        };
+        let end = match parts_iter.next() {
+            Some("") => {
+                // handles start.. case
+                inclusive = true;
+                Some(-1isize)
+            }
+            Some(e) => {
+                inclusive = e.starts_with('.') || e.starts_with('=');
+                if inclusive {
+                    Some(e[1..].parse::<isize>().ok()?)
+                } else {
+                    Some(e.parse::<isize>().ok()?)
+                }
+            }
+            None => None,
+        };
+        let step = match parts_iter.next() {
+            Some(s) => Some(s.parse::<isize>().ok())?,
+            None => None,
+        };
+
+        Some(RangeInput { start, end, step, inclusive })
     }
 }

@@ -9,6 +9,8 @@ pub struct Range {
     start:     Index,
     /// Ending index
     end:       Index,
+    /// Interval to step by
+    step:      Option<Index>,
     /// Is this range inclusive? If false, this object represents a half-open
     /// range of [start, end), otherwise [start, end]
     inclusive: bool,
@@ -44,11 +46,41 @@ impl Range {
         }
     }
 
-    pub fn exclusive(start: Index, end: Index) -> Range { Range { start, end, inclusive: false } }
+    pub fn exclusive(start: Index, end: Index, step: Option<Index>) -> Range {
+        Range { start, end, inclusive: false, step }
+    }
 
-    pub fn inclusive(start: Index, end: Index) -> Range { Range { start, end, inclusive: true } }
+    pub fn inclusive(start: Index, end: Index, step: Option<Index>) -> Range {
+        Range { start, end, inclusive: true, step }
+    }
 
-    pub fn from(start: Index) -> Range { Range { start, end: Index::new(-1), inclusive: true } }
+    pub fn from(start: Index, step: Option<Index>) -> Range {
+        Range { start, end: Index::new(-1), inclusive: true, step }
+    }
 
-    pub fn to(end: Index) -> Range { Range { start: Index::new(0), end, inclusive: false } }
+    pub fn to(end: Index, step: Option<Index>) -> Range {
+        Range { start: Index::new(0), end, inclusive: false, step }
+    }
+}
+
+impl<'a> Range {
+    pub fn iter_array<T: std::fmt::Display + 'a>(
+        &'a self,
+        array_len: usize,
+        array_iter: &'a mut (impl std::iter::DoubleEndedIterator<Item = T> + 'a),
+    ) -> Option<impl std::iter::Iterator<Item = T> + 'a> {
+        let modified_iter: Box<dyn std::iter::Iterator<Item = T>> = match self.step {
+            Some(Index::Forward(0)) => return None,
+            Some(Index::Forward(s)) => Box::new(std::iter::Iterator::step_by(array_iter, s)),
+            Some(Index::Backward(s)) => Box::new(array_iter.rev().step_by(s + 1)),
+            None => Box::new(array_iter),
+        };
+        self.bounds(array_len).and_then(|(start, length)| {
+            if array_len > start {
+                Some(modified_iter.skip(start).take(length))
+            } else {
+                None
+            }
+        })
+    }
 }

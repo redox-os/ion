@@ -11,10 +11,10 @@ mod tests {
 
     #[test]
     fn ranges() {
-        let range1 = Range::exclusive(Index::new(1), Index::new(5));
+        let range1 = Range::exclusive(Index::new(1), Index::new(5), None);
         assert_eq!(Some((1, 4)), range1.bounds(42));
         assert_eq!(Some((1, 4)), range1.bounds(7));
-        let range2 = Range::inclusive(Index::new(2), Index::new(-4));
+        let range2 = Range::inclusive(Index::new(2), Index::new(-4), None);
         assert_eq!(Some((2, 5)), range2.bounds(10));
         assert_eq!(None, range2.bounds(3));
     }
@@ -22,23 +22,25 @@ mod tests {
     #[test]
     fn index_ranges() {
         let valid_cases = vec![
-            (Range::exclusive(Index::Forward(0), Index::Forward(3)), "0..3"),
-            (Range::inclusive(Index::Forward(0), Index::Forward(2)), "0...2"),
-            (Range::inclusive(Index::Forward(0), Index::Forward(4)), "0..=4"),
-            (Range::inclusive(Index::Forward(2), Index::Backward(1)), "2...-2"),
-            (Range::inclusive(Index::Forward(0), Index::Backward(0)), "0...-1"),
-            (Range::exclusive(Index::Backward(2), Index::Backward(0)), "-3..-1"),
-            (Range::from(Index::Backward(2)), "-3.."),
-            (Range::to(Index::Forward(5)), "..5"),
+            (Range::exclusive(Index::Forward(0), Index::Forward(3), None), "0..3"),
+            (Range::inclusive(Index::Forward(0), Index::Forward(2), None), "0...2"),
+            (Range::inclusive(Index::Forward(0), Index::Forward(4), None), "0..=4"),
+            (Range::inclusive(Index::Forward(2), Index::Backward(1), None), "2...-2"),
+            (Range::inclusive(Index::Forward(0), Index::Backward(0), None), "0...-1"),
+            (Range::exclusive(Index::Backward(2), Index::Backward(0), None), "-3..-1"),
+            (Range::from(Index::Backward(2), None), "-3.."),
+            (Range::to(Index::Forward(5), None), "..5"),
         ];
 
         for (range, string) in valid_cases {
+            println!("{:?} ---- {:?}", range, string);
             assert_eq!(Some(range), parse_index_range(string));
         }
 
         let invalid_cases = vec!["0..A", "3-3..42", "0.=3", "0=..3", "0.=.3"];
 
         for range in invalid_cases {
+            println!("{:?}", range);
             assert_eq!(None, parse_index_range(range))
         }
     }
